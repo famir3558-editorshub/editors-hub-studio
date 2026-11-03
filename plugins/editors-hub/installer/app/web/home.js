@@ -21,7 +21,7 @@ function render() {
   $("renderBanner").innerHTML = waiting4Render.length ? `<div><b>Claude is waiting for your render settings</b><span class="muted">${waiting4Render.map((v) => `<a href="/review/${enc(v.id)}">${esc(v.name)}</a>`).join(", ")}</span></div>` : "";
   const grace = S.state.approval?.grace_until;
   $("approvalBanner").hidden = !grace;
-  $("approvalBanner").innerHTML = grace ? `<div><b>This computer needs the owner's approval</b><span class="muted">It stops working on ${new Date(grace * 1000).toLocaleDateString()} until then. <a href="/approve">Ask for a code</a></span></div>` : "";
+  $("approvalBanner").innerHTML = grace ? `<div><b>This computer needs the owner's approval</b><span class="muted"><a href="/approve">Ask for a code</a> by ${new Date(grace * 1000).toLocaleDateString()} to keep using it.</span></div>` : "";
   const waiting4Broll = videos.filter((v) => v.broll_waiting);
   $("brollBanner").hidden = !waiting4Broll.length;
   $("brollBanner").innerHTML = waiting4Broll.length ? `<div><b>Claude is waiting for your b-roll choice</b><span class="muted">${waiting4Broll.map((v) => `<a href="/review/${enc(v.id)}">${esc(v.name)}</a>`).join(", ")}</span></div>` : "";

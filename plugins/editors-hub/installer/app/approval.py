@@ -161,8 +161,9 @@ def status(data_dir):
     if record.get("removed"):
         return {"required": True, "on": True, "removed": True}
     try:
-        in_use = bool(json.loads((Path(data_dir) / "users.json").read_text(encoding="utf-8")))
-    except (OSError, ValueError):
+        accounts = json.loads((Path(data_dir) / "users.json").read_text(encoding="utf-8"))
+        in_use = bool(accounts.get("users", accounts))
+    except (OSError, ValueError, AttributeError):
         in_use = False
     if not in_use:
         return {"required": True, "on": True}
