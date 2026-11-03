@@ -3811,7 +3811,7 @@ def watch_for_updates():
     next_look = 0
     while True:
         if time.time() >= next_look:
-            next_look = time.time() + 6 * 3600
+            next_look = time.time() + 3600
             spawn_detached(updater)
         try:
             here = (ROOT / "VERSION").read_text(encoding="utf-8").strip()

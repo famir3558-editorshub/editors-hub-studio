@@ -29,7 +29,7 @@ VERSION_URL = f"https://raw.githubusercontent.com/{REPO}/main/{APP_PATH}/VERSION
 ZIP_URL = f"https://codeload.github.com/{REPO}/zip/refs/heads/main"
 MANIFEST = "update-manifest.json"
 KEEP = {"data", "library", "profile"}
-CHECK_EVERY = 3600  # a session can start any number of times: look at most once an hour
+CHECK_EVERY = 3300  # a session can start any number of times: at most hourly, a little under so Home's hourly look is never turned away
 MAX_DOWNLOAD = 300_000_000
 
 
