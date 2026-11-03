@@ -20,6 +20,7 @@
     <button data-tab="deleted" data-maker>Recently deleted<em id="deletedCount"></em></button>
     <button data-tab="team" data-owner hidden>Team</button>
     <button data-tab="settings">Settings</button>
+    <button data-tab="report" id="reportTab" hidden><span id="reportLabel">Report to owner</span><em id="reportCount"></em></button>
   </nav>
   <div class="spacer"></div>
   <button class="btn" id="newProjectBtn" data-maker>New project</button>
@@ -112,6 +113,27 @@
     <div class="panel settings">
       <div class="row"><h3>Let people on your Wi-Fi in</h3><div class="spacer"></div><label class="switch"><input type="checkbox" id="lanToggle"><span></span></label></div>
       <p class="muted" id="lanText"></p>
+    </div>
+  </section>
+
+  <section id="tab-report" hidden>
+    <div id="reportSend">
+      <div class="hero"><div><h1>Report to owner</h1><p class="muted">Tell the studio's owner about a glitch or issue, or ask for help. Their answer shows up here.</p></div></div>
+      <form class="panel settings" id="reportForm">
+        <label class="field">What is it?<select name="kind"><option value="glitch">A glitch or issue</option><option value="help">I need help</option></select></label>
+        <label class="field">What happened, or what do you need?<textarea name="message" rows="5" maxlength="4000" required placeholder="What you were doing, what you expected, and what happened instead."></textarea></label>
+        <label class="field">A screenshot <small>Optional</small><input type="file" name="shot" accept="image/png,image/jpeg,image/webp"></label>
+        <p class="muted">Your name and email, your studio's version and the kind of computer you're on go with it. Keep passwords and keys out of it.</p>
+        <div class="row"><div class="spacer"></div><button class="btn primary">Send to owner</button></div>
+      </form>
+      <div class="panel settings">
+        <h3>Your reports</h3>
+        <div class="skills" id="reportList"></div>
+      </div>
+    </div>
+    <div id="reportInbox" hidden>
+      <div class="hero"><div><h1>Reports</h1><p class="muted">What people report comes to your email and to your approvals page. Answer there, and they'll see it in their studio.</p></div></div>
+      <div class="panel settings"><div class="row"><a class="btn primary" id="reportAdmin" target="_blank" rel="noopener">Open reports and approvals</a></div></div>
     </div>
   </section>
 

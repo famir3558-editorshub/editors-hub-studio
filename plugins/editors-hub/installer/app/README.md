@@ -166,6 +166,8 @@ Everyone signs in with a **username, an email and a 6-digit code**. There are no
   approve or ask for changes. The owner picks each person's role on the Team page.
 - **Email:** on the Team page, add a Gmail address and a Gmail *app password* so codes reach your inbox. Until then
   they show on the Team page and with `studio.py codes` on this computer.
+- **Something wrong, or need help?** "Report to owner" sends it to the studio's owner, and their answer shows up there. The
+  owner gets it by email and answers from their approvals page (the Reports tab links to it).
 - **Other devices:** turn on "Let people on your Wi-Fi in" on the Team page, then restart Editors.Hub. Only the owner's
   studios can do this: on anyone else's, the studio is theirs alone, and each person asks for approval on their own computer.
 - Accounts are kept in `data/` on each computer (not online). Sessions last 30 days.

@@ -343,6 +343,9 @@ function renderMe(me) {
   document.body.className = "role-" + me.role;
   document.querySelectorAll("[data-owner]").forEach((el) => (el.hidden = !owner));
   document.querySelector('[data-tab="team"]').hidden = !owner || S.state?.alone !== false;
+  const report = S.state?.report;
+  $("reportTab").hidden = !report;
+  $("reportLabel").textContent = report?.inbox ? "Reports" : "Report to owner";
   $("me").innerHTML = `<div class="who">${esc(me.username)}<small>${esc(me.role)}</small></div><div class="avatar">${esc(me.username[0])}</div>`;
   $("meBadge").textContent = me.username[0].toUpperCase();
   $("meName").textContent = me.username;
@@ -446,6 +449,77 @@ $("lanToggle").onchange = async (e) => {
   }
 };
 
+// ---- report to owner
+
+function seenAnswers(value) {
+  try {
+    if (value !== undefined) localStorage.setItem("reportsSeen", value);
+    return Number(localStorage.getItem("reportsSeen")) || 0;
+  } catch (e) {
+    return 0;
+  }
+}
+
+function renderReports(reports) {
+  const label = { open: "sent", answered: "answered", done: "done" };
+  $("reportList").innerHTML = reports.slice().reverse().map((r) => `<div class="member" style="grid-template-columns:1fr auto">
+      <div><b>${r.kind === "help" ? "I need help" : "A glitch or issue"}</b><small>${new Date(r.created * 1000).toLocaleString()}${r.shot ? " · with a screenshot" : ""}</small>
+        <p style="white-space:pre-wrap;margin:6px 0 0">${esc(r.message)}</p>
+        ${r.reply ? `<p style="white-space:pre-wrap;margin:8px 0 0;padding-left:10px;border-left:3px solid var(--red)"><b>Owner's answer:</b> ${esc(r.reply)}</p>` : ""}</div>
+      <span class="pill ${r.status === "open" ? "s-in-review" : "s-approved"}">${label[r.status] || esc(r.status)}</span></div>`).join("")
+    || `<p class="faint" style="padding:8px 10px;margin:0">Nothing sent yet.</p>`;
+}
+
+async function loadReports(justCount) {
+  const { reports } = await api("GET", "/api/report");
+  const newest = Math.max(0, ...reports.map((r) => r.replied || 0));
+  if (!justCount) seenAnswers(newest);
+  const fresh = reports.filter((r) => (r.replied || 0) > seenAnswers()).length;
+  $("reportCount").textContent = fresh || "";
+  if (!justCount) renderReports(reports);
+}
+
+function openReports() {
+  const report = S.state?.report;
+  $("reportSend").hidden = !report?.send;
+  $("reportInbox").hidden = !report?.inbox;
+  if (report?.inbox) $("reportAdmin").href = report.inbox;
+  if (report?.send) loadReports().catch((e) => {
+    $("reportList").innerHTML = `<p class="faint" style="padding:8px 10px;margin:0">${esc(e.message)}</p>`;
+  });
+}
+
+async function shrinkScreenshot(file) {  // a request here can only be so big, and a screenshot doesn't need to be full size
+  const picture = await createImageBitmap(file);
+  const scale = Math.min(1, 1600 / Math.max(picture.width, picture.height));
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.round(picture.width * scale);
+  canvas.height = Math.round(picture.height * scale);
+  canvas.getContext("2d").drawImage(picture, 0, 0, canvas.width, canvas.height);
+  for (const quality of [0.8, 0.6, 0.4]) {
+    const data = canvas.toDataURL("image/jpeg", quality);
+    if (data.length < 700000) return data;
+  }
+  throw new Error("That screenshot is too big to send. Try a smaller one.");
+}
+
+$("reportForm").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const f = e.target, send = f.querySelector("button.primary");
+  send.disabled = true;
+  try {
+    const file = f.elements.shot.files[0];
+    await api("POST", "/api/report", { kind: f.elements.kind.value, message: f.elements.message.value, shot: file ? await shrinkScreenshot(file) : undefined });
+    f.reset();
+    toast("Sent to the owner");
+    await loadReports();
+  } catch (ex) {
+    toast(ex.message, true);
+  } finally {
+    send.disabled = false;
+  }
+});
+
 // ---- Recently deleted (bottom of My styles)
 
 async function loadTrash() {
@@ -497,18 +571,19 @@ function setTab(tab, allow) {
   if ((tab === "team" || tab === "setup") && S.state && !owner) tab = "videos";
   if (tab === "team" && S.state?.alone) tab = "videos";
   // the owner finishes setup first; Settings stays open so keys can be added
-  if (owner && wasReady === false && !["setup", "settings"].includes(tab) && !allow) {
+  if (owner && wasReady === false && !["setup", "settings", "report"].includes(tab) && !allow) {
     toast("Finish setting up first");
     tab = "setup";
   }
   if (tab === "settings" && owner) { loadSkills(); loadKeys(); }
   if (tab === "team") loadTeam();
+  if (tab === "report") openReports();
   if (tab === "deleted") loadTrash();
   if (tab === "shared") loadOnlineGrid();
   if (tab === "setup") loadSetup();
   S.tab = tab;
   document.querySelectorAll(".tabs button").forEach((b) => b.classList.toggle("on", b.dataset.tab === tab));
-  ["videos", "projects", "styles", "shared", "deleted", "team", "settings", "setup"].forEach((t) => ($("tab-" + t).hidden = t !== tab));
+  ["videos", "projects", "styles", "shared", "deleted", "team", "report", "settings", "setup"].forEach((t) => ($("tab-" + t).hidden = t !== tab));
   history.replaceState(null, "", tab === "videos" ? "/" : "/#" + tab);
 }
 
@@ -947,7 +1022,8 @@ $("projectFilter").onchange = (e) => { S.project = e.target.value; render(); };
 $("search").oninput = (e) => { S.q = e.target.value; render(); };
 
 load().then(() => {
-  if (["projects", "styles", "shared", "deleted", "team", "settings", "setup"].includes(location.hash.slice(1))) setTab(location.hash.slice(1), true);
+  if (["projects", "styles", "shared", "deleted", "team", "report", "settings", "setup"].includes(location.hash.slice(1))) setTab(location.hash.slice(1), true);
+  if (S.state?.report?.send) loadReports(true).catch(() => {});  // for the count of new answers
   const wanted = location.hash.match(/^#new-video:(.+)$/);  // "+ Video" on a style page
   if (wanted) {
     history.replaceState(null, "", "/");

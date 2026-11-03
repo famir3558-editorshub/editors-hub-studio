@@ -184,6 +184,25 @@ def open_to_others(data_dir):
     return bool(email) and hashlib.sha256(email.encode()).hexdigest() == cfg.get("owner_sha256")
 
 
+def _reports_call(data_dir, path, body):
+    token = _read(data_dir).get("token")
+    if not token:
+        raise ApprovalError("This computer needs the owner's approval first.")
+    status_code, data = _call(path, {**body, "token": token})
+    if status_code != 200:
+        raise ApprovalError(data.get("error") or "The owner's service couldn't take that. Try again in a while.")
+    return data
+
+
+def send_report(data_dir, **report):
+    """To the owner. Someone on the owner's own team is named in it, since the pass on this computer is the owner's."""
+    return _reports_call(data_dir, "/report", report)["report"]
+
+
+def my_reports(data_dir, from_email=""):
+    return [r for r in _reports_call(data_dir, "/my-reports", {})["reports"] if (r.get("from_email") or "") == from_email]
+
+
 def _call(path, body):
     cfg = config()
     if not cfg:

@@ -3274,6 +3274,8 @@ class Handler(BaseHTTPRequestHandler):
             can_see_video(parts[2], self.user)
         if parts[:1] == ["media"] and len(parts) >= 2:
             can_see_video(parts[1], self.user)
+        if parts == ["api", "report"]:
+            return self.report_route(method)
 
         if method in ("GET", "HEAD"):
             if not parts:
@@ -3565,6 +3567,32 @@ class Handler(BaseHTTPRequestHandler):
             return self.send_json(self.team())
         raise NotFound("not found")
 
+    def report_route(self, method):
+        """Everyone can write to the owner. It goes through the online service: a studio is on that person's own computer."""
+        approved_as = (approval.status(DATA).get("email") or "").strip().lower()
+        me = self.user["email"]
+        named = {} if me == approved_as else {"from_name": self.user["username"], "from_email": me}
+        try:
+            if method == "GET":
+                return self.send_json({"reports": approval.my_reports(DATA, named.get("from_email", ""))})
+            if method == "POST":
+                body = self.read_json_body()
+                report = approval.send_report(DATA, kind=body.get("kind"), message=body.get("message"), shot=body.get("shot"), version=APP_VERSION,
+                                              platform="Windows" if WINDOWS else "Mac" if sys.platform == "darwin" else "Linux", **named)
+                return self.send_json({"report": report})
+        except approval.ApprovalError as e:
+            raise StudioError(str(e))
+        raise NotFound("not found")
+
+    def report_mode(self):
+        """The owner reads reports online; everyone else writes them. A copy with no service has neither."""
+        cfg = approval.config()
+        if not cfg:
+            return None
+        if self.user["role"] == "owner" and approval.open_to_others(DATA):
+            return {"inbox": cfg["url"].rstrip("/") + "/admin"}
+        return {"send": True}
+
     def team(self):
         acc = accounts()
         port = self.server.server_port
@@ -3594,7 +3622,7 @@ class Handler(BaseHTTPRequestHandler):
             for p in list_projects()]
         me = accounts().public(self.user)
         visible = ("studio_name", "your_name", "library") if me["role"] == "owner" else ("studio_name",)
-        return {"me": me, "version": APP_VERSION, "approval": approval.status(DATA), "alone": not approval.open_to_others(DATA), "settings": {k: s[k] for k in visible},
+        return {"me": me, "version": APP_VERSION, "approval": approval.status(DATA), "alone": not approval.open_to_others(DATA), "report": self.report_mode(), "settings": {k: s[k] for k in visible},
                 "projects": projects, "styles": styles, "videos": videos, "statuses": STATUSES,
                 "platform": "windows" if WINDOWS else "mac" if sys.platform == "darwin" else "linux"}
 
