@@ -184,7 +184,7 @@ def open_to_others(data_dir):
     return bool(email) and hashlib.sha256(email.encode()).hexdigest() == cfg.get("owner_sha256")
 
 
-def _reports_call(data_dir, path, body):
+def _signed_call(data_dir, path, body):
     token = _read(data_dir).get("token")
     if not token:
         raise ApprovalError("This computer needs the owner's approval first.")
@@ -196,11 +196,20 @@ def _reports_call(data_dir, path, body):
 
 def send_report(data_dir, **report):
     """To the owner. Someone on the owner's own team is named in it, since the pass on this computer is the owner's."""
-    return _reports_call(data_dir, "/report", report)["report"]
+    return _signed_call(data_dir, "/report", report)["report"]
 
 
 def my_reports(data_dir, from_email=""):
-    return [r for r in _reports_call(data_dir, "/my-reports", {})["reports"] if (r.get("from_email") or "") == from_email]
+    return [r for r in _signed_call(data_dir, "/my-reports", {})["reports"] if (r.get("from_email") or "") == from_email]
+
+
+def approved_people(data_dir):
+    """For the owner's Team tab; the service only answers the owner's own pass."""
+    return _signed_call(data_dir, "/owner/list", {})["people"]
+
+
+def set_approved(data_dir, email, removed):
+    return _signed_call(data_dir, "/owner/set", {"email": email, "removed": bool(removed)})["people"]
 
 
 def _call(path, body):

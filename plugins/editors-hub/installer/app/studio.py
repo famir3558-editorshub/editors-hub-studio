@@ -3277,6 +3277,7 @@ class Handler(BaseHTTPRequestHandler):
         if parts == ["api", "report"]:
             return self.report_route(method)
         if parts == ["api", "update-seen"] and method == "POST":
+            self.read_json_body()  # or what's left of it is taken for the start of the next request on this connection
             with LOCK:
                 last = read_json(DATA / "last-update.json", {})
                 write_json(DATA / "last-update.json", {**last, "seen": [*last.get("seen", []), self.user["email"]]})
@@ -3372,6 +3373,12 @@ class Handler(BaseHTTPRequestHandler):
             if parts == ["api", "team"]:
                 self.need_others_allowed()
                 return self.send_json(self.team())
+            if parts == ["api", "approved"]:
+                self.need_others_allowed()
+                try:
+                    return self.send_json({"people": approval.approved_people(DATA)})
+                except approval.ApprovalError as e:
+                    raise StudioError(str(e))
             if parts == ["api", "keys"]:
                 return self.send_json({"keys": keys.status(needed_keys()), "file": str(keys.KEYS_FILE)})
             if parts == ["api", "setup", "folders"]:
@@ -3560,6 +3567,12 @@ class Handler(BaseHTTPRequestHandler):
             else:
                 acc.set_mail(body.get("user"), body.get("password"), body.get("host"), body.get("port"))
             return self.send_json(self.team())
+        if parts[:2] == ["api", "approved"] and len(parts) == 3 and method == "POST":
+            self.need_others_allowed()
+            try:
+                return self.send_json({"people": approval.set_approved(DATA, parts[2].lower(), body.get("removed"))})
+            except approval.ApprovalError as e:
+                raise StudioError(str(e))
         if parts[:2] == ["api", "team"] and len(parts) == 3:
             self.need_others_allowed()
             email = parts[2].lower()

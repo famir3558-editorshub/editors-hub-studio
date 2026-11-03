@@ -408,6 +408,38 @@ async function loadTeam() {
   }
 }
 
+function renderApproved(people) {
+  const me = S.state?.me.email;
+  $("approvedList").innerHTML = people.map((p) => `<div class="member">
+      <div class="avatar">${esc(p.username[0])}</div>
+      <div><b>${esc(p.username)}</b><small>${esc(p.email)} · ${p.computers} computer${p.computers === 1 ? "" : "s"}</small></div>
+      ${p.email === me ? `<span class="pill s-in-review">you</span><span></span>` :
+        `${p.revoked ? `<span class="pill s-delivered">removed</span>` : `<span></span>`}
+         <button class="btn small" data-approved="${esc(p.email)}" data-name="${esc(p.username)}" data-removed="${p.revoked ? "" : "1"}">${p.revoked ? "Let back in" : "Remove"}</button>`}</div>`).join("")
+    || `<p class="faint" style="padding:8px 10px;margin:0">Nobody yet.</p>`;
+}
+
+async function loadApproved() {
+  try {
+    renderApproved((await api("GET", "/api/approved")).people);
+  } catch (e) {
+    $("approvedList").innerHTML = `<p class="faint" style="padding:8px 10px;margin:0">${esc(e.message)}</p>`;
+  }
+}
+
+$("approvedList").addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-approved]");
+  if (!b) return;
+  const removed = !!b.dataset.removed;
+  if (removed && !(await ehConfirm(`Their studio stops working within a day or so. Their files stay on their computer, and you can let them back in here.`, { title: `Remove ${b.dataset.name}?`, ok: "Remove", danger: true }))) return;
+  try {
+    renderApproved((await api("POST", `/api/approved/${enc(b.dataset.approved)}`, { removed })).people);
+    toast(removed ? `${b.dataset.name} removed` : `${b.dataset.name} can come back: they'll need a new code from you`);
+  } catch (ex) {
+    toast(ex.message, true);
+  }
+});
+
 async function teamAction(method, url, body, msg) {
   try {
     renderTeam(await api(method, url, body));
@@ -577,7 +609,7 @@ function setTab(tab, allow) {
     tab = "setup";
   }
   if (tab === "settings" && owner) { loadSkills(); loadKeys(); }
-  if (tab === "team") loadTeam();
+  if (tab === "team") { loadTeam(); loadApproved(); }
   if (tab === "report") openReports();
   if (tab === "deleted") loadTrash();
   if (tab === "shared") loadOnlineGrid();
