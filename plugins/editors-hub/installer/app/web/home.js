@@ -346,10 +346,11 @@ function renderMe(me) {
   const report = S.state?.report;
   $("reportTab").hidden = !report;
   $("reportLabel").textContent = report?.inbox ? "Reports" : "Report to owner";
-  $("me").innerHTML = `<div class="who">${esc(me.username)}<small>${esc(me.role)}</small></div><div class="avatar">${esc(me.username[0])}</div>`;
+  const title = owner && S.state?.alone !== false ? "member" : me.role;  // someone else's copy: it's theirs to run, but the studio's owner is the owner
+  $("me").innerHTML = `<div class="who">${esc(me.username)}<small>${esc(title)}</small></div><div class="avatar">${esc(me.username[0])}</div>`;
   $("meBadge").textContent = me.username[0].toUpperCase();
   $("meName").textContent = me.username;
-  $("meInfo").textContent = `${me.email} · ${me.role}${owner ? " (admin)" : ""}`;
+  $("meInfo").textContent = `${me.email} · ${title}${title === "owner" ? " (admin)" : ""}`;
 }
 
 async function signOut() {
