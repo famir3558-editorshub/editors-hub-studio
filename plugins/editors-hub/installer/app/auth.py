@@ -2,6 +2,7 @@
 
 Every code goes to the OWNER: their own, and everyone else's. A new person signs up, the owner gets their code (by email
 and on the Team page) and hands it over only if they want that person in. So nobody gets in without the owner.
+On a studio that isn't the owner's (see approval.open_to_others), nobody but its one person can sign in at all.
 
 Only the owner can do admin things (settings, team, tools, skills, email). Everyone else is an editor or a reviewer.
 Accounts, sessions and codes are kept in the studio's data folder on this computer.
@@ -53,9 +54,13 @@ def mask(email):
     return f"{name[:1]}{'•' * max(2, len(name) - 2)}{name[-1:] if len(name) > 1 else ''}@{domain}"
 
 
+ALONE = "This studio is only for the person it was approved for. To use Editors.Hub, install it on your own computer and ask for approval there."
+
+
 class Auth:
-    def __init__(self, data_dir, owner_email, log=print, claim=None):
+    def __init__(self, data_dir, owner_email, log=print, claim=None, open_to_others=None):
         self.claim = claim  # how a new studio's first account becomes its owner; None when the owner is settled
+        self.open_to_others = open_to_others  # whether anyone but this studio's owner may use it; None means yes
         self.dir = Path(data_dir)
         self.owner_email = owner_email.strip().lower()
         self.log = log
@@ -88,6 +93,9 @@ class Auth:
 
     def owner_exists(self):
         return self.owner_email in self.users()
+
+    def kept_out(self, email):
+        return email != self.owner_email and self.open_to_others is not None and not self.open_to_others()
 
     def find(self, login):
         login = (login or "").strip().lower().lstrip("@")
@@ -122,11 +130,15 @@ class Auth:
                     self.claim(email)
                 if email != self.owner_email and not self.owner_exists():
                     raise AuthError("This studio isn't set up yet. The owner has to create their account first.")
+                if self.kept_out(email):
+                    raise Forbidden(ALONE)
             elif purpose == "signin":
                 u = self.find(login)
                 if not u:
                     raise AuthError("No account with that username or email. Create one instead.")
                 email, username = u["email"], u["username"]
+                if self.kept_out(email):
+                    raise Forbidden(ALONE)
             else:
                 raise AuthError("unknown request")
 
@@ -174,6 +186,8 @@ class Auth:
             codes = self._load("codes.json")
             u = self.find(login)
             email = u["email"] if u else (login or "").strip().lower()
+            if self.kept_out(email):
+                raise Forbidden(ALONE)
             c = codes.get(email)
             if not c or c["expires"] < _now():
                 raise AuthError("That code has run out. Ask for a new one.")
@@ -239,7 +253,7 @@ class Auth:
         if not token:
             return None
         s = self._load("sessions.json").get(_token_key(token))
-        if not s or s["expires"] < _now():
+        if not s or s["expires"] < _now() or self.kept_out(s["email"]):
             return None
         return self.users().get(s["email"])
 

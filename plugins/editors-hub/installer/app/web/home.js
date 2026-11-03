@@ -370,6 +370,9 @@ $("me").onclick = () => setTab("settings");
 
 let teamTimer;
 function renderTeam(t) {
+  document.querySelectorAll("[data-with-others]").forEach((el) => { el.hidden = t.alone; });
+  $("teamIntro").textContent = t.alone ? "This studio is just for you. Anyone else who wants to use Editors.Hub installs it on their own computer and asks for approval there."
+    : "Everyone's sign-up and sign-in code comes to you. Give a code only to people you want in.";
   $("pendingList").innerHTML = t.pending.length ? t.pending.map((c) => `<div class="member">
       <span class="code-big">${esc(c.code)}</span>
       <div><b>${esc(c.username)}</b> wants to ${c.purpose === "signup" ? "join" : "sign in"}<small>${esc(c.email)} · ${Math.ceil(c.expires_in / 60)} min left</small></div>

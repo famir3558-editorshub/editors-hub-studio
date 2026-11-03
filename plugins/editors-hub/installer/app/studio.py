@@ -190,10 +190,16 @@ def settings():
         return s
 
 
+def wifi_on():
+    return bool(settings().get("lan")) and approval.open_to_others(DATA)
+
+
 def update_settings(changes):
     with LOCK:
         s = settings()
         if "lan" in changes:
+            if changes["lan"] and not approval.open_to_others(DATA):
+                raise StudioError(auth.ALONE)
             s["lan"] = bool(changes["lan"])
         if "library_confirmed" in changes:
             s["library_confirmed"] = bool(changes["library_confirmed"])
@@ -1813,7 +1819,8 @@ def accounts():
         s = settings()
         open_to_claim = not s["owner_email"] or s.get("owner_claimed") or \
             hashlib.sha256(s["owner_email"].encode()).hexdigest() == OLD_DEFAULT_OWNER
-        _ACCOUNTS = auth.Auth(DATA, s["owner_email"], log=lambda line: print(line, flush=True), claim=claim_owner if open_to_claim else None)
+        _ACCOUNTS = auth.Auth(DATA, s["owner_email"], log=lambda line: print(line, flush=True), claim=claim_owner if open_to_claim else None,
+                              open_to_others=lambda: approval.open_to_others(DATA))
     return _ACCOUNTS
 
 
@@ -3123,7 +3130,7 @@ class Handler(BaseHTTPRequestHandler):
     # -- access: signed-in accounts only; admin things for the owner only
 
     def host_ok(self):
-        if settings().get("lan"):
+        if wifi_on():
             return True
         port = self.server.server_port
         return self.headers.get("Host", "") in {f"127.0.0.1:{port}", f"localhost:{port}"}
@@ -3555,8 +3562,8 @@ class Handler(BaseHTTPRequestHandler):
     def team(self):
         acc = accounts()
         port = self.server.server_port
-        return {"members": acc.team(), "pending": acc.pending(), "mail": acc.mail_status(),
-                "owner_email": acc.owner_email, "lan": bool(settings().get("lan")),
+        return {"members": acc.team(), "pending": acc.pending(), "mail": acc.mail_status(), "alone": not approval.open_to_others(DATA),
+                "owner_email": acc.owner_email, "lan": wifi_on(),
                 "lan_urls": lan_addresses(port), "lan_live": self.server.server_address[0] != "127.0.0.1"}
 
     def state(self):
@@ -3788,13 +3795,13 @@ def serve(port):
     library()
     try:
         # only this computer, unless the owner lets people on the same Wi-Fi in (Team page)
-        httpd = ThreadingHTTPServer(("0.0.0.0" if settings().get("lan") else "127.0.0.1", port), Handler)
+        httpd = ThreadingHTTPServer(("0.0.0.0" if wifi_on() else "127.0.0.1", port), Handler)
     except OSError as e:
         sys.exit(f"can't use port {port}: {e}")
     httpd.daemon_threads = True
     PIDFILE.write_text(str(os.getpid()))
     print(f"Editors.Hub is running: {home_url()}", flush=True)
-    if settings().get("lan"):
+    if wifi_on():
         print(f"On your Wi-Fi: {', '.join(lan_addresses(port)) or 'no network found'}", flush=True)
     keys.load_into_environment()
 

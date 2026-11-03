@@ -175,6 +175,15 @@ def status(data_dir):
     return {"required": True, "on": True}
 
 
+def open_to_others(data_dir):
+    """Other people can only use the studio of the owner, who let them in by choosing to. Everyone else's is theirs alone."""
+    cfg = config()
+    if not cfg:
+        return True
+    email = (status(data_dir).get("email") or "").strip().lower()
+    return bool(email) and hashlib.sha256(email.encode()).hexdigest() == cfg.get("owner_sha256")
+
+
 def _call(path, body):
     cfg = config()
     if not cfg:
