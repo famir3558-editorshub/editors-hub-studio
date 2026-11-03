@@ -3276,6 +3276,11 @@ class Handler(BaseHTTPRequestHandler):
             can_see_video(parts[1], self.user)
         if parts == ["api", "report"]:
             return self.report_route(method)
+        if parts == ["api", "update-seen"] and method == "POST":
+            with LOCK:
+                last = read_json(DATA / "last-update.json", {})
+                write_json(DATA / "last-update.json", {**last, "seen": [*last.get("seen", []), self.user["email"]]})
+            return self.send_json({"ok": True})
 
         if method in ("GET", "HEAD"):
             if not parts:
@@ -3622,7 +3627,7 @@ class Handler(BaseHTTPRequestHandler):
             for p in list_projects()]
         me = accounts().public(self.user)
         visible = ("studio_name", "your_name", "library") if me["role"] == "owner" else ("studio_name",)
-        return {"me": me, "version": APP_VERSION, "approval": approval.status(DATA), "alone": not approval.open_to_others(DATA), "report": self.report_mode(), "settings": {k: s[k] for k in visible},
+        return {"me": me, "version": APP_VERSION, "approval": approval.status(DATA), "alone": not approval.open_to_others(DATA), "report": self.report_mode(), "updated": update_to_tell(me["email"]), "settings": {k: s[k] for k in visible},
                 "projects": projects, "styles": styles, "videos": videos, "statuses": STATUSES,
                 "platform": "windows" if WINDOWS else "mac" if sys.platform == "darwin" else "linux"}
 
@@ -3824,9 +3829,24 @@ def watch_for_updates():
         time.sleep(30)
 
 
+def note_version():
+    """At each start: if the studio is on a new version, everyone gets told once. A brand-new studio has nothing to be told."""
+    path = DATA / "last-update.json"
+    last = read_json(path, {})
+    if last.get("version") == APP_VERSION:
+        return
+    write_json(path, {"version": APP_VERSION, "seen": [], "tell": bool(last.get("version") or accounts().users())})
+
+
+def update_to_tell(email):
+    last = read_json(DATA / "last-update.json", {})
+    return last["version"] if last.get("tell") and email not in last.get("seen", []) else None
+
+
 def serve(port):
     settings()
     library()
+    note_version()
     try:
         # only this computer, unless the owner lets people on the same Wi-Fi in (Team page)
         httpd = ThreadingHTTPServer(("0.0.0.0" if wifi_on() else "127.0.0.1", port), Handler)

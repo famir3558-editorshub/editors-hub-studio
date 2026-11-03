@@ -1022,6 +1022,13 @@ $("styleFilter").onchange = (e) => { S.style = e.target.value; render(); };
 $("projectFilter").onchange = (e) => { S.project = e.target.value; render(); };
 $("search").oninput = (e) => { S.q = e.target.value; render(); };
 
+async function tellIfUpdated() {
+  const version = S.state?.updated;
+  if (!version || document.querySelector("dialog[open]")) return;
+  await api("POST", "/api/update-seen", {}).catch(() => {});  // first, so a reload while it's showing doesn't tell them twice
+  ehConfirm(`Your studio updated itself to version ${version}. Your videos, clients and styles are all still here.`, { title: "You're on the newest version", ok: "Got it", cancel: "" });
+}
+
 load().then(() => {
   if (["projects", "styles", "shared", "deleted", "team", "report", "settings", "setup"].includes(location.hash.slice(1))) setTab(location.hash.slice(1), true);
   if (S.state?.report?.send) loadReports(true).catch(() => {});  // for the count of new answers
@@ -1039,5 +1046,6 @@ load().then(() => {
   }
   loadSetup();
   if (S.state?.me.role !== "reviewer") loadTrash();
+  tellIfUpdated();
 });
 setInterval(() => document.visibilityState === "visible" && !document.querySelector("dialog[open]") && load(), 5000);

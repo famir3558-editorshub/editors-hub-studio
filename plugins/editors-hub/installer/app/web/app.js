@@ -86,6 +86,7 @@ function ehAsk({ title = "", message = "", ok = "OK", cancel = "Cancel", danger 
     dlg.querySelector("h2").hidden = !title;
     dlg.querySelector(".ask-text").textContent = message;
     dlg.querySelector("[data-no]").textContent = cancel;
+    dlg.querySelector("[data-no]").hidden = !cancel;
     dlg.querySelector("[data-yes]").textContent = ok;
     const field = dlg.querySelector(".ask-input");
     if (field) field.value = input;
