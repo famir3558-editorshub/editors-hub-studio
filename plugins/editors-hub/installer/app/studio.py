@@ -3153,6 +3153,10 @@ class Handler(BaseHTTPRequestHandler):
         else:
             self.send_body(json.dumps(data or {}).encode(), "application/json", extra=[("Set-Cookie", cookie)])
 
+    def need_others_allowed(self):
+        if not approval.open_to_others(DATA):
+            raise auth.Forbidden(auth.ALONE)
+
     def need(self, *roles):
         if self.user["role"] not in roles:
             raise auth.Forbidden("Only the studio owner can do that." if roles == ("owner",) else
@@ -3359,6 +3363,7 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send_json({"skills": list_skills(), "folder": str(CLAUDE_SKILLS),
                                        "profile": profile_summary(PROFILE_PACK)})
             if parts == ["api", "team"]:
+                self.need_others_allowed()
                 return self.send_json(self.team())
             if parts == ["api", "keys"]:
                 return self.send_json({"keys": keys.status(needed_keys()), "file": str(keys.KEYS_FILE)})
@@ -3549,6 +3554,7 @@ class Handler(BaseHTTPRequestHandler):
                 acc.set_mail(body.get("user"), body.get("password"), body.get("host"), body.get("port"))
             return self.send_json(self.team())
         if parts[:2] == ["api", "team"] and len(parts) == 3:
+            self.need_others_allowed()
             email = parts[2].lower()
             if method == "POST" and "role" in body:
                 acc.set_role(email, body["role"])
@@ -3562,7 +3568,7 @@ class Handler(BaseHTTPRequestHandler):
     def team(self):
         acc = accounts()
         port = self.server.server_port
-        return {"members": acc.team(), "pending": acc.pending(), "mail": acc.mail_status(), "alone": not approval.open_to_others(DATA),
+        return {"members": acc.team(), "pending": acc.pending(), "mail": acc.mail_status(),
                 "owner_email": acc.owner_email, "lan": wifi_on(),
                 "lan_urls": lan_addresses(port), "lan_live": self.server.server_address[0] != "127.0.0.1"}
 
@@ -3588,7 +3594,7 @@ class Handler(BaseHTTPRequestHandler):
             for p in list_projects()]
         me = accounts().public(self.user)
         visible = ("studio_name", "your_name", "library") if me["role"] == "owner" else ("studio_name",)
-        return {"me": me, "version": APP_VERSION, "approval": approval.status(DATA), "settings": {k: s[k] for k in visible},
+        return {"me": me, "version": APP_VERSION, "approval": approval.status(DATA), "alone": not approval.open_to_others(DATA), "settings": {k: s[k] for k in visible},
                 "projects": projects, "styles": styles, "videos": videos, "statuses": STATUSES,
                 "platform": "windows" if WINDOWS else "mac" if sys.platform == "darwin" else "linux"}
 

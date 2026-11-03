@@ -342,6 +342,7 @@ function renderMe(me) {
   const owner = me.role === "owner";
   document.body.className = "role-" + me.role;
   document.querySelectorAll("[data-owner]").forEach((el) => (el.hidden = !owner));
+  document.querySelector('[data-tab="team"]').hidden = !owner || S.state?.alone !== false;
   $("me").innerHTML = `<div class="who">${esc(me.username)}<small>${esc(me.role)}</small></div><div class="avatar">${esc(me.username[0])}</div>`;
   $("meBadge").textContent = me.username[0].toUpperCase();
   $("meName").textContent = me.username;
@@ -370,9 +371,6 @@ $("me").onclick = () => setTab("settings");
 
 let teamTimer;
 function renderTeam(t) {
-  document.querySelectorAll("[data-with-others]").forEach((el) => { el.hidden = t.alone; });
-  $("teamIntro").textContent = t.alone ? "This studio is just for you. Anyone else who wants to use Editors.Hub installs it on their own computer and asks for approval there."
-    : "Everyone's sign-up and sign-in code comes to you. Give a code only to people you want in.";
   $("pendingList").innerHTML = t.pending.length ? t.pending.map((c) => `<div class="member">
       <span class="code-big">${esc(c.code)}</span>
       <div><b>${esc(c.username)}</b> wants to ${c.purpose === "signup" ? "join" : "sign in"}<small>${esc(c.email)} · ${Math.ceil(c.expires_in / 60)} min left</small></div>
@@ -497,6 +495,7 @@ $("deletedList").addEventListener("click", async (e) => {
 function setTab(tab, allow) {
   const owner = S.state?.me.role === "owner";
   if ((tab === "team" || tab === "setup") && S.state && !owner) tab = "videos";
+  if (tab === "team" && S.state?.alone) tab = "videos";
   // the owner finishes setup first; Settings stays open so keys can be added
   if (owner && wasReady === false && !["setup", "settings"].includes(tab) && !allow) {
     toast("Finish setting up first");
