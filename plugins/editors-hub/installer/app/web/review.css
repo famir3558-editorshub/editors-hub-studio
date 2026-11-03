@@ -190,6 +190,7 @@ body { height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
 @media (max-width: 1020px) {  /* the notes stay beside the video, so a note never means scrolling away from it */
   .review { grid-template-columns: minmax(0, 1fr) 320px; }
   .stage { padding: 12px 14px 32px; }
+  .player { height: max(260px, min(calc(100vh - 480px), 760px)); }  /* the bars above it wrap onto more rows here */
   .info { grid-template-columns: 1fr; }
   .claude-state { display: none; }
   .side-tabs .seg button { padding: 6px 7px; white-space: nowrap; font-size: 12.5px; }
