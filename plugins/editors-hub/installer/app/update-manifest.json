@@ -699,8 +699,6 @@
 "skills/watch/.claude-plugin/marketplace.json": "5af17cae806091f61f217109ecf756996f01d4a1500d4e5e76ced1bfcb406b67",
 "skills/watch/.claude-plugin/plugin.json": "55ccc3bab0e8dffc759683d26a738f22fb04bf746a6166c30db4b39b4df34b8e",
 "skills/watch/.codex-plugin/plugin.json": "63f9a6382eaf1e2bd471ec7a5726aca50376dd9469a5590afb22c986dceddeb8",
-"skills/watch/.gitattributes": "e72969de042012f87411c570b10cef80e5aab6374a4e628c8a4ae7c32d9be301",
-"skills/watch/.gitignore": "bf6d35bb21fa509a502669e1a6add54f3efe108c666b79ad95f25251758bba99",
 "skills/watch/CHANGELOG.md": "50dbf9e2454a02d8c7b2c65dc7703cbd29eb8866c383f695bc9448969c9037a1",
 "skills/watch/commands/watch.md": "832f2e4b08d6ff199095cc0ef0dfe551da89574b253e04b498f9b5bbdd7c37f8",
 "skills/watch/hooks/hooks.json": "797e7967ba493db7a2285f203b10c1d6d359ad82ee0723021b09ea50ae483e4d",
