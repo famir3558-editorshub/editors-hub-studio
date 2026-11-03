@@ -2643,6 +2643,8 @@ def import_project_from(path, user=None, remove_after=False):
 ONLINE_PART = 1_900_000_000
 ONLINE_MARK = "editors-hub-style:"
 ONLINE_REPO_NAME = "editors-hub-styles"
+DRIVE_PIECE = 32 * 256 * 1024  # Google takes pieces in multiples of 256 KB
+DRIVE_TRIES = 8
 
 
 def gh(*args, timeout=900, check=True):
@@ -2670,7 +2672,208 @@ def online_repo():
     return f"{login}/{ONLINE_REPO_NAME}"
 
 
+def drive_styles():
+    """What this person can see in the Shared section, on the owner's Google Drive by way of the approval service."""
+    try:
+        found = approval.shared_call(DATA, "/styles/list")["styles"]
+    except approval.ApprovalError as e:
+        raise StudioError(str(e))
+    return [{**s, "tag": s["key"], "size": s["bytes"], "complete": True, "uploaded_by": s.get("maker_name")} for s in found]
+
+
+def drive_upload_file(url, path, job):
+    """Straight to Google a piece at a time, so a dropped connection only repeats the piece it dropped in."""
+    size, sent, tries = path.stat().st_size, 0, 0
+    with open(path, "rb") as f:
+        while True:
+            check_stop(job)
+            f.seek(sent)
+            piece = f.read(DRIVE_PIECE)
+            req = urllib.request.Request(url, data=piece, method="PUT", headers={
+                "Content-Range": f"bytes {sent}-{sent + len(piece) - 1}/{size}", "Content-Length": str(len(piece)), "User-Agent": "Editors.Hub"})
+            try:
+                with urllib.request.urlopen(req, timeout=600) as r:
+                    job["done_bytes"] = size
+                    return json.loads(r.read() or b"{}")
+            except urllib.error.HTTPError as e:
+                if e.code == 308:
+                    held = e.headers.get("Range") or ""
+                    sent = int(held.rsplit("-", 1)[1]) + 1 if held else 0
+                    job["done_bytes"], tries = sent, 0
+                    continue
+                if e.code < 500:
+                    raise StudioError(f"Google Drive refused the upload ({e.code}). Try sharing it again.")
+                problem = e
+            except (urllib.error.URLError, OSError) as e:
+                problem = e
+            tries += 1
+            if tries > DRIVE_TRIES:
+                raise StudioError(f"The upload kept failing ({problem}). Check the internet and try again.")
+            job["stage"] = "Retrying (the connection dropped)"
+            time.sleep(min(30, 3 * tries))
+            ask = urllib.request.Request(url, data=b"", method="PUT", headers={"Content-Range": f"bytes */{size}", "User-Agent": "Editors.Hub"})
+            try:  # how much did Google really keep?
+                with urllib.request.urlopen(ask, timeout=60) as r:
+                    job["done_bytes"] = size
+                    return json.loads(r.read() or b"{}")
+            except urllib.error.HTTPError as e:
+                if e.code == 308:
+                    held = e.headers.get("Range") or ""
+                    sent = int(held.rsplit("-", 1)[1]) + 1 if held else 0
+            except (urllib.error.URLError, OSError):
+                pass
+            job["done_bytes"] = sent
+            job["stage"] = "Uploading"
+
+
+def drive_share_style(style_id, user=None):
+    sdir = style_dir(style_id, user)
+    meta = style_meta(sdir)
+    if not can_manage(meta, user):
+        raise auth.Forbidden("Only the person who made this style, or the owner, can share it online.")
+    # its videos stay here: raw footage is big, and it's often someone else's
+    files = [(rel, f) for rel, f in transfer_files(sdir) if not rel.startswith("videos/")]
+    manifest = style_manifest(sdir, files)
+    manifest["videos"] = 0
+    if shutil.disk_usage(library()).free < manifest["bytes"] * 1.05 + 100_000_000:
+        raise StudioError(f"Not enough space to pack it: sharing needs about {manifest['bytes'] / 1e9:.1f} GB free for a moment.")
+    named = {}
+    if user is not None and user["email"] != (approval.status(DATA).get("email") or "").strip().lower():
+        named = {"from_name": user["username"]}
+
+    def work(job):
+        job["total_bytes"] = manifest["bytes"]
+        tmp = library() / f".online-{secrets.token_hex(4)}"
+        tmp.mkdir()
+        try:
+            job["stage"] = "Packing the style"
+            writer = PartWriter(tmp, f"{style_id}{ZIP_SUFFIX}", 1 << 62, job)
+            with zipfile.ZipFile(writer, "w", zipfile.ZIP_STORED, allowZip64=True) as zf:
+                zf.writestr(f"{style_id}/{STYLE_MANIFEST}", json.dumps(manifest, indent=1))
+                for rel, f in files:
+                    zf.write(f, f"{style_id}/{rel}")
+            writer.close()
+            whole = writer.parts[0]
+            job["done_bytes"], job["total_bytes"] = 0, whole.stat().st_size
+            check_stop(job)
+            job["stage"] = "Connecting to the online Shared folder"
+            described = {"id": style_id, "name": meta["name"], "notes": (meta.get("notes") or "")[:400], "format": meta.get("format") or "",
+                         "palette": meta.get("palette", [])[:8], **named}
+            try:
+                url = approval.shared_call(DATA, "/styles/start", bytes=whole.stat().st_size, **described)["upload_url"]
+                job["stage"] = "Uploading"
+                file_id = drive_upload_file(url, whole, job).get("id")
+                if not file_id:
+                    raise StudioError("Google Drive didn't say where it saved the style. Try sharing it again.")
+                job["stage"] = "Finishing"
+                entry = approval.shared_call(DATA, "/styles/finish", file_id=file_id, **described)["style"]
+            except approval.ApprovalError as e:
+                raise StudioError(str(e))
+            with LOCK:
+                data = read_json(sdir / "style.json", {}) or {}
+                data["online"] = {"repo": "drive", "tag": entry["key"], "at": now()}
+                write_json(sdir / "style.json", data)
+            return {"name": meta["name"], "repo": "drive", "bytes": manifest["bytes"], "status": entry["status"]}
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+    return start_job("online-upload", f"Sharing {meta['name']}", user, work, style=style_id)
+
+
+def drive_download_file(key, dest, size, job):
+    tries = 0
+    while True:
+        check_stop(job)
+        have = dest.stat().st_size if dest.exists() else 0
+        if have >= size:
+            return
+        try:
+            with approval.open_shared_style(DATA, key, have) as resp, open(dest, "ab" if have else "wb") as out:
+                while True:
+                    check_stop(job)
+                    chunk = resp.read(1 << 20)
+                    if not chunk:
+                        break
+                    out.write(chunk)
+                    job["done_bytes"] += len(chunk)
+                    tries = 0
+        except approval.ApprovalError as e:
+            raise StudioError(str(e))
+        except (urllib.error.URLError, OSError) as e:
+            problem = e
+        else:
+            problem = "the download stopped part way"
+            if dest.stat().st_size >= size:
+                return
+        tries += 1
+        if tries > DRIVE_TRIES:
+            raise StudioError(f"The download kept failing ({problem}). Check the internet and try again.")
+        job["stage"] = "Retrying (the connection dropped)"
+        time.sleep(min(30, 3 * tries))
+        job["stage"] = "Downloading"
+
+
+def drive_download_style(key, where="mine", user=None):
+    if user is not None and user["role"] == "reviewer":
+        raise auth.Forbidden("Your account can't do that. Ask the owner.")
+    item = next((i for i in drive_styles() if i["tag"] == key), None)
+    if not item:
+        raise NotFound("That style isn't in the online Shared folder any more.")
+    if shutil.disk_usage(library()).free < item["size"] * 2.1 + 100_000_000:
+        raise StudioError(f"Not enough space: downloading needs about {item['size'] * 2 / 1e9:.1f} GB free for a moment.")
+
+    def work(job):
+        job["total_bytes"] = item["size"]
+        job["stage"] = "Downloading"
+        tmp = library() / f".online-{secrets.token_hex(4)}"
+        tmp.mkdir()
+        try:
+            whole = tmp / f"{item['id']}{ZIP_SUFFIX}"
+            drive_download_file(key, whole, item["size"], job)
+            job["stage"] = "Unpacking and checking every file"
+            job["done_bytes"] = 0
+            inner = import_style_from(whole, where, user, remove_after=True)
+            while inner["state"] == "running":
+                if job.get("stop"):
+                    inner["stop"] = True
+                job["done_bytes"], job["total_bytes"] = inner["done_bytes"], inner["total_bytes"] or item["size"]
+                time.sleep(0.3)
+            if inner["state"] == "stopped":
+                raise JobStopped()
+            if inner["state"] != "done":
+                raise StudioError(inner["message"])
+            got = style_dirs().get(inner["result"].get("id"))
+            if got:  # this copy is theirs now: the online one is still whoever shared it's
+                with LOCK:
+                    data = read_json(got / "style.json", {}) or {}
+                    data.pop("online", None)
+                    data["shared_online_by"] = item.get("maker_name") or ""
+                    write_json(got / "style.json", data)
+            return {**inner["result"], "from": f"the Shared section, shared by {item.get('maker_name')}"}
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+    return start_job("online-download", f"Downloading {item['name']}", user, work, style=item.get("id"))
+
+
+def drive_remove_style(key, user=None):
+    item = next((i for i in drive_styles() if i["tag"] == key), None)
+    if not item:
+        raise NotFound("That style isn't in the online Shared folder.")
+    try:
+        approval.shared_call(DATA, "/styles/remove", key=key)
+    except approval.ApprovalError as e:
+        raise StudioError(str(e))
+    for sdir in style_dirs().values():
+        with LOCK:
+            data = read_json(sdir / "style.json", {}) or {}
+            if (data.get("online") or {}).get("tag") == key:
+                data.pop("online")
+                write_json(sdir / "style.json", data)
+    return {"removed": item["name"]}
+
+
 def online_styles():
+    if approval.config():
+        return "the Shared section", drive_styles()
     repo = online_repo()
     r = gh("api", f"repos/{repo}/releases?per_page=100", timeout=60, check=False)
     if r.returncode != 0:
@@ -2809,6 +3012,8 @@ class PartWriter:
 
 
 def upload_style_online(style_id, user=None):
+    if approval.config():
+        return drive_share_style(style_id, user)
     sdir = style_dir(style_id, user)
     meta = style_meta(sdir)
     if not can_manage(meta, user):
@@ -2876,6 +3081,8 @@ def upload_style_online(style_id, user=None):
 
 
 def download_online_style(tag, where="mine", user=None):
+    if approval.config():
+        return drive_download_style(tag, where, user)
     if user is not None and user["role"] == "reviewer":
         raise auth.Forbidden("Your account can't do that. Ask the owner.")
     repo, items = online_styles()
@@ -2924,6 +3131,8 @@ def download_online_style(tag, where="mine", user=None):
 
 
 def remove_online_style(tag, user=None):
+    if approval.config():
+        return drive_remove_style(tag, user)
     repo, items = online_styles()
     item = next((i for i in items if i["tag"] == tag), None)
     if not item:
@@ -3320,7 +3529,7 @@ class Handler(BaseHTTPRequestHandler):
                 self.need("owner", "editor")
                 try:
                     repo, items = online_styles()
-                    return self.send_json({"ready": True, "repo": repo, "styles": items})
+                    return self.send_json({"ready": True, "repo": repo, "styles": items, "drive": bool(approval.config())})
                 except StudioError as e:
                     return self.send_json({"ready": False, "message": str(e), "styles": []})
             if parts == ["api", "trash"]:
@@ -3484,6 +3693,13 @@ class Handler(BaseHTTPRequestHandler):
             return self.send_json(upload_style_online(parts[2], self.user))
         if method == "POST" and parts[:2] == ["api", "online"] and parts[3:] == ["download"]:
             return self.send_json(download_online_style(parts[2], body.get("where", "mine"), self.user))
+        if method == "POST" and parts[:2] == ["api", "online"] and parts[3:] == ["status"]:
+            self.need("owner")
+            try:
+                approval.shared_call(DATA, "/owner/style-status", key=parts[2], status=body.get("status"))
+            except approval.ApprovalError as e:
+                raise StudioError(str(e))
+            return self.send_json({"ok": True})
         if method == "DELETE" and parts[:2] == ["api", "online"] and len(parts) == 3:
             return self.send_json(remove_online_style(parts[2], self.user))
         if method == "POST" and parts[:2] == ["api", "styles"] and parts[3:] == ["rename"]:

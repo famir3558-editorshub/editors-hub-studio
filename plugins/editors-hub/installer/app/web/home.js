@@ -991,20 +991,40 @@ async function loadOnlineGrid() {
       $("onlineNote").textContent = o.message;
       return;
     }
-    $("onlineNote").textContent = `Styles uploaded online (${o.repo}) can be downloaded into Editors.Hub on any of your computers.`;
+    $("onlineNote").textContent = o.drive ? "Styles people have shared online. Download one and it's added to your styles. To share your own: on any of your styles, ⋯ → Share online."
+      : `Styles uploaded online (${o.repo}) can be downloaded into Editors.Hub on any of your computers.`;
     $("onlineGrid").innerHTML = o.styles.map((x) => `<div class="online-card">
         <div class="row"><b>${esc(x.name)}</b><div class="spacer"></div>${(x.palette || []).length ? `<span class="swatches">${x.palette.slice(0, 5).map((c) => `<i style="background:${esc(c)}"></i>`).join("")}</span>` : ""}</div>
         <small>${onlineLine(x)}</small>
         ${x.client ? `<small>Client: ${esc(x.client)}</small>` : ""}
-        <div class="row"><div class="spacer"></div>${x.complete ? `<button class="btn small primary" data-online-get="${esc(x.tag)}">Download</button>` : ""}</div>
-      </div>`).join("") || `<p class="faint" style="margin:0">Nothing uploaded yet. On any style: ⋯ → Upload to the online Shared folder.</p>`;
+        ${x.notes ? `<small>${esc(x.notes)}</small>` : ""}
+        ${x.status === "waiting" ? `<span class="share-tag private" style="justify-self:start">${x.is_owner ? "Waiting for your check" : "Waiting for the owner's check"}</span>` : ""}
+        <div class="row" style="flex-wrap:wrap"><div class="spacer"></div>
+          ${x.is_owner && o.drive ? (x.status === "waiting" ? `<button class="btn small" data-online-status="live" data-tag="${esc(x.tag)}">Approve</button>` : `<button class="btn small" data-online-status="waiting" data-tag="${esc(x.tag)}">Take it down</button>`) : ""}
+          ${(x.mine || x.is_owner) && o.drive ? `<button class="btn small" data-online-remove="${esc(x.tag)}" data-name="${esc(x.name)}">Remove</button>` : ""}
+          ${x.complete ? `<button class="btn small primary" data-online-get="${esc(x.tag)}">Download</button>` : ""}</div>
+      </div>`).join("") || `<p class="faint" style="margin:0">Nothing shared yet. On any of your styles: ⋯ → Share online.</p>`;
   } catch (e) {
     $("onlineNote").textContent = e.message;
   }
 }
-$("onlineGrid").addEventListener("click", (e) => {
+$("onlineGrid").addEventListener("click", async (e) => {
   const b = e.target.closest("[data-online-get]");
-  if (b) openAddStyle("online", b.dataset.onlineGet);
+  if (b) return openAddStyle("online", b.dataset.onlineGet);
+  const status = e.target.closest("[data-online-status]"), gone = e.target.closest("[data-online-remove]");
+  try {
+    if (status) {
+      await api("POST", `/api/online/${enc(status.dataset.tag)}/status`, { status: status.dataset.onlineStatus });
+      toast(status.dataset.onlineStatus === "live" ? "Approved: everyone can download it now" : "Taken down: only you and whoever shared it can see it");
+    } else if (gone) {
+      if (!(await ehConfirm(`It's deleted from the online Shared folder. Copies people have already downloaded stay with them.`, { title: `Remove "${gone.dataset.name}"?`, ok: "Remove", danger: true }))) return;
+      await api("DELETE", `/api/online/${enc(gone.dataset.onlineRemove)}`);
+      toast("Removed from the online Shared folder");
+    } else return;
+    loadOnlineGrid();
+  } catch (ex) {
+    toast(ex.message, true);
+  }
 });
 
 $("newVideoBtn").onclick = () => openVideoDlg(null, null, S.tab === "videos" && S.kind === "style");

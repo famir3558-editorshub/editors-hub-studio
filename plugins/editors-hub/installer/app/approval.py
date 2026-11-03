@@ -212,6 +212,31 @@ def set_approved(data_dir, email, removed):
     return _signed_call(data_dir, "/owner/set", {"email": email, "removed": bool(removed)})["people"]
 
 
+def shared_call(data_dir, path, **body):
+    """The Shared section's listing, sharing and removing, which the service checks against this computer's pass."""
+    return _signed_call(data_dir, path, body)
+
+
+def open_shared_style(data_dir, key, start=0):
+    """The start of a shared style's download; `start` picks up from there after a dropped connection."""
+    token = _read(data_dir).get("token")
+    if not token or not config():
+        raise ApprovalError("This computer needs the owner's approval first.")
+    headers = {"Content-Type": "application/json", "User-Agent": "Editors.Hub"}
+    if start:
+        headers["Range"] = f"bytes={start}-"
+    req = urllib.request.Request(config()["url"].rstrip("/") + "/styles/download", method="POST", headers=headers,
+                                 data=json.dumps({"token": token, "key": key}).encode())
+    try:
+        return urllib.request.urlopen(req, timeout=300)
+    except urllib.error.HTTPError as e:
+        try:
+            message = json.loads(e.read() or b"{}").get("error")
+        except ValueError:
+            message = None
+        raise ApprovalError(message or "The style couldn't be downloaded. Try again in a while.")
+
+
 def _call(path, body):
     cfg = config()
     if not cfg:
