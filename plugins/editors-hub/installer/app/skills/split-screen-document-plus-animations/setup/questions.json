@@ -1,0 +1,217 @@
+{
+ "skill": "split-screen-document-plus-animations",
+ "questions": [
+  {
+   "key": "creator_name",
+   "scope": "shared",
+   "ask": "What name should I use for you: the one that appears on screen and in my notes?",
+   "default": null,
+   "required": true
+  },
+  {
+   "key": "brand_name",
+   "scope": "shared",
+   "ask": "What is the business or brand called?",
+   "default": null,
+   "required": true
+  },
+  {
+   "key": "handle",
+   "scope": "shared",
+   "ask": "What is your main handle, and on which platform do you post most?",
+   "default": "not set",
+   "required": false
+  },
+  {
+   "key": "niche",
+   "scope": "shared",
+   "ask": "In one sentence: what do you help people with, and who are they?",
+   "default": "not set",
+   "required": false
+  },
+  {
+   "key": "accent",
+   "scope": "shared",
+   "ask": "What is your accent colour (the one colour used for the key word, the focal element and the glow)?",
+   "default": null,
+   "required": true
+  },
+  {
+   "key": "accent_name",
+   "scope": "shared",
+   "ask": "(saved with the accent colour) the plain word for it: blue, gold, lime",
+   "default": "accent colour",
+   "required": false
+  },
+  {
+   "key": "font_main_name",
+   "scope": "shared",
+   "ask": "Which font do you use for headlines?",
+   "default": null,
+   "required": true
+  },
+  {
+   "key": "font_main_bold",
+   "scope": "shared",
+   "ask": "(found on their computer) the bold weight of the main font",
+   "default": null,
+   "required": true
+  },
+  {
+   "key": "font_main_regular",
+   "scope": "shared",
+   "ask": "(found on their computer) the regular or medium weight of the main font; left unset, the bold is reused",
+   "default": null,
+   "required": false
+  },
+  {
+   "key": "font_accent_name",
+   "scope": "shared",
+   "ask": "Do you want key words in a second, contrasting font, or the same font in your colour?",
+   "default": "Playfair Display Italic",
+   "required": false
+  },
+  {
+   "key": "font_accent",
+   "scope": "shared",
+   "ask": "(found on their computer) the emphasis font; the shipped Playfair Display Italic if they have no preference",
+   "default": {
+    "file": "PlayfairDisplay-Italic.ttf"
+   },
+   "required": false
+  },
+  {
+   "key": "transcriber",
+   "scope": "shared",
+   "ask": "Transcribe with ElevenLabs (recommended, the most accurate word timings) or on this computer (free)?",
+   "default": null,
+   "required": true
+  },
+  {
+   "key": "output_rule",
+   "scope": "shared",
+   "ask": "Where should finished videos go? Next to the raw file in an '- Edit' folder is the default.",
+   "default": "beside the raw file, in a \"<video name> - Edit\" folder",
+   "required": false
+  },
+  {
+   "key": "media_drive",
+   "scope": "shared",
+   "ask": "Is your raw footage on an external drive? Which one?",
+   "default": "none",
+   "required": false
+  },
+  {
+   "key": "sfx_dir",
+   "scope": "shared",
+   "ask": "Do you have a sound-effects pack (whooshes, pops, clicks)? Tell me the folder.",
+   "default": "none yet (videos are delivered without sound effects)",
+   "required": false
+  },
+  {
+   "key": "proof_dir",
+   "scope": "shared",
+   "ask": "Where do you keep the real things I can show on screen: client results, reviews, screenshots?",
+   "default": "none yet",
+   "required": false
+  },
+  {
+   "key": "recorder",
+   "scope": "skill",
+   "ask": "What do you record with? Tella (a camera track plus a screen track per recording) is the supported default; anything else works if you can give me the two files as camera.mp4 and screen.mp4.",
+   "default": "Tella: a camera track and a screen track per recording",
+   "required": false
+  },
+  {
+   "key": "raw_dir",
+   "scope": "skill",
+   "ask": "Where do your raw lesson recordings live? I look there first when you name a video.",
+   "default": "none: ask each time",
+   "required": false
+  },
+  {
+   "key": "doc_page_color",
+   "scope": "skill",
+   "ask": "What colour is the page of your document on screen? Say a hex code, or leave it and I read the colour from the recording itself.",
+   "default": "auto",
+   "required": false
+  },
+  {
+   "key": "min_full_seconds",
+   "scope": "skill",
+   "ask": "How short may a full-screen moment be, in seconds? Five is the default; raise it if the switching between document and you feels busy.",
+   "default": 5,
+   "required": false
+  },
+  {
+   "key": "asset_dirs",
+   "scope": "skill",
+   "ask": "Besides your proof folder, are there other folders I should search for real things to show: client work, brand assets, screenshots?",
+   "default": "none",
+   "required": false
+  },
+  {
+   "key": "web_assets",
+   "scope": "skill",
+   "ask": "When you name a company, a person, a channel or a website, the illustration is strongest with the real thing. May I fetch real logos, avatars, screenshots and thumbnails from the web? I list every source in my report.",
+   "default": "yes: real over drawn, every source listed in the report",
+   "required": false
+  },
+  {
+   "key": "never_show",
+   "scope": "skill",
+   "ask": "Is there anything that must never be shown on screen: names, clients, competitors, figures, old offers?",
+   "default": "nothing listed",
+   "required": false
+  },
+  {
+   "key": "quiet_audio_fix",
+   "scope": "skill",
+   "ask": "If a recording comes in quiet, should I ask you before raising the voice level, fix it automatically, or never touch it? (Only recordings that measure quiet are ever affected.)",
+   "default": "ask",
+   "required": false
+  },
+  {
+   "key": "voice_target_lufs",
+   "scope": "skill",
+   "ask": "If the voice is raised, to what loudness? The default is gentle: about -19.8 LUFS, natural, nothing else added.",
+   "default": -19.8,
+   "required": false
+  },
+  {
+   "key": "voice_denoise_db",
+   "scope": "skill",
+   "ask": "How much light de-noise, in dB, should go with a raise? The boost brings up mic hiss; 6 is light, 0 is none.",
+   "default": 6,
+   "required": false
+  },
+  {
+   "key": "punch_percent",
+   "scope": "skill",
+   "ask": "When a line really matters, the picture can cut in closer on the creator for a moment (only while full screen). How strong? 112 is clear but gentle.",
+   "default": 112,
+   "required": false
+  },
+  {
+   "key": "depth_3d",
+   "scope": "skill",
+   "ask": "Graphics can use depth (cards separating towards the viewer, a screenshot at a slight angle). Keep that, or keep everything flat?",
+   "default": "on",
+   "required": false
+  },
+  {
+   "key": "no_sfx_copy",
+   "scope": "skill",
+   "ask": "Alongside the version with quiet sound effects, deliver a second copy with no sound effects at all?",
+   "default": "yes",
+   "required": false
+  },
+  {
+   "key": "work_rule",
+   "scope": "skill",
+   "ask": "How far should I go before checking in? Show the plan as a short table, then build and report at the end (default), or stop and ask after the cut, after the plan and after the draft?",
+   "default": "show the plan as a short table, then run to the end and report",
+   "required": false
+  }
+ ]
+}

@@ -1,0 +1,64 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sign in · Editors.Hub</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/app.css">
+<link rel="stylesheet" href="/static/signin.css">
+</head>
+<body>
+<main class="auth">
+  <div class="logo big"></div>
+  <div class="card">
+    <div class="tabs" id="tabs">
+      <button data-mode="signin" class="on">Sign in</button>
+      <button data-mode="signup">Create account</button>
+    </div>
+
+    <form id="startForm" autocomplete="on">
+      <div>
+        <h1 id="title">Welcome back</h1>
+        <p class="muted" id="lead">Sign in with your username or email. We'll send a code.</p>
+      </div>
+      <label class="field" id="loginField">Username or email<input name="login" autocomplete="username" autocapitalize="none" spellcheck="false"></label>
+      <label class="field" id="userField" hidden>Username<input name="username" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="e.g. sam"></label>
+      <label class="field" id="emailField" hidden>Email<input name="email" type="email" autocomplete="email" spellcheck="false" placeholder="you@example.com"></label>
+      <div class="error" id="startError"></div>
+      <button class="btn primary wide" id="sendBtn">Send code</button>
+    </form>
+
+    <form id="codeForm" hidden>
+      <div>
+        <h1>Enter the code</h1>
+        <p class="muted" id="codeLead"></p>
+      </div>
+      <div class="connect" id="connectBox" hidden>
+        <p><b>Connect your Gmail once</b>, so this and every code after it comes to your inbox.</p>
+        <ol>
+          <li><a href="https://myaccount.google.com/apppasswords" target="_blank" rel="noopener">Open Google's app passwords ↗</a> (signed in as <b id="ownerMail"></b>; 2-Step Verification has to be on).</li>
+          <li>Create one called <b>Editors.Hub</b> and paste the 16 letters here.</li>
+        </ol>
+        <input id="appPassword" type="password" autocomplete="off" spellcheck="false" placeholder="xxxx xxxx xxxx xxxx" aria-label="Gmail app password">
+        <button type="button" class="btn primary wide" id="connectBtn">Email me the code</button>
+        <p class="faint small">It stays on this computer only. Or skip this and ask Claude for the code.</p>
+      </div>
+      <input id="code" class="code" inputmode="numeric" autocomplete="one-time-code" maxlength="7" placeholder="••••••" aria-label="6-digit code">
+      <div class="error" id="codeError"></div>
+      <button class="btn primary wide" id="verifyBtn">Continue</button>
+      <div class="row small-links">
+        <button type="button" class="link" id="backBtn">← Use another account</button>
+        <div class="spacer"></div>
+        <button type="button" class="link" id="resendBtn">Send a new code</button>
+      </div>
+    </form>
+  </div>
+  <p class="faint foot">Editors.Hub · private studio. Only people the owner lets in can sign in.</p>
+</main>
+<div id="toast"></div>
+<script src="/static/app.js"></script>
+<script src="/static/signin.js"></script>
+</body>
+</html>

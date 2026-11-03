@@ -1,0 +1,172 @@
+{
+ "_note": "Worked example from the original style. A reference for structure and API use only: never reuse its wording, names or assets. The image files named here are not shipped: use the creator's own picks.",
+ "duration": 15.05,
+ "hook": {
+  "lines": [
+   "Three ways to make people",
+   "watch your videos longer"
+  ],
+  "sub": "(they get more specific)",
+  "end": 4.2
+ },
+ "captions": [
+  "Here are three ways to",
+  "make people watch your",
+  "videos for longer",
+  "But they get more",
+  "specific as we go",
+  "Number one is contrast",
+  "Pair two opposites and",
+  "let the gap do the work",
+  "The bigger the gap",
+  "the stronger you pull them in",
+  "Number two is proof"
+ ],
+ "collage": [
+  {
+   "file": "images/c_cinema_4.jpg",
+   "x": 0,
+   "y": 0,
+   "w": 430,
+   "h": 480
+  },
+  {
+   "file": "images/c_phone_0.jpg",
+   "x": 430,
+   "y": 0,
+   "w": 650,
+   "h": 480
+  },
+  {
+   "file": "images/c_eye_0.jpg",
+   "x": 0,
+   "y": 480,
+   "w": 560,
+   "h": 480
+  },
+  {
+   "file": "images/c_hourglass_2.jpg",
+   "x": 560,
+   "y": 480,
+   "w": 520,
+   "h": 480
+  },
+  {
+   "file": "images/c_crowd_0.jpg",
+   "x": 0,
+   "y": 960,
+   "w": 380,
+   "h": 480
+  },
+  {
+   "file": "images/c_tv_0.jpg",
+   "x": 380,
+   "y": 960,
+   "w": 700,
+   "h": 480
+  },
+  {
+   "file": "images/c_phone_1.jpg",
+   "x": 0,
+   "y": 1440,
+   "w": 600,
+   "h": 480
+  },
+  {
+   "file": "images/c_cinema_3.jpg",
+   "x": 600,
+   "y": 1440,
+   "w": 480,
+   "h": 480
+  }
+ ],
+ "backdrops": [
+  {
+   "t": 0,
+   "file": "collage",
+   "pos": "BIG"
+  },
+  {
+   "t": 4.2,
+   "file": "images/contrast2_0.jpg",
+   "fx": 0.5,
+   "fy": 0.5,
+   "pos": "TR"
+  },
+  {
+   "t": 5.42,
+   "file": "images/opp_4.jpg",
+   "fx": 0.5,
+   "fy": 0.6,
+   "pos": "TL"
+  },
+  {
+   "t": 6.36,
+   "file": "images/gap2_2.jpg",
+   "fx": 0.5,
+   "fy": 0.5,
+   "pos": "BL"
+  },
+  {
+   "t": 8.25,
+   "file": "images/dollarC_0.jpg",
+   "fx": 0.5,
+   "fy": 0.5,
+   "pos": "TR"
+  },
+  {
+   "t": 9.2,
+   "file": "images/million_0.jpg",
+   "fx": 0.5,
+   "fy": 0.5,
+   "pos": "BL"
+  },
+  {
+   "t": 10.1,
+   "file": "images/amateur2_3.jpg",
+   "fx": 0.89,
+   "fy": 0.5,
+   "pos": "TR"
+  },
+  {
+   "t": 11.18,
+   "file": "images/pro2_0.jpg",
+   "fx": 0.6,
+   "fy": 0.45,
+   "pos": "BL"
+  },
+  {
+   "t": 11.84,
+   "file": "images/canyon_4.jpg",
+   "fx": 0.5,
+   "fy": 0.5,
+   "pos": "TL"
+  },
+  {
+   "t": 12.5,
+   "file": "images/holeB_1.jpg",
+   "fx": 0.5,
+   "fy": 0.5,
+   "pos": "BR"
+  },
+  {
+   "t": 13.7,
+   "file": "images/authority2_4.jpg",
+   "fx": 0.5,
+   "fy": 0.5,
+   "pos": "BL"
+  }
+ ],
+ "cutout": {
+  "top": 250,
+  "left": 0,
+  "width": 1080,
+  "rim": 0.5
+ },
+ "caption": {
+  "y": 885,
+  "size": 58,
+  "lead": 0.08
+ },
+ "zoom": 0.05
+}

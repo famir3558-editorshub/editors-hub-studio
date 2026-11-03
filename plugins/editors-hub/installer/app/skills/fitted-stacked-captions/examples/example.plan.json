@@ -1,0 +1,51 @@
+{
+ "_note": "Worked example from the original style. A reference for structure and API use only: never reuse its wording, names or assets.",
+ "cy": 1125,
+ "lead": 0.22,
+ "captions": [
+  {
+   "id": "cap00",
+   "pre": "The one thing that kept",
+   "em": "clients",
+   "post": "from signing up"
+  },
+  {
+   "id": "cap01",
+   "pre": "was a price they"
+  },
+  {
+   "id": "cap02",
+   "pre": "never really",
+   "em": "understood"
+  },
+  {
+   "id": "cap03",
+   "pre": "so we rebuilt",
+   "em": "the offer",
+   "post": "around results"
+  },
+  {
+   "id": "cap04",
+   "pre": "and it was a lot"
+  },
+  {
+   "id": "cap05",
+   "pre": "easier to say",
+   "em": "yes."
+  },
+  {
+   "id": "cap06",
+   "pre": "That is why I"
+  },
+  {
+   "id": "cap07",
+   "pre": "check this",
+   "em": "first",
+   "post": "every time"
+  },
+  {
+   "id": "cap08",
+   "pre": "before I change anything else"
+  }
+ ]
+}

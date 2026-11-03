@@ -1,0 +1,182 @@
+{
+  "skill": "explainer-panel-reel",
+  "questions": [
+    {
+      "key": "creator_name",
+      "scope": "shared",
+      "ask": "What name should I use for you: the one that appears on screen and in my notes?",
+      "default": null,
+      "required": true
+    },
+    {
+      "key": "brand_name",
+      "scope": "shared",
+      "ask": "What is the business or brand called?",
+      "default": null,
+      "required": true
+    },
+    {
+      "key": "handle",
+      "scope": "shared",
+      "ask": "What is your main handle, and on which platform do you post most?",
+      "default": "not set",
+      "required": false
+    },
+    {
+      "key": "platform",
+      "scope": "shared",
+      "ask": "(saved with the handle) Instagram, TikTok, YouTube or LinkedIn",
+      "default": "instagram",
+      "required": false
+    },
+    {
+      "key": "niche",
+      "scope": "shared",
+      "ask": "In one sentence: what do you help people with, and who are they?",
+      "default": "not set",
+      "required": false
+    },
+    {
+      "key": "accent",
+      "scope": "shared",
+      "ask": "What is your accent colour (the one colour used for the key word, the active element and the glow)?",
+      "default": null,
+      "required": true
+    },
+    {
+      "key": "accent_name",
+      "scope": "shared",
+      "ask": "(saved with the accent colour) the plain word for it: blue, gold, lime",
+      "default": "accent colour",
+      "required": false
+    },
+    {
+      "key": "font_main_name",
+      "scope": "shared",
+      "ask": "Which font do you use for headlines?",
+      "default": null,
+      "required": true
+    },
+    {
+      "key": "font_main_bold",
+      "scope": "shared",
+      "ask": "(found on their computer) the bold weight of the main font",
+      "default": null,
+      "required": true
+    },
+    {
+      "key": "font_accent_name",
+      "scope": "shared",
+      "ask": "Do you want key words in a second, contrasting font, or the same font in your colour?",
+      "default": "Playfair Display Italic",
+      "required": false
+    },
+    {
+      "key": "font_accent",
+      "scope": "shared",
+      "ask": "(found on their computer) the emphasis font; the shipped Playfair Display Italic if they have no preference",
+      "default": {
+        "file": "PlayfairDisplay-Italic.ttf"
+      },
+      "required": false
+    },
+    {
+      "key": "font_caption_name",
+      "scope": "shared",
+      "ask": "Captions in the same main font, or a different one?",
+      "default": null,
+      "required": false
+    },
+    {
+      "key": "font_caption",
+      "scope": "shared",
+      "ask": "(found on their computer) the caption font; left unset, the main bold is reused",
+      "default": null,
+      "required": false
+    },
+    {
+      "key": "transcriber",
+      "scope": "shared",
+      "ask": "Transcribe with ElevenLabs (recommended, the most accurate word timings) or on this computer (free)?",
+      "default": null,
+      "required": true
+    },
+    {
+      "key": "output_rule",
+      "scope": "shared",
+      "ask": "Where should finished videos go? Next to the raw file in an '- Edit' folder is the default.",
+      "default": "beside the raw file, in a \"<video name> - Edit\" folder",
+      "required": false
+    },
+    {
+      "key": "media_drive",
+      "scope": "shared",
+      "ask": "Is your raw footage on an external drive? Which one?",
+      "default": "none",
+      "required": false
+    },
+    {
+      "key": "music_rule",
+      "scope": "shared",
+      "ask": "If you ask for music: should I always check which track with you, or pick one of your favourites and tell you?",
+      "default": "ask",
+      "required": false
+    },
+    {
+      "key": "proof_dir",
+      "scope": "shared",
+      "ask": "Where do you keep the real things I can show on screen: client results, reviews, screenshots, your own reel covers?",
+      "default": "none yet",
+      "required": false
+    },
+    {
+      "key": "asset_dirs",
+      "scope": "skill",
+      "ask": "Besides your proof folder, are there other folders I should search for real things to show: screenshots, posts, documents, B-roll?",
+      "default": "none",
+      "required": false
+    },
+    {
+      "key": "watermark",
+      "scope": "skill",
+      "ask": "Do you want your handle drawn as a small watermark beside the graphics? (yes or no)",
+      "default": "no",
+      "required": false
+    },
+    {
+      "key": "emphasis_scale",
+      "scope": "skill",
+      "ask": "Emphasis words in a serif or italic look smaller than a bold sans at the same size. How much larger should they be set? 1.12 suits a serif italic; use 1.0 when the emphasis font is the main font.",
+      "default": 1.12,
+      "required": false
+    },
+    {
+      "key": "heading_block",
+      "scope": "skill",
+      "ask": "Second line of each heading: on a solid block of your accent colour (block), or plain with a thin accent underline (underline)?",
+      "default": "block",
+      "required": false
+    },
+    {
+      "key": "popout",
+      "scope": "skill",
+      "ask": "Should the head and raised hands rise above the top edge of the panel (on, needs a clean cut-out of the person), or stay inside the panel (off)?",
+      "default": "on",
+      "required": false
+    },
+    {
+      "key": "close_up_zoom",
+      "scope": "skill",
+      "ask": "Add a slow, eased zoom-out on every full-frame close-up? (on or off)",
+      "default": "off",
+      "required": false
+    },
+    {
+      "key": "work_rule",
+      "scope": "skill",
+      "ask": "Should I show you the plan before building and the draft before the final render, or run to the end and report afterwards?",
+      "default": "show the plan before building and the draft before the final render",
+      "required": false
+    }
+  ]
+}

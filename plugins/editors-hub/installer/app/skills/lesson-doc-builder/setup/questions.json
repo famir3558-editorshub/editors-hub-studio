@@ -1,0 +1,175 @@
+{
+ "skill": "lesson-doc-builder",
+ "questions": [
+  {
+   "key": "creator_name",
+   "scope": "shared",
+   "ask": "What name should I use for you: the one that appears on screen and in my notes?",
+   "default": null,
+   "required": true
+  },
+  {
+   "key": "brand_name",
+   "scope": "shared",
+   "ask": "What is the business or brand called?",
+   "default": null,
+   "required": true
+  },
+  {
+   "key": "handle",
+   "scope": "shared",
+   "ask": "What is your main handle, and on which platform do you post most?",
+   "default": "not set",
+   "required": false
+  },
+  {
+   "key": "niche",
+   "scope": "shared",
+   "ask": "In one sentence: what do you help people with, and who are they?",
+   "default": "not set",
+   "required": false
+  },
+  {
+   "key": "accent",
+   "scope": "shared",
+   "ask": "What is your accent colour (the one colour used for the title keyword, arrows and highlights)?",
+   "default": null,
+   "required": true
+  },
+  {
+   "key": "accent_name",
+   "scope": "shared",
+   "ask": "(the plain word for the accent colour)",
+   "default": "accent colour",
+   "required": false
+  },
+  {
+   "key": "font_main_name",
+   "scope": "shared",
+   "ask": "Which font do you use for headlines?",
+   "default": null,
+   "required": true
+  },
+  {
+   "key": "font_main_bold",
+   "scope": "shared",
+   "ask": "(found on their computer) the bold weight of the main font",
+   "default": null,
+   "required": true
+  },
+  {
+   "key": "font_main_regular",
+   "scope": "shared",
+   "ask": "(found on their computer) the regular weight of the main font, used for every paragraph; a system font saved as local if the main font has no readable regular weight",
+   "default": null,
+   "required": true
+  },
+  {
+   "key": "font_title_name",
+   "scope": "shared",
+   "ask": "Do you want the big title in a different font from your headings (for example a serif)? Left unset, it is the main font.",
+   "default": null,
+   "required": false
+  },
+  {
+   "key": "font_title",
+   "scope": "shared",
+   "ask": "(found on their computer) the title font; left unset, the main bold is used",
+   "default": null,
+   "required": false
+  },
+  {
+   "key": "font_accent_name",
+   "scope": "shared",
+   "ask": "Do you want the title keyword in a second, contrasting font, or the same font in your colour?",
+   "default": "Playfair Display Italic",
+   "required": false
+  },
+  {
+   "key": "font_accent",
+   "scope": "shared",
+   "ask": "(found on their computer) the emphasis font; the shipped Playfair Display Italic if they have no preference",
+   "default": {
+    "file": "PlayfairDisplay-Italic.ttf"
+   },
+   "required": false
+  },
+  {
+   "key": "proof_dir",
+   "scope": "shared",
+   "ask": "Where do you keep the real things I can show on screen: client results, reviews, screenshots?",
+   "default": "none yet",
+   "required": false
+  },
+  {
+   "key": "credibility",
+   "scope": "skill",
+   "ask": "What are the two or three real results that go in the 'why you should listen to me' section? Facts in your own words; I never add to them.",
+   "default": null,
+   "required": true
+  },
+  {
+   "key": "series_name",
+   "scope": "skill",
+   "ask": "What should the small line above the title say: your series, channel or programme name?",
+   "default": "the channel name",
+   "required": false
+  },
+  {
+   "key": "model_dir",
+   "scope": "skill",
+   "ask": "Do you have your own framework images, models or diagrams? Where do they live?",
+   "default": "none: draw the diagrams",
+   "required": false
+  },
+  {
+   "key": "audience_types",
+   "scope": "skill",
+   "ask": "Which two kinds of people watch you (for the section that gives the same advice for each)?",
+   "default": "decide per lesson from the script",
+   "required": false
+  },
+  {
+   "key": "cta_default",
+   "scope": "skill",
+   "ask": "What does the in-video call to action usually point to, and is there anything I must never say about it?",
+   "default": "a free download for that lesson; ask for its name and link each time",
+   "required": false
+  },
+  {
+   "key": "spelling",
+   "scope": "skill",
+   "ask": "British or American spelling?",
+   "default": null,
+   "required": true
+  },
+  {
+   "key": "script_source",
+   "scope": "skill",
+   "ask": "Where do your scripts and outlines live: pasted into the chat, or somewhere I should look?",
+   "default": "pasted into the chat",
+   "required": false
+  },
+  {
+   "key": "doc_version",
+   "scope": "skill",
+   "ask": "The full document, a notes version (headings, diagrams and prompts only), or ask each time?",
+   "default": "full",
+   "required": false
+  },
+  {
+   "key": "doc_side",
+   "scope": "skill",
+   "ask": "When you record, is the document on the left of the screen or the right?",
+   "default": "left",
+   "required": false
+  },
+  {
+   "key": "docs_root",
+   "scope": "skill",
+   "ask": "Where should I save the documents?",
+   "default": "~/lesson-docs",
+   "required": false
+  }
+ ]
+}

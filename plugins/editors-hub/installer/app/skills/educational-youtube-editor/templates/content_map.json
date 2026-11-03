@@ -1,0 +1,22 @@
+{
+ "title": "__TITLE__",
+ "topic": "",
+ "promise": "what the viewer gets if they watch to the end, in one sentence",
+ "viewer": "who this is for and what they believe before watching",
+ "hook": {"a": 0, "b": 0, "line": "", "why_it_works": ""},
+ "learn": ["the things the creator says the viewer will learn, in their order"],
+ "sections": [
+  {"id": "intro", "a": 0, "b": 45, "name": "Intro", "kind": "intro", "energy": "high", "point": ""},
+  {"id": "s1", "a": 45, "b": 0, "name": "", "kind": "teaching | framework | story | example | nuance | transition | cta", "energy": "high | medium | low", "point": "the one thing this section must land"}
+ ],
+ "frameworks": [{"id": "fw1", "name": "", "steps": [], "introduced": 0, "returns": [{"t": 0, "step": 0}]}],
+ "lists": [{"t": 0, "n": 0, "items": [], "previewed_at": null}],
+ "comparisons": [{"t": 0, "a": "", "b": ""}],
+ "stories": [{"a": 0, "b": 0, "about": "", "people": [], "places": [], "dates": [], "emotional": true}],
+ "statistics": [{"t": 0, "value": "", "claim": "", "source": ""}],
+ "entities": [{"t": 0, "name": "", "type": "company | person | product | website | app | book | study | place | post | object", "said": "their exact words", "show": "what should be on screen"}],
+ "abstract": [{"t": 0, "idea": "", "metaphor": "how it could be SHOWN"}],
+ "callbacks": [{"t": 0, "refers_to": "id or time of the earlier moment", "note": "reuse the same visual so the viewer connects them"}],
+ "conclusions": [{"t": 0, "line": ""}],
+ "memorable": [{"t": 0, "line": ""}]
+}

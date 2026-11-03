@@ -1,0 +1,187 @@
+{
+ "skill": "ranking-format",
+ "questions": [
+  {
+   "key": "creator_name",
+   "scope": "shared",
+   "ask": "What name should I use for you: the one that appears on screen and in my notes?",
+   "default": null,
+   "required": true
+  },
+  {
+   "key": "brand_name",
+   "scope": "shared",
+   "ask": "What is the business or brand called?",
+   "default": null,
+   "required": true
+  },
+  {
+   "key": "handle",
+   "scope": "shared",
+   "ask": "What is your main handle, and on which platform do you post most?",
+   "default": "not set",
+   "required": false
+  },
+  {
+   "key": "platform",
+   "scope": "shared",
+   "ask": "(saved with the handle) the platform they post on most",
+   "default": "not set",
+   "required": false
+  },
+  {
+   "key": "niche",
+   "scope": "shared",
+   "ask": "In one sentence: what do you help people with, and who are they?",
+   "default": "not set",
+   "required": false
+  },
+  {
+   "key": "accent",
+   "scope": "shared",
+   "ask": "What is your accent colour (the one colour used for the topic title and the spoken item name)?",
+   "default": null,
+   "required": true
+  },
+  {
+   "key": "accent_name",
+   "scope": "shared",
+   "ask": "(saved with the accent colour) the plain word for it: blue, gold, lime",
+   "default": "accent colour",
+   "required": false
+  },
+  {
+   "key": "font_main_name",
+   "scope": "shared",
+   "ask": "Which font do you use for headlines?",
+   "default": "the main font",
+   "required": false
+  },
+  {
+   "key": "font_main_bold",
+   "scope": "shared",
+   "ask": "(found on their computer) the bold weight of the main font: title, tier letters and card names",
+   "default": null,
+   "required": true
+  },
+  {
+   "key": "font_caption_name",
+   "scope": "shared",
+   "ask": "Captions in the same main font, or a different one?",
+   "default": null,
+   "required": false
+  },
+  {
+   "key": "font_caption",
+   "scope": "shared",
+   "ask": "(found on their computer) the caption font; left unset, the main bold is reused",
+   "default": null,
+   "required": false
+  },
+  {
+   "key": "transcriber",
+   "scope": "shared",
+   "ask": "Transcribe with ElevenLabs (recommended, the most accurate word timings) or on this computer (free)?",
+   "default": null,
+   "required": true
+  },
+  {
+   "key": "output_rule",
+   "scope": "shared",
+   "ask": "Where should finished videos go? Next to the raw file in an '- Edit' folder is the default.",
+   "default": "beside the raw file, in a \"<video name> - Edit\" folder",
+   "required": false
+  },
+  {
+   "key": "media_drive",
+   "scope": "shared",
+   "ask": "Is your raw footage on an external drive? Which one?",
+   "default": "none",
+   "required": false
+  },
+  {
+   "key": "music_dir",
+   "scope": "shared",
+   "ask": "Where do you keep music you are allowed to use?",
+   "default": "none yet",
+   "required": false
+  },
+  {
+   "key": "music_rule",
+   "scope": "shared",
+   "ask": "Should I always ask before adding music, or add a favourite and tell you which?",
+   "default": "ask",
+   "required": false
+  },
+  {
+   "key": "proof_dir",
+   "scope": "shared",
+   "ask": "Where do you keep real things I can show on screen: screenshots, client results, your own reel covers?",
+   "default": "none yet",
+   "required": false
+  },
+  {
+   "key": "asset_dirs",
+   "scope": "skill",
+   "ask": "Besides your proof folder, other folders to search for a picture that represents each item (full paths; several are fine)",
+   "default": "none",
+   "required": false
+  },
+  {
+   "key": "web_assets",
+   "scope": "skill",
+   "ask": "May I fetch real screenshots, logos and photos from the web for the item cards? You decide what you are comfortable publishing; I list every source.",
+   "default": "yes: real over drawn, every source listed in the report",
+   "required": false
+  },
+  {
+   "key": "never_show",
+   "scope": "skill",
+   "ask": "Anything that must never appear on a card: names, brands, competitors, people?",
+   "default": "nothing listed",
+   "required": false
+  },
+  {
+   "key": "title_style",
+   "scope": "skill",
+   "ask": "Topic title style: italic or upright?",
+   "default": "italic",
+   "required": false
+  },
+  {
+   "key": "title_case",
+   "scope": "skill",
+   "ask": "Topic title case: all caps or as written?",
+   "default": "uppercase",
+   "required": false
+  },
+  {
+   "key": "card_name_colour",
+   "scope": "skill",
+   "ask": "Colour of the item name printed on each card (outlined in black so it reads on any picture)",
+   "default": "#FFE53B",
+   "required": false
+  },
+  {
+   "key": "captions",
+   "scope": "skill",
+   "ask": "Captions on the reel: on or off?",
+   "default": "on",
+   "required": false
+  },
+  {
+   "key": "face_rule",
+   "scope": "skill",
+   "ask": "Where may the table go if it would cover the face?",
+   "default": "safe zone first, then lower into the bottom zone, then 10-20% smaller; always show the option frames and let the creator choose",
+   "required": false
+  },
+  {
+   "key": "work_rule",
+   "scope": "skill",
+   "ask": "How far should I go alone: build a preview and report, or stop and check after the plan and after the layout options?",
+   "default": "build a preview, show the layout options when the table cannot sit in the safe zone, then wait for approval before the final",
+   "required": false
+  }
+ ]
+}

@@ -1,0 +1,27 @@
+{
+ "skill": "cutout-grid-reel",
+ "questions": [
+  {"key": "creator_name", "scope": "shared", "ask": "What name should I use for you: the one that appears on screen and in my notes?", "default": null, "required": true},
+  {"key": "brand_name", "scope": "shared", "ask": "What is the business or brand called?", "default": null, "required": false},
+  {"key": "handle", "scope": "shared", "ask": "What is your main handle, and on which platform do you post most?", "default": "not set", "required": false},
+  {"key": "niche", "scope": "shared", "ask": "In one sentence: what do you help people with, and who are they?", "default": "not set", "required": false},
+  {"key": "font_main_name", "scope": "shared", "ask": "Which font do you use for headlines? (it sets the hook label)", "default": null, "required": false},
+  {"key": "font_main_bold", "scope": "shared", "ask": "The main font file (bold weight), found on your computer.", "default": null, "required": true},
+  {"key": "font_main_regular", "scope": "shared", "ask": "A regular or medium weight of the main font, if you have one.", "default": null, "required": false},
+  {"key": "font_caption_name", "scope": "shared", "ask": "Captions in the same main font, or a different one?", "default": null, "required": false},
+  {"key": "font_caption", "scope": "shared", "ask": "The caption font file, if different from the main font.", "default": null, "required": false},
+  {"key": "paper", "scope": "shared", "ask": "Your off-white (used for the thin light rim round the cut-out), if your brand guide has one.", "default": "#F2F0EC", "required": false},
+  {"key": "transcriber", "scope": "shared", "ask": "Transcribe with ElevenLabs (most accurate, about $0.22 per hour) or on this computer (free)?", "default": null, "required": true},
+  {"key": "output_rule", "scope": "shared", "ask": "Where should finished videos go?", "default": "beside the raw file", "required": false},
+  {"key": "media_drive", "scope": "shared", "ask": "Is your raw footage on an external drive? Which one?", "default": "none", "required": false},
+  {"key": "music_dir", "scope": "shared", "ask": "Where do you keep music you are allowed to use?", "default": "none", "required": false},
+  {"key": "music_rule", "scope": "shared", "ask": "Should I always ask before adding music, or add a favourite and tell you which?", "default": "ask", "required": false},
+  {"key": "proof_dir", "scope": "shared", "ask": "Where do you keep your own images and real material I can use in the grid?", "default": "none yet", "required": false},
+  {"key": "caption_size", "scope": "skill", "ask": "How big should the captions on your chest be? 46 px keeps a four-to-six word line about as wide as your chest.", "default": "46", "required": false},
+  {"key": "caption_tracking", "scope": "skill", "ask": "Letter spacing of the captions, in em (negative is tighter). -0.045 suits a clean sans; use 0 for a wide or script font.", "default": "-0.045", "required": false},
+  {"key": "cutout_width", "scope": "skill", "ask": "How wide should you appear in the centre, in pixels of the 1080 frame? 540 is head to chest at medium size.", "default": "540", "required": false},
+  {"key": "hook_rule", "scope": "skill", "ask": "Should the opening carry a text hook on a white label across the top images?", "default": "ask each time", "required": false},
+  {"key": "web_images", "scope": "skill", "ask": "May I search the web for the images (stock and print-shop sites filtered out, every source listed in my report), or use only your own material?", "default": "yes: web search, every source listed in the report", "required": false},
+  {"key": "never_show", "scope": "skill", "ask": "Is there anything that must never be shown in the grid: people, brands, competitors, topics?", "default": "nothing listed", "required": false}
+ ]
+}

@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Review · Editors.Hub</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/app.css">
+<link rel="stylesheet" href="/static/review.css">
+</head>
+<body>
+<header class="top">
+  <a class="logo" href="/"></a>
+  <nav class="crumbs"><a href="/">‹ Your videos</a><span>/</span><span id="vClient"></span><b id="vName">…</b></nav>
+  <div class="spacer"></div>
+  <span class="claude-state" id="claudeState"></span>
+  <select id="statusSel" title="Status" data-maker></select>
+  <button class="btn small" id="folderBtn" data-maker>Folder</button>
+  <button class="btn warn small" id="changesBtn">Ask for changes</button>
+  <button class="btn primary small" id="approveBtn">Approve the edit</button>
+</header>
+
+<main class="review">
+  <section class="stage">
+    <div class="bar">
+      <div class="seg" id="modeSeg"><button data-mode="render" class="on">Render</button><button data-mode="live">Live preview</button></div>
+      <span class="faint small-print" id="renderName"></span>
+      <div class="spacer"></div>
+      <a class="btn small" id="studioBtn" target="_blank" rel="noopener" hidden>Studio ↗</a>
+      <label class="btn small primary" title="Or drop a video file anywhere on the page" data-maker>+ Upload draft<input type="file" id="draftInput" accept="video/*" hidden></label>
+    </div>
+    <div class="play-note" id="playNote" hidden></div>
+    <div class="bar" id="renderBar">
+      <div class="seg" id="viewSeg"><button data-view="watch" class="on">Watch</button><button data-view="compare">Compare</button></div>
+      <div class="compare-pick" id="comparePick" hidden>
+        <select id="cmpA"></select><span class="faint">vs</span><select id="cmpB"></select>
+      </div>
+    </div>
+    <div id="approvedBar" class="approved" hidden></div>
+
+    <div class="player" id="player">
+      <video id="vid" playsinline preload="metadata"></video>
+      <div class="compare" id="compareBox" hidden>
+        <figure><video id="vidA" playsinline preload="metadata" muted></video><figcaption id="capA"></figcaption></figure>
+        <figure><video id="vidB" playsinline preload="metadata" muted></video><figcaption id="capB"></figcaption></figure>
+      </div>
+      <iframe id="liveFrame" title="Live preview" hidden></iframe>
+      <div class="drop" id="emptyDrop" hidden>
+        <div class="drop-icon">▶</div>
+        <h3 id="emptyTitle">No draft yet</h3>
+        <p class="muted" id="emptyText">Drop a rendered video here, click <b>+ Upload draft</b>, or wait for Claude to ask for your render settings.</p>
+        <button class="btn primary small" id="startLive" data-maker hidden>Start live preview</button>
+      </div>
+    </div>
+
+    <div class="controls" id="controls">
+      <button class="btn small icon" id="playBtn" title="Play (Space)">▶</button>
+      <button class="btn small" id="back5">-5s</button>
+      <button class="btn small" id="fwd5">+5s</button>
+      <span class="clock"><b id="tNow">0:00.0</b> / <span id="tDur">0:00.0</span></span>
+      <div class="spacer"></div>
+      <button class="btn small" id="speedBtn" title="Playback speed">1x</button>
+      <button class="btn small" id="soundBtn">Sound</button>
+      <button class="btn small" id="fullBtn">Full screen</button>
+    </div>
+    <div class="timeline" id="timeline">
+      <div class="bubbles" id="bubbles"></div>
+      <div class="track"><div class="played" id="played"></div><div id="markers"></div><div class="head" id="head"></div></div>
+      <div class="ticks" id="ticks"></div>
+    </div>
+    <div class="keys faint">Space play/pause · ←/→ 1 s (Shift 5 s) · , / . one frame · N new note</div>
+
+    <div class="info">
+      <div class="panel-box" data-maker><h4>Made with</h4><div id="madeWith" class="made-with"></div></div>
+      <div class="panel-box"><h4>Brief</h4><div id="brief" class="brief"></div></div>
+      <div class="panel-box"><h4>Files</h4><div id="files"></div></div>
+      <div class="panel-box" data-maker>
+        <h4>Who can review</h4>
+        <div id="reviewers" class="atts"></div>
+        <div class="row rev-add"><input id="revEmail" type="email" placeholder="client@email.com" autocomplete="off"><button class="btn small" id="addRev">Invite</button></div>
+        <p class="faint small-print">A client with a reviewer account sees only the videos they're invited to: no styles, nothing else.</p>
+      </div>
+    </div>
+  </section>
+
+  <aside class="side">
+    <div class="side-tabs">
+      <div class="seg" id="sideSeg"><button data-side="notes" class="on">Notes <span class="faint" id="doneCount"></span></button><button data-side="live" data-maker>Live <span class="live-new" id="liveNew" hidden></span></button><button data-side="broll" data-maker>B-roll <span class="live-new" id="brollNew" hidden>!</span></button><button data-side="drafts">Drafts</button></div>
+      <span class="live-dot" id="liveDot" title="Is a Claude session listening for your feedback?"><i></i><span>Listening</span></span>
+    </div>
+    <div class="side-sub faint" id="draftInfo"></div>
+
+    <div class="side-body" id="notesPane">
+      <section id="changedBox" hidden>
+        <div class="row"><b>Changed in this draft</b><div class="spacer"></div><span class="faint small-print" id="workedFor"></span></div>
+        <div id="changedList"></div>
+      </section>
+      <div class="row list-head"><b id="noteCount">Notes</b><div class="spacer"></div><label><input type="checkbox" id="allVers"> All drafts</label></div>
+      <ol id="noteList"></ol>
+    </div>
+    <div class="side-body" id="livePane" hidden>
+      <div id="renderCard"></div>
+      <div id="liveFeed"></div>
+    </div>
+    <div class="side-body" id="brollPane" hidden><div id="brollSide"></div></div>
+    <div class="side-body" id="draftsPane" hidden><div id="draftList"></div></div>
+
+    <div class="composer" id="composer">
+      <div class="pending" id="pendingAtt"></div>
+      <div class="add-more">
+        <button class="btn small wide-btn" id="addMoreBtn">＋ Anything to add? Images or links</button>
+        <div class="add-menu" id="addMenu" hidden>
+          <label class="btn small">Image or file<input type="file" id="attFile" multiple hidden></label>
+          <div class="row"><input id="linkInput" placeholder="https://…"><button class="btn small" id="addLink">Add link</button></div>
+        </div>
+      </div>
+      <form class="note-box" id="noteForm">
+        <button type="button" class="time" id="atBtn" title="Use the playhead's time">◷ 0:00.0</button>
+        <textarea id="noteText" rows="2" placeholder="Feedback on this draft…"></textarea>
+        <label class="icon-btn" title="Attach an image or file">📎<input type="file" id="attFile2" multiple hidden></label>
+        <button class="icon-btn send" id="addBtn" title="Add the note (Enter)">↑</button>
+      </form>
+      <button class="btn submit-btn" id="submitBtn" data-maker>Submit feedback to Claude</button>
+      <p class="faint small-print hint" id="submitHint"></p>
+    </div>
+  </aside>
+</main>
+
+<dialog id="brollDlg">
+  <form method="dialog" id="brollForm">
+    <h2 id="brollTitle"></h2>
+    <p class="muted" id="brollIntro" style="margin:0"></p>
+    <div id="brollBody"></div>
+    <div class="error"></div>
+    <div class="actions"><span class="faint small-print" id="brollCount"></span><div class="spacer"></div><button class="btn ghost" type="button" id="brollLater">Later</button><span id="brollActions"></span></div>
+  </form>
+</dialog>
+
+<dialog id="renderDlg">
+  <form method="dialog" id="renderForm">
+    <h2 id="renderTitle">Choose the render settings</h2>
+    <p class="muted" id="renderNote" style="margin:0"></p>
+    <label class="field">Resolution<select name="resolution"></select></label>
+    <label class="field">Frame rate<select name="fps"></select></label>
+    <label class="field">Bitrate <small>Higher looks cleaner and makes a bigger file.</small><select name="bitrate"></select></label>
+    <label class="field">Format<select name="format"></select></label>
+    <label class="field">Audio quality<select name="audio"></select></label>
+    <p class="render-plan" id="renderPlan"></p>
+    <div class="error"></div>
+    <div class="actions"><button class="btn ghost" type="button" id="renderLater">Later</button><button class="btn primary" id="renderGo">Start the render</button></div>
+  </form>
+</dialog>
+
+<div class="dropveil" id="dropVeil"><div>Drop to add a new draft</div></div>
+<div class="uploading" id="uploading" hidden><span id="upText">Uploading…</span><div class="progress"><div id="upBar"></div></div></div>
+<div id="toast"></div>
+<script src="/static/app.js"></script>
+<script src="/static/review.js"></script>
+</body>
+</html>

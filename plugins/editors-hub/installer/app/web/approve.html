@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Ask for access · Editors.Hub</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/app.css">
+<link rel="stylesheet" href="/static/signin.css">
+</head>
+<body>
+<main class="signin-page">
+  <section class="card signin-card" style="max-width:460px;margin:8vh auto;padding:28px;display:grid;gap:16px">
+    <a class="logo" href="/"></a>
+    <h1 id="title" style="margin:0;font-family:var(--display);font-size:24px">Ask for access</h1>
+    <p class="muted" id="lead" style="margin:0">Editors.Hub is private. Add your name and email, and a code goes to the studio's owner. If they let you in, they'll give it to you.</p>
+    <form id="askForm" style="display:grid;gap:14px">
+      <label class="field">Username<input name="username" required autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="e.g. sam"></label>
+      <label class="field">Email<input name="email" type="email" required autocomplete="email" placeholder="you@email.com"></label>
+      <button class="btn primary" id="askBtn">Ask for a code</button>
+    </form>
+    <form id="codeForm" hidden style="display:grid;gap:14px">
+      <label class="field">The code from the owner<input name="code" required inputmode="numeric" autocomplete="one-time-code" placeholder="123456"></label>
+      <button class="btn primary" id="codeBtn">Let me in</button>
+      <button class="btn ghost" type="button" id="backBtn">Back</button>
+    </form>
+    <div class="error" id="err"></div>
+  </section>
+</main>
+<div id="toast"></div>
+<script src="/static/app.js"></script>
+<script src="/static/approve.js"></script>
+</body>
+</html>

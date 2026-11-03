@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Project · Editors.Hub</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/app.css">
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header class="top">
+  <a class="logo" href="/"></a>
+  <a class="btn ghost small" href="/#projects">← Projects</a>
+  <div class="spacer"></div>
+</header>
+
+<main class="wrap">
+  <section class="hero-style">
+    <div class="stills" id="stills"></div>
+    <div class="about">
+      <h1 id="pName">…</h1>
+      <p class="faint" id="pSub"></p>
+      <div class="chips" id="chips"></div>
+      <p class="desc" id="pAbout"></p>
+      <div class="actions">
+        <button class="btn primary" id="videoBtn">+ Video</button>
+        <button class="btn" id="promptBtn">Copy a prompt for Claude</button>
+        <button class="btn" id="editBtn" hidden>Edit details</button>
+        <button class="btn" id="folderBtn">Main folder</button>
+        <a class="btn" id="downloadBtn" download>Download (.zip)</a>
+        <button class="btn" id="saveBtn">Save to a drive</button>
+        <button class="btn" id="deleteBtn" hidden>Delete</button>
+      </div>
+      <p class="faint small-print hint">The client's brand decides colours, fonts and logos. The style you pick for each video decides the editing.</p>
+    </div>
+  </section>
+
+  <nav class="stabs" id="tabs"></nav>
+
+  <section class="pane" id="pane"></section>
+</main>
+
+<dialog id="saveDlg">
+  <form method="dialog" id="saveForm">
+    <h2>Save this client to a drive</h2>
+    <p class="muted" style="margin:0">For a backup, or to take them to another computer (Mac or Windows). Their details, brand guidelines, brand files and videos all come along. On the other computer: <b>Projects → Import a project</b>.</p>
+    <div class="places" id="places">Looking for drives…</div>
+    <label class="field">Or another folder<input name="dest" placeholder="E:\ or /Volumes/USB" autocomplete="off"></label>
+    <p class="render-styles" id="saveStyles" hidden></p>
+    <p class="faint small-print" id="saveSize"></p>
+    <div class="progress" hidden><div></div></div>
+    <div class="error"></div>
+    <div class="actions"><button class="btn ghost" type="button" onclick="this.closest('dialog').close()">Close</button><button class="btn primary" id="saveGo">Save</button></div>
+  </form>
+</dialog>
+
+<div class="dropveil" id="dropVeil"><div id="dropText">Drop to add to this client</div></div>
+<div class="uploading" id="uploading" hidden><span id="upText">Adding…</span><div class="progress"><div id="upBar"></div></div></div>
+<input type="file" id="fileInput" multiple hidden>
+<div id="toast"></div>
+<script src="/static/app.js"></script>
+<script src="/static/project.js"></script>
+</body>
+</html>

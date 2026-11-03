@@ -1,0 +1,21 @@
+{
+ "skill": "video-to-written-content",
+ "questions": [
+  {"key": "creator_name", "scope": "shared", "ask": "What name should I use for you: the one your writing goes out under?", "default": null, "required": true},
+  {"key": "brand_name", "scope": "shared", "ask": "What is the business or brand called?", "default": "same as the creator's name", "required": true},
+  {"key": "handle", "scope": "shared", "ask": "What is your main handle?", "default": null, "required": false},
+  {"key": "platform", "scope": "shared", "ask": "Which platform do you post on most?", "default": null, "required": false},
+  {"key": "niche", "scope": "shared", "ask": "In one sentence: what do you help people with, and who are they?", "default": null, "required": true},
+  {"key": "transcriber", "scope": "shared", "ask": "Transcribe with ElevenLabs (recommended: most accurate, about $0.22 per hour of audio) or on this computer (free)?", "default": "elevenlabs", "options": ["elevenlabs", "local"], "required": true},
+  {"key": "outputs", "scope": "skill", "ask": "Which kinds of writing do you want from each video by default?", "default": ["emails", "youtube-community"], "options": ["emails", "youtube-community", "linkedin", "x-threads"], "required": true},
+  {"key": "voice_samples", "scope": "skill", "ask": "Paste or upload 2-3 emails or posts you wrote yourself and are proud of, so the writing sounds like you on the page.", "default": "none yet: voice taken from how they speak in each video", "required": true},
+  {"key": "offers", "scope": "skill", "ask": "What offers, lead magnets or links may a call to action point to? For each: its name, the link, and when it fits.", "default": "none", "required": true},
+  {"key": "default_cta", "scope": "skill", "ask": "When none of those fits a piece, what should the call to action be?", "default": "link to the source video", "required": true},
+  {"key": "email_signoff", "scope": "skill", "ask": "How do you sign off your emails?", "default": "the creator's first name on its own line", "required": true},
+  {"key": "audience_name", "scope": "skill", "ask": "Do you have a name for your list or your audience?", "default": "no name: write to one reader as \"you\"", "required": true},
+  {"key": "spelling", "scope": "skill", "ask": "British or American spelling?", "default": "match the speaker", "options": ["British", "American", "match the speaker"], "required": true},
+  {"key": "keyterms", "scope": "skill", "ask": "Which names, brands and terms should the transcript always spell correctly? (your name and brand are added automatically)", "default": ["<creator_name>", "<brand_name>"], "required": true},
+  {"key": "banned_phrases", "scope": "skill", "ask": "Are there words or phrases you never want in your copy?", "default": "none added", "required": true},
+  {"key": "output_dir", "scope": "skill", "ask": "Where should the folders of finished writing go?", "default": "./video-content", "required": true}
+ ]
+}

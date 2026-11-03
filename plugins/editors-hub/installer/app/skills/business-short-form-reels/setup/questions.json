@@ -1,0 +1,27 @@
+{
+ "skill": "business-short-form-reels",
+ "questions": [
+  {"key": "creator_name", "scope": "shared", "ask": "What name should I use for you: the one that appears on screen and in my notes?", "default": null, "required": true},
+  {"key": "brand_name", "scope": "shared", "ask": "What is the business or brand called?", "default": null, "required": true},
+  {"key": "handle", "scope": "shared", "ask": "What is your main handle?", "default": null, "required": true},
+  {"key": "platform", "scope": "shared", "ask": "Which platform do you post on most?", "default": "Instagram", "required": false},
+  {"key": "niche", "scope": "shared", "ask": "In one sentence: what do you help people with, and who are they?", "default": null, "required": true},
+  {"key": "accent", "scope": "shared", "ask": "What is your brand's accent colour (hex)? Or drop in a logo, brand guide or website and I will read it.", "default": null, "required": true},
+  {"key": "accent_name", "scope": "shared", "ask": "(derived) the plain word for the accent colour", "default": "accent colour", "required": false},
+  {"key": "font_main_name", "scope": "shared", "ask": "Which font do you use for headlines?", "default": null, "required": true},
+  {"key": "font_main_bold", "scope": "shared", "ask": "(found on their computer) the bold weight of the main font", "default": null, "required": true},
+  {"key": "font_accent_name", "scope": "shared", "ask": "Do you want key words in a second, contrasting font, or the same font in your colour?", "default": "Playfair Display Italic", "required": false},
+  {"key": "font_accent", "scope": "shared", "ask": "(found on their computer) the emphasis font", "default": {"file": "PlayfairDisplay-Italic.ttf"}, "required": false},
+  {"key": "transcriber", "scope": "shared", "ask": "Transcription: ElevenLabs (recommended) or on this computer (free)?", "default": null, "required": true},
+  {"key": "output_rule", "scope": "shared", "ask": "Where should finished videos go?", "default": "beside the raw file, in a \"<Title> - Edit\" folder", "required": false},
+  {"key": "sfx_dir", "scope": "shared", "ask": "Do you have a sound-effects pack? Which folder?", "default": "none yet (reels are delivered without sound effects)", "required": false},
+  {"key": "music_dir", "scope": "shared", "ask": "Where do you keep music you are allowed to use?", "default": "none yet", "required": false},
+  {"key": "music_rule", "scope": "shared", "ask": "Should I always ask before adding music, or pick a favourite and tell you?", "default": "ask", "required": false},
+  {"key": "proof_dir", "scope": "shared", "ask": "Where do you keep client results, testimonials, screenshots and reel covers?", "default": "none yet (ask the creator for each real asset)", "required": false},
+  {"key": "camera_setup", "scope": "skill", "ask": "How do you film your business videos?", "default": null, "required": true},
+  {"key": "crop_full", "scope": "skill", "ask": "(worked out from a sample clip) 9:16 crop window: width height x y", "default": "1215 2160 1312 0", "required": false},
+  {"key": "crop_top", "scope": "skill", "ask": "(worked out from a sample clip) 9:8 crop window: width height x y", "default": "1800 1600 1020 280", "required": false},
+  {"key": "working_style", "scope": "skill", "ask": "Check design choices with you before building, or build first and report?", "default": "consult", "required": true},
+  {"key": "cta_style", "scope": "skill", "ask": "How do your videos usually end?", "default": "comment a keyword to get the resource", "required": false}
+ ]
+}

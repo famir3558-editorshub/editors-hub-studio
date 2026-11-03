@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 \"${CLAUDE_PLUGIN_ROOT}/installer/check.py\" 2>/dev/null || py \"${CLAUDE_PLUGIN_ROOT}/installer/check.py\"",
+            "timeout": 60
+          }
+        ]
+      }
+    ]
+  }
+}

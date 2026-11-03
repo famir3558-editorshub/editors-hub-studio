@@ -1,0 +1,15 @@
+{
+ "_note": "Worked example from the original style. A reference for structure only: never reuse its wording, names or assets. composite.py reads title, source, out_dir, fps, top_crop, fs_crop, fullscreen, scenes; underscore keys are ignored.",
+ "title": "Example Reel",
+ "source": "/path/to/the-cut.mp4",
+ "out_dir": "/path/to/output/Example Reel - Edit",
+ "fps": "24000/1001",
+ "top_crop": [1800, 1600, 1060, 200],
+ "fs_crop": [1215, 2160, 1342, 0],
+ "fullscreen": [[3.0, 5.4]],
+ "scenes": [
+  { "id": "01-Hook", "start": 0.0, "end": 3.7 },
+  { "id": "02-Framework", "start": 3.7, "end": 12.6 },
+  { "id": "03-Close", "start": 12.6, "end": 18.0 }
+ ]
+}

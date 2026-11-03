@@ -1,0 +1,30 @@
+{
+ "skill": "image-cluster-reel",
+ "questions": [
+  {"key": "creator_name", "scope": "shared", "ask": "What name should I use for you: the one that appears on screen and in my notes?", "default": null, "required": true},
+  {"key": "brand_name", "scope": "shared", "ask": "What is the business or brand called?", "default": null, "required": true},
+  {"key": "handle", "scope": "shared", "ask": "What is your main handle, and on which platform do you post most?", "default": "not set", "required": false},
+  {"key": "niche", "scope": "shared", "ask": "In one sentence: what do you help people with, and who are they?", "default": "not set", "required": false},
+  {"key": "accent", "scope": "shared", "ask": "What is your accent colour? (This style does not draw it: it is saved so every skill in the pack shares one profile.)", "default": null, "required": true},
+  {"key": "accent_name", "scope": "shared", "ask": "(saved with the accent colour) the plain word for it: blue, gold, lime", "default": "accent colour", "required": false},
+  {"key": "font_main_name", "scope": "shared", "ask": "Which font do you use for headlines?", "default": null, "required": true},
+  {"key": "font_main_bold", "scope": "shared", "ask": "(found on their computer) the bold weight of the main font", "default": null, "required": true},
+  {"key": "font_main_regular", "scope": "shared", "ask": "(found on their computer) the regular or medium weight of the main font; used for the captions when no caption font is set", "default": null, "required": false},
+  {"key": "font_caption_name", "scope": "shared", "ask": "Captions in the same main font, or a different one?", "default": null, "required": false},
+  {"key": "font_caption", "scope": "shared", "ask": "(found on their computer) the caption font file or installed name; leave unset to reuse the main font", "default": null, "required": false},
+  {"key": "transcriber", "scope": "shared", "ask": "Transcribe with ElevenLabs (recommended, the most accurate word timings) or on this computer (free)?", "default": null, "required": true},
+  {"key": "output_rule", "scope": "shared", "ask": "Where should finished videos go? Next to the raw file in an '- Edit' folder is the default.", "default": "beside the raw file, in a \"<video name> - Edit\" folder", "required": false},
+  {"key": "media_drive", "scope": "shared", "ask": "Is your raw footage on an external drive? Which one?", "default": "none", "required": false},
+  {"key": "music_dir", "scope": "shared", "ask": "Where do you keep music you are allowed to use?", "default": "none yet", "required": false},
+  {"key": "music_rule", "scope": "shared", "ask": "Should I always ask before adding music, or add a favourite and tell you which?", "default": "ask", "required": false},
+  {"key": "proof_dir", "scope": "shared", "ask": "Where do you keep the real things I can show on screen: client results, testimonials, screenshots?", "default": "none yet", "required": false},
+  {"key": "caption_size", "scope": "skill", "ask": "How big should the captions be? 30 px on a 1080-wide frame is the tiny, quiet size this style is built on.", "default": 30, "required": false},
+  {"key": "caption_x", "scope": "skill", "ask": "Where should the left edge of the captions sit, in pixels from the left of a 1080-wide frame? (Moved per reel to the side of the chin with the most clear space.)", "default": 92, "required": false},
+  {"key": "caption_y", "scope": "skill", "ask": "How far down should the top of the captions sit, in pixels from the top of a 1920-high frame? Always above 1250.", "default": 1196, "required": false},
+  {"key": "image_types", "scope": "skill", "ask": "Which kinds of image do you want above your head: metaphors and surreal art, memes, known experiments and diagrams, quote screenshots? Anything you do not want?", "default": "a mix of metaphor and surreal art, memes people recognise, known experiments or diagrams, and quote screenshots or the person when one is named", "required": false},
+  {"key": "image_sources", "scope": "skill", "ask": "Where should I look for images: Pinterest in your own logged-in Chrome (needs the Claude in Chrome extension), a web image search, only your own folders, or a mix?", "default": "Pinterest through the Claude in Chrome extension when it is connected, otherwise the web image search script, plus the creator's own folders first", "required": false},
+  {"key": "image_dirs", "scope": "skill", "ask": "Besides your proof folder, are there folders of your own images I should search first (screenshots, past reels, a saved collection)? Full paths; several are fine.", "default": "none", "required": false},
+  {"key": "never_show", "scope": "skill", "ask": "Is there anything or anyone that must never be shown on screen: people, brands, topics, competitors?", "default": "nothing listed", "required": false},
+  {"key": "review_rule", "scope": "skill", "ask": "Should I show you a quick 720p preview and wait for your notes before the full-quality render, or go straight to the final?", "default": "show a preview and wait for approval before the final render", "required": false}
+ ]
+}

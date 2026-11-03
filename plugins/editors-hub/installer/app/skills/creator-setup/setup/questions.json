@@ -1,0 +1,7 @@
+{"skill": "creator-setup", "questions": [
+ {"key": "creator_name", "scope": "shared", "ask": "What name should I use for you?", "default": "", "required": true},
+ {"key": "brand_name", "scope": "shared", "ask": "What is the business or brand called?", "default": "", "required": true},
+ {"key": "accent", "scope": "shared", "ask": "What is your accent colour?", "default": "", "required": true},
+ {"key": "font_main_bold", "scope": "shared", "ask": "Which font do you use for headlines?", "default": "", "required": true},
+ {"key": "transcriber", "scope": "shared", "ask": "ElevenLabs or on-this-computer transcription?", "default": "elevenlabs", "required": true}
+]}

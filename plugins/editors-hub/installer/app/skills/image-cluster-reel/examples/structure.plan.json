@@ -1,0 +1,25 @@
+{
+ "_note": "Worked example from the original style. A reference for structure and API use only: never reuse its wording, names or assets. The image files named here are not shipped.",
+ "duration": 13.0,
+ "caption": {"x": 92, "y": 1196, "size": 30, "lead": 0.1},
+ "captions": [
+  "the first thought goes here",
+  "a second line of\nthree to five words",
+  "next idea",
+  "caption blocks are replaced\nnot built word by word",
+  "the last block has\nno punctuation"
+ ],
+ "clusters": [
+  {"t": 0.0, "images": [
+    {"file": "images/metaphor-a.jpg", "t": 0.1, "x": 150, "y": 330, "w": 360, "z": 1},
+    {"file": "images/meme-b.jpg", "t": 1.25, "x": 560, "y": 300, "w": 330, "z": 2}]},
+  {"t": 3.2, "images": [
+    {"file": "images/abstract-c.jpg", "t": 3.25, "x": 330, "y": 300, "w": 470, "z": 1}]},
+  {"t": 6.4, "images": [
+    {"file": "images/diagram-d.jpg", "t": 6.45, "x": 120, "y": 360, "w": 470, "z": 1},
+    {"file": "images/photo-e.jpg", "t": 7.5, "x": 520, "y": 290, "w": 290, "z": 2},
+    {"file": "images/quote-f.jpg", "t": 8.7, "x": 300, "y": 520, "w": 420, "z": 3}]},
+  {"t": 10.0, "images": [
+    {"file": "images/surreal-g.jpg", "t": 10.05, "x": 200, "y": 330, "w": 520, "z": 1}]}
+ ]
+}

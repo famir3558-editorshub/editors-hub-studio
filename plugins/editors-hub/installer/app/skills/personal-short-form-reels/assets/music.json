@@ -1,0 +1,6 @@
+{
+ "_note": "Favourite music beds, filled in at setup. start = the second of the track where the reel's music should begin. Level: -43 dB mean (mix.py default).",
+ "root": "@@MUSIC_DIR@@",
+ "favourites": [],
+ "rejected": []
+}

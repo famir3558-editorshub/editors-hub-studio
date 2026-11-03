@@ -1,0 +1,66 @@
+/* Lesson Doc Builder: design system. Page = 960px wide (one half of a 1080p frame).
+   Brand values are filled in by setup (setup/apply_profile.py). Fonts are read from fonts/ beside this file. */
+  @font-face{font-family:"DocMain";font-weight:700;src:@@FONT_MAIN_BOLD_SRC_CSS@@}
+  @font-face{font-family:"DocMain";font-weight:400;src:@@FONT_MAIN_REGULAR_SRC_CSS@@}
+  @font-face{font-family:"DocTitle";font-weight:100 900;src:@@FONT_TITLE_SRC_CSS@@}
+  @font-face{font-family:"DocAccent";font-weight:100 900;font-style:italic;src:@@FONT_ACCENT_SRC_CSS@@}
+  :root{
+    --ink:#111111; --body:#1d1d1d; --muted:#8E8983; --line:#E6E1DA; --raised:#F6F4F1; --neutral:#D9D4CD;
+    --accent:@@ACCENT@@; --accent-text:@@ACCENT_DARK@@; --on-accent-text:@@ON_ACCENT_DARK@@; --accent-tint:@@ACCENT_TINT@@;
+    --link:#1a5fd0;
+    --sans:"DocMain", 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    --title:"DocTitle", "DocMain", 'Helvetica Neue', Helvetica, Arial, sans-serif;
+    --emph:"DocAccent", "DocTitle", Georgia, serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:#fff;color:var(--body)}
+  body{font-family:var(--sans);font-size:20px;line-height:1.5;letter-spacing:-.01em;-webkit-font-smoothing:antialiased}
+  .page{width:960px;margin:0 auto;padding:120px 70px 200px}
+  p{margin:0 0 14px}
+  b,strong{color:var(--ink)}
+  a{color:var(--link)}
+
+  .kicker{font-size:13px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--muted);margin-bottom:14px}
+  h1{font-family:var(--title);font-weight:900;font-size:50px;line-height:1.08;letter-spacing:-.01em;color:var(--ink);margin:0 0 34px}
+  h1 em{font-family:var(--emph);font-weight:400;font-style:italic;color:var(--accent)}
+  h1 .num{font-family:var(--sans);font-weight:700}   /* figures in the title stay in the main font */
+  h2{font-size:34px;font-weight:700;color:var(--ink);line-height:1.2;margin:70px 0 14px;letter-spacing:-.015em}
+  h3{font-size:26px;font-weight:700;color:var(--ink);line-height:1.25;margin:56px 0 12px;letter-spacing:-.01em}
+  h4{font-size:21px;font-weight:700;color:var(--ink);margin:30px 0 10px}
+  h5{font-size:20px;font-weight:700;color:var(--ink);text-decoration:underline;text-underline-offset:3px;margin:26px 0 10px}
+  .runin{font-weight:700;color:var(--ink);display:block;margin-bottom:2px}
+  .formula{font-weight:700;color:var(--ink);margin-bottom:10px}
+
+  /* black callout bar */
+  .bar{background:var(--ink);color:#fff;font-weight:700;text-align:center;padding:16px 26px;margin:26px 0;line-height:1.4}
+  .bar em{font-style:normal;color:var(--accent)}
+
+  /* numbered accent labels */
+  .label{display:inline-block;background:var(--accent-text);color:var(--on-accent-text);font-weight:700;padding:1px 8px;margin:16px 0 4px}
+
+  ul,ol{margin:6px 0 16px;padding-left:28px}
+  li{margin-bottom:8px}
+  .fill{letter-spacing:.05em;color:var(--muted)}
+  .tbd{background:var(--accent-tint);padding:0 4px}
+
+  /* proof grid */
+  .proof{display:grid;grid-template-columns:1fr 1fr;gap:34px 30px;margin:30px 0 10px}
+  .proof figure{margin:0;text-align:center}
+  .proof .shot{height:230px;background:var(--raised);border:1px solid var(--line);overflow:hidden;display:flex;align-items:center;justify-content:center}
+  .proof img{width:100%;height:100%;object-fit:cover}
+  .proof img.contain{object-fit:contain;background:#000}
+  .proof figcaption b{display:block;font-size:21px;margin-top:12px}
+  .proof figcaption span{font-size:17px}
+  .proof.one{grid-template-columns:1fr}            /* a single wide proof shot */
+  .ph{font-size:13px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}   /* stand-in text inside an empty .shot or .model */
+
+  .model{margin:26px -20px 10px;border:1px solid var(--line)}
+  .model img{display:block;width:100%}
+  .model.empty{height:300px;display:flex;align-items:center;justify-content:center;background:var(--raised)}
+  figure.diagram{margin:26px 0;text-align:center}
+  svg text{font-family:var(--sans)}
+  .cap{font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+
+  /* diagram colours: use these classes in SVG instead of typing the accent hex, so a colour change re-skins every doc */
+  .af{fill:var(--accent)} .as{stroke:var(--accent)} .at{fill:var(--accent-text)}
+  .nf{fill:var(--neutral)} .ns{stroke:var(--neutral)} .mt{fill:var(--muted)}

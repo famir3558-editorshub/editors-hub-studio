@@ -1,0 +1,176 @@
+{
+ "skill": "broll-stacked-text-edit",
+ "questions": [
+  {
+   "key": "creator_name",
+   "scope": "shared",
+   "ask": "What name should I use for you: the one that appears in my notes and reports?",
+   "default": null,
+   "required": true
+  },
+  {
+   "key": "brand_name",
+   "scope": "shared",
+   "ask": "What is the business or brand called?",
+   "default": null,
+   "required": true
+  },
+  {
+   "key": "handle",
+   "scope": "shared",
+   "ask": "What is your main handle, and on which platform do you post most?",
+   "default": "not set",
+   "required": false
+  },
+  {
+   "key": "accent",
+   "scope": "shared",
+   "ask": "What is your accent colour? It is the colour of the one key word in a stacked caption.",
+   "default": null,
+   "required": true
+  },
+  {
+   "key": "accent_name",
+   "scope": "shared",
+   "ask": "(saved with the accent colour) the plain word for it: blue, gold, lime",
+   "default": "accent colour",
+   "required": false
+  },
+  {
+   "key": "font_main_name",
+   "scope": "shared",
+   "ask": "Which font do you use for headlines? The large line of a stacked caption is set in its bold weight.",
+   "default": "main font",
+   "required": false
+  },
+  {
+   "key": "font_main_bold",
+   "scope": "shared",
+   "ask": "(found on their computer) the bold weight of the main font",
+   "default": null,
+   "required": true
+  },
+  {
+   "key": "font_main_regular",
+   "scope": "shared",
+   "ask": "(found on their computer) the regular or medium weight of the main font; left unset, the caption font or the bold is reused",
+   "default": null,
+   "required": false
+  },
+  {
+   "key": "font_caption_name",
+   "scope": "shared",
+   "ask": "Captions in the same main font, or a different one?",
+   "default": null,
+   "required": false
+  },
+  {
+   "key": "font_caption",
+   "scope": "shared",
+   "ask": "(found on their computer) the caption font; left unset, the regular weight of the main font is used",
+   "default": null,
+   "required": false
+  },
+  {
+   "key": "font_accent_name",
+   "scope": "shared",
+   "ask": "Do you want the key word in a second, contrasting font, or the same font in your colour?",
+   "default": "Playfair Display Italic",
+   "required": false
+  },
+  {
+   "key": "font_accent",
+   "scope": "shared",
+   "ask": "(found on their computer) the emphasis font; the shipped Playfair Display Italic if they have no preference",
+   "default": {
+    "file": "PlayfairDisplay-Italic.ttf"
+   },
+   "required": false
+  },
+  {
+   "key": "transcriber",
+   "scope": "shared",
+   "ask": "Transcribe with ElevenLabs (recommended, the most accurate word timings) or on this computer (free)?",
+   "default": null,
+   "required": true
+  },
+  {
+   "key": "output_rule",
+   "scope": "shared",
+   "ask": "Where should finished videos go? Next to the raw file in an '- Edit' folder is the default.",
+   "default": "beside the raw file, in a \"<video name> - Edit\" folder",
+   "required": false
+  },
+  {
+   "key": "media_drive",
+   "scope": "shared",
+   "ask": "Is your footage on an external drive? Which one?",
+   "default": "none",
+   "required": false
+  },
+  {
+   "key": "broll_dirs",
+   "scope": "skill",
+   "ask": "Where does your B-roll footage live? Give me the folder, or several. (If you already indexed it with personal-broll-library I will start from that footage folder.)",
+   "default": null,
+   "required": true
+  },
+  {
+   "key": "never_show",
+   "scope": "skill",
+   "ask": "Is there anything in your footage that must never be used as B-roll: people, places, private screens?",
+   "default": "nothing listed",
+   "required": false
+  },
+  {
+   "key": "source_framing",
+   "scope": "skill",
+   "ask": "Your talking-head video is horizontal but the finished video is vertical. Should I crop it to fill the vertical frame, centred on you (fill), or show the whole horizontal picture with black above and below (fit)? Fill is the default for a talking head.",
+   "default": "fill",
+   "required": false,
+   "options": [
+    "fill",
+    "fit"
+   ]
+  },
+  {
+   "key": "caption_size",
+   "scope": "skill",
+   "ask": "How big should the regular captions be, in pixels on the 1080 x 1920 frame? 54 reads well on a phone.",
+   "default": "54",
+   "required": false
+  },
+  {
+   "key": "stack_size",
+   "scope": "skill",
+   "ask": "How big should the large line of a stacked caption be? 132 is the default; the engine shrinks it if the phrase would be wider than the frame.",
+   "default": "132",
+   "required": false
+  },
+  {
+   "key": "broll_max_share",
+   "scope": "skill",
+   "ask": "What is the most of the video B-roll may cover, as a percentage? The speaker stays the main picture; about a third is the default.",
+   "default": "35",
+   "required": false
+  },
+  {
+   "key": "stack_density",
+   "scope": "skill",
+   "ask": "How many stacked captions do you want? Stacks are for the idea, the number, the turn, the line to remember: two to four a minute at most is the default.",
+   "default": "2 to 4 a minute at most, never back to back",
+   "required": false
+  },
+  {
+   "key": "review_rule",
+   "scope": "skill",
+   "ask": "Should I show you a quick draft and wait for your approval before rendering the full-quality final, or render the final straight away?",
+   "default": "show the draft and wait for approval before the final render",
+   "required": false,
+   "options": [
+    "show the draft and wait for approval before the final render",
+    "render the final straight away and report"
+   ]
+  }
+ ]
+}

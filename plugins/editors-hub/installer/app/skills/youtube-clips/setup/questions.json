@@ -1,0 +1,175 @@
+{
+ "skill": "youtube-clips",
+ "questions": [
+  {
+   "key": "creator_name",
+   "scope": "shared",
+   "ask": "What name should I use for you: the one that appears on screen and in my notes?",
+   "default": null,
+   "required": true
+  },
+  {
+   "key": "brand_name",
+   "scope": "shared",
+   "ask": "What is the business or brand called?",
+   "default": null,
+   "required": true
+  },
+  {
+   "key": "handle",
+   "scope": "shared",
+   "ask": "What is your main handle, and on which platform do you post most?",
+   "default": "not set",
+   "required": false
+  },
+  {
+   "key": "accent",
+   "scope": "shared",
+   "ask": "What is your accent colour (the one colour used for the key word and the focal element)?",
+   "default": null,
+   "required": true
+  },
+  {
+   "key": "font_main_name",
+   "scope": "shared",
+   "ask": "Which font do you use for headlines?",
+   "default": null,
+   "required": true
+  },
+  {
+   "key": "font_main_bold",
+   "scope": "shared",
+   "ask": "(found on their computer) the bold weight of the main font",
+   "default": null,
+   "required": true
+  },
+  {
+   "key": "font_main_regular",
+   "scope": "shared",
+   "ask": "(found on their computer) the regular or medium weight of the main font; left unset, the bold is reused",
+   "default": null,
+   "required": false
+  },
+  {
+   "key": "font_accent_name",
+   "scope": "shared",
+   "ask": "Do you want key words in a second, contrasting font, or the same font in your colour?",
+   "default": "Playfair Display Italic",
+   "required": false
+  },
+  {
+   "key": "font_accent",
+   "scope": "shared",
+   "ask": "(found on their computer) the emphasis font; the shipped Playfair Display Italic if they have no preference",
+   "default": {
+    "file": "PlayfairDisplay-Italic.ttf"
+   },
+   "required": false
+  },
+  {
+   "key": "transcriber",
+   "scope": "shared",
+   "ask": "Transcribe with ElevenLabs (recommended, speaker labels) or on this computer (free, no speaker labels)?",
+   "default": null,
+   "required": true
+  },
+  {
+   "key": "proof_dir",
+   "scope": "shared",
+   "ask": "Where do you keep the real things I can show on screen: client results, reviews, screenshots?",
+   "default": "none yet",
+   "required": false
+  },
+  {
+   "key": "channel",
+   "scope": "skill",
+   "ask": "What is your YouTube channel called, and what is its link?",
+   "default": null,
+   "required": true
+  },
+  {
+   "key": "raw_dir",
+   "scope": "skill",
+   "ask": "Where do the raw recordings and clean cuts of your videos live (no captions, graphics or music burned in)? I look there before downloading anything.",
+   "default": "none: ask each time",
+   "required": false
+  },
+  {
+   "key": "published_look",
+   "scope": "skill",
+   "ask": "Do your published videos have captions or music burned into them?",
+   "default": "check each video",
+   "required": false
+  },
+  {
+   "key": "downloads_dir",
+   "scope": "skill",
+   "ask": "(do not ask unless their disk is short of space) where downloaded videos are kept",
+   "default": "~/Movies/YouTube Downloads",
+   "required": false
+  },
+  {
+   "key": "max_clips",
+   "scope": "skill",
+   "ask": "How many clips at most from one video? I keep every clip that clears the bar, up to this number.",
+   "default": 10,
+   "required": false
+  },
+  {
+   "key": "ratios",
+   "scope": "skill",
+   "ask": "Which versions do you want of each clip: horizontal 16:9, vertical 9:16, or both?",
+   "default": "both",
+   "required": false
+  },
+  {
+   "key": "swear_captions",
+   "scope": "skill",
+   "ask": "Swearing stays in the audio. In the captions: starred (f***) or written as spoken?",
+   "default": "starred",
+   "required": false
+  },
+  {
+   "key": "build_rule",
+   "scope": "skill",
+   "ask": "After I have written the clip list and the editing prompts, should I stop and ask before building, or build everything and report?",
+   "default": "ask",
+   "required": false
+  },
+  {
+   "key": "clip_sound",
+   "scope": "skill",
+   "ask": "Music or sound effects on these clips, or just the video's own sound?",
+   "default": "none",
+   "required": false
+  },
+  {
+   "key": "full_video_tag",
+   "scope": "skill",
+   "ask": "Should clips point back to the full video (a small title tag or an end card)?",
+   "default": "no tag",
+   "required": false
+  },
+  {
+   "key": "finals_dir",
+   "scope": "skill",
+   "ask": "Where should finished clips go? Beside the video is the default.",
+   "default": "beside the video",
+   "required": false
+  },
+  {
+   "key": "other_creators",
+   "scope": "skill",
+   "ask": "Do you ever clip other people's videos? The default is that I stop and ask you each time.",
+   "default": "ask each time",
+   "required": false
+  },
+  {
+   "key": "never_clip",
+   "scope": "skill",
+   "ask": "Is there anything that must never be clipped: topics, names, sponsors, old offers?",
+   "default": "nothing listed",
+   "required": false
+  }
+ ]
+}

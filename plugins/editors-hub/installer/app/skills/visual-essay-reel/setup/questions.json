@@ -1,0 +1,203 @@
+{
+ "skill": "visual-essay-reel",
+ "questions": [
+  {
+   "key": "creator_name",
+   "scope": "shared",
+   "ask": "What name should I use for you: the one that appears on screen and in my notes?",
+   "default": null,
+   "required": true
+  },
+  {
+   "key": "brand_name",
+   "scope": "shared",
+   "ask": "What is the business or brand called?",
+   "default": null,
+   "required": true
+  },
+  {
+   "key": "handle",
+   "scope": "shared",
+   "ask": "What is your main handle, and on which platform do you post most?",
+   "default": "not set",
+   "required": false
+  },
+  {
+   "key": "niche",
+   "scope": "shared",
+   "ask": "In one sentence: what do you help people with, and who are they?",
+   "default": "not set",
+   "required": false
+  },
+  {
+   "key": "accent",
+   "scope": "shared",
+   "ask": "What is your accent colour (the one colour used for the key word, the focal element and the glow)?",
+   "default": null,
+   "required": true
+  },
+  {
+   "key": "accent_name",
+   "scope": "shared",
+   "ask": "(saved with the accent colour) the plain word for it: blue, gold, lime",
+   "default": "accent colour",
+   "required": false
+  },
+  {
+   "key": "font_main_name",
+   "scope": "shared",
+   "ask": "Which font do you use for headlines?",
+   "default": null,
+   "required": true
+  },
+  {
+   "key": "font_main_bold",
+   "scope": "shared",
+   "ask": "(found on their computer) the bold weight of the main font",
+   "default": null,
+   "required": true
+  },
+  {
+   "key": "font_main_regular",
+   "scope": "shared",
+   "ask": "(found on their computer) the regular or medium weight of the main font; left unset, the bold is reused",
+   "default": null,
+   "required": false
+  },
+  {
+   "key": "font_accent_name",
+   "scope": "shared",
+   "ask": "Do you want key words in a second, contrasting font, or the same font in your colour?",
+   "default": "Playfair Display Italic",
+   "required": false
+  },
+  {
+   "key": "font_accent",
+   "scope": "shared",
+   "ask": "(found on their computer) the emphasis font; the shipped Playfair Display Italic if they have no preference",
+   "default": {
+    "file": "PlayfairDisplay-Italic.ttf"
+   },
+   "required": false
+  },
+  {
+   "key": "transcriber",
+   "scope": "shared",
+   "ask": "Transcribe with ElevenLabs (recommended, the most accurate word timings) or on this computer (free)?",
+   "default": null,
+   "required": true
+  },
+  {
+   "key": "output_rule",
+   "scope": "shared",
+   "ask": "Where should finished videos go? Next to the raw file in an '- Edit' folder is the default.",
+   "default": "beside the raw file, in a \"<video name> - Edit\" folder",
+   "required": false
+  },
+  {
+   "key": "media_drive",
+   "scope": "shared",
+   "ask": "Is your raw footage on an external drive? Which one?",
+   "default": "none",
+   "required": false
+  },
+  {
+   "key": "sfx_dir",
+   "scope": "shared",
+   "ask": "Do you have a sound-effects pack (whooshes, pops, clicks)? Tell me the folder.",
+   "default": "none yet (videos are delivered without sound effects)",
+   "required": false
+  },
+  {
+   "key": "music_dir",
+   "scope": "shared",
+   "ask": "Where do you keep music you are allowed to use?",
+   "default": "none yet",
+   "required": false
+  },
+  {
+   "key": "music_rule",
+   "scope": "shared",
+   "ask": "Should I always ask before adding music, or add a favourite and tell you which?",
+   "default": "ask",
+   "required": false
+  },
+  {
+   "key": "proof_dir",
+   "scope": "shared",
+   "ask": "Where do you keep the real things I can show on screen: client results, case studies, screenshots?",
+   "default": "none yet",
+   "required": false
+  },
+  {
+   "key": "asset_dirs",
+   "scope": "skill",
+   "ask": "Besides your proof folder, are there other folders I should search for real things to show: client work, brand assets, B-roll, screenshots? (full paths; several are fine, saved as a JSON list)",
+   "default": "none",
+   "required": false
+  },
+  {
+   "key": "web_assets",
+   "scope": "skill",
+   "ask": "When you name a person, a company, a post, a study or a website, the edit is strongest when I show the real thing. May I fetch real posts, profiles, articles and screenshots from the web? I list every source in my report and you decide what you are comfortable publishing.",
+   "default": "yes: real over drawn, every source listed in the report",
+   "required": false
+  },
+  {
+   "key": "never_show",
+   "scope": "skill",
+   "ask": "Is there anything that must never be shown on screen: names, clients, competitors, figures, old offers, topics?",
+   "default": "nothing listed",
+   "required": false
+  },
+  {
+   "key": "cut_gap",
+   "scope": "skill",
+   "ask": "How much space should I leave between sentences in the tight cut, in seconds? 0.12 keeps natural pacing; lower is tighter.",
+   "default": 0.12,
+   "required": false
+  },
+  {
+   "key": "head_y",
+   "scope": "skill",
+   "ask": "How high in the frame should you sit? This is where the top of your head lands, in pixels from the top of a 1920 px frame. 1000 puts you in the lower half and leaves the evidence wall above you.",
+   "default": 1000,
+   "required": false
+  },
+  {
+   "key": "head_px",
+   "scope": "skill",
+   "ask": "How large should your head be, top of the hair to the chin, in pixels? 320 is about 17% of the frame height.",
+   "default": 320,
+   "required": false
+  },
+  {
+   "key": "caption_size",
+   "scope": "skill",
+   "ask": "Caption size in pixels. 54 is deliberately small, because the evidence is the loudest thing on screen.",
+   "default": 54,
+   "required": false
+  },
+  {
+   "key": "title_font",
+   "scope": "skill",
+   "ask": "The opening title: first line in your emphasis font (the editorial look), or in your main font?",
+   "default": "emphasis",
+   "required": false
+  },
+  {
+   "key": "glow_default",
+   "scope": "skill",
+   "ask": "Where should the accent light come from by default: bottom, low-left, low-right, left, right, behind, top?",
+   "default": "bottom",
+   "required": false
+  },
+  {
+   "key": "work_rule",
+   "scope": "skill",
+   "ask": "Should I finish the whole reel and then give you a full report (every asset and where it came from, every wording choice), or stop and check with you at each stage: after the cut, after the cut-out check, after the evidence plan, after the draft?",
+   "default": "run to the end, then report",
+   "required": false
+  }
+ ]
+}

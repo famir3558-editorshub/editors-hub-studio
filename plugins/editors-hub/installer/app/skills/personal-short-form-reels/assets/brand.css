@@ -1,0 +1,45 @@
+/* 3C Hook Matrix (HyperFrames). Shared by every scene. */
+@font-face { font-family: "HelvB"; src: @@FONT_MAIN_BOLD_SRC_CSS@@; font-weight: 700; }
+@font-face { font-family: "HelvR"; src: @@FONT_MAIN_REGULAR_SRC_CSS@@; font-weight: 400; }
+@font-face { font-family: "PlayIt"; src: @@FONT_ACCENT_SRC_CSS@@; font-style: italic; font-weight: 400 900; }
+@font-face { font-family: "Hand"; src: url("fonts/Caveat.ttf") format("truetype"); font-weight: 400 700; }
+
+:root { --o: @@ACCENT@@; --ink: @@BG@@; --paper: @@PAPER@@; --grey: @@GREY@@; }
+
+.scrim { position: absolute; left: -140px; top: 220px; width: 1360px; height: 1260px; border-radius: 50%; background: radial-gradient(closest-side, rgba(11,9,8,.92), rgba(11,9,8,.72) 55%, rgba(11,9,8,0)); z-index: 2; }
+.de-panel { position: absolute; left: 0; top: 960px; width: 1080px; height: 960px; overflow: hidden; color: var(--paper); font-family: "HelvB", Helvetica, sans-serif; }
+.de-full { position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; overflow: hidden; color: var(--paper); font-family: "HelvB", Helvetica, sans-serif; }
+.de-panel, .de-full { background: @@BG@@; }
+.de-grid { position: absolute; inset: 0; z-index: 0; }
+.de-panel .de-grid { background: radial-gradient(95% 85% at 50% 118%, rgba(@@ACCENT_RGB@@,.62) 0%, rgba(@@ACCENT_RGB@@,.30) 32%, rgba(@@ACCENT_RGB@@,.09) 58%, rgba(@@BG_RGB@@,0) 78%), radial-gradient(60% 50% at 8% 0%, rgba(@@ACCENT_RGB@@,.12), rgba(@@BG_RGB@@,0) 70%), @@BG@@; }
+.de-full .de-grid { background: radial-gradient(110% 62% at 50% 112%, rgba(@@ACCENT_RGB@@,.62) 0%, rgba(@@ACCENT_RGB@@,.30) 30%, rgba(@@ACCENT_RGB@@,.09) 58%, rgba(@@BG_RGB@@,0) 80%), radial-gradient(70% 34% at 6% 0%, rgba(@@ACCENT_RGB@@,.14), rgba(@@BG_RGB@@,0) 70%), @@BG@@; }
+.de-grid::after { content: ""; position: absolute; inset: 0; opacity: .07; mix-blend-mode: overlay;
+  background: url("data:image/svg+xml,%3Csvg viewBox='0 0 400 400' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='1.7' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 1 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E"); background-size: 400px 400px; }
+.de-seam { position: absolute; left: 0; right: 0; top: 0; height: 46px; background: linear-gradient(@@BG@@, rgba(@@BG_RGB@@,0)); z-index: 8; }
+.de-leak { position: absolute; width: 900px; height: 640px; border-radius: 50%; filter: blur(90px); background: radial-gradient(closest-side, rgba(@@ACCENT_RGB@@,.30), rgba(@@ACCENT_RGB@@,0)); }
+.de-grain { position: absolute; inset: -50%; width: 200%; height: 200%; pointer-events: none; z-index: 9; opacity: .13; mix-blend-mode: screen;
+  background: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  animation: de-grain .5s steps(1) infinite; }
+@keyframes de-grain { 0%,100%{transform:translate(0,0)} 20%{transform:translate(-6%,4%)} 40%{transform:translate(5%,-7%)} 60%{transform:translate(-4%,8%)} 80%{transform:translate(7%,2%)} }
+
+.de-kicker { position: absolute; left: 0; right: 0; text-align: center; font-family: "PlayIt", serif; font-style: italic; color: var(--o); letter-spacing: -0.02em; text-shadow: 0 0 30px rgba(@@ACCENT_RGB@@,.35); z-index: 5; }
+.de-head { position: absolute; left: 40px; right: 40px; text-align: center; font-family: "HelvB", Helvetica, sans-serif; font-weight: 700; text-transform: uppercase; letter-spacing: -0.045em; line-height: .96; color: var(--paper); z-index: 5; }
+.de-head .w { display: inline-block; white-space: pre; }
+.de-o { color: var(--o); text-shadow: 0 0 34px rgba(@@ACCENT_RGB@@,.55); }
+.de-sub { position: absolute; left: 0; right: 0; text-align: center; font-family: "HelvR", Helvetica, sans-serif; color: var(--paper); z-index: 5; }
+.de-sub i { font-family: "PlayIt", serif; color: var(--o); }
+.de-note { position: absolute; font-family: "Hand", cursive; font-weight: 700; color: var(--paper); white-space: nowrap; z-index: 7; }
+.de-glass { border-radius: 30px; background: linear-gradient(180deg, rgba(255,255,255,.11), rgba(255,255,255,.04)); border: 2px solid rgba(255,255,255,.14); box-shadow: inset 0 1px 0 rgba(255,255,255,.16), 0 30px 70px rgba(0,0,0,.55); }
+.de-hot { border: 3px solid var(--o) !important; box-shadow: 0 0 46px rgba(@@ACCENT_RGB@@,.5), inset 0 0 22px rgba(@@ACCENT_RGB@@,.16) !important; }
+.de-tile { position: absolute; border-radius: 22px; overflow: hidden; border: 2px solid rgba(255,255,255,.16); box-shadow: 0 24px 60px rgba(0,0,0,.6); background: #161210; }
+.de-tile img, .de-tile video { display: block; width: 100%; height: 100%; object-fit: cover; }
+.de-chip { display: inline-block; padding: 12px 26px; border-radius: 16px; font-family: "HelvB", Helvetica, sans-serif; font-size: 34px; letter-spacing: -0.03em; border: 2px dashed rgba(@@ACCENT_RGB@@,.85); color: var(--paper); }
+.de-chip.on { background: var(--o); border: 2px solid var(--o); color: @@ON_ACCENT@@; box-shadow: 0 0 40px rgba(@@ACCENT_RGB@@,.55); }
+.de-num { font-family: "HelvB", Helvetica, sans-serif; font-variant-numeric: tabular-nums; letter-spacing: -0.05em; }
+.de-label { font-family: "HelvB", Helvetica, sans-serif; font-size: 22px; letter-spacing: .26em; color: var(--grey); }
+
+/* FACE-BOTTOM split: animation panel is the TOP half, the creator is the bottom half. */
+.de-panel { top: 0 !important; }
+.de-shift { position: absolute; left: 0; top: 286px; width: 1080px; height: 674px; }
+.de-panel .de-seam { top: auto; bottom: 0; background: linear-gradient(rgba(@@BG_RGB@@,0), @@BG@@); }
+.de-panel .de-grid { background: radial-gradient(95% 70% at 50% -14%, rgba(@@ACCENT_RGB@@,.50) 0%, rgba(@@ACCENT_RGB@@,.22) 34%, rgba(@@ACCENT_RGB@@,.07) 58%, rgba(@@BG_RGB@@,0) 78%), @@BG@@; }

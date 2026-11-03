@@ -1,0 +1,234 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Editors.Hub</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/app.css">
+<link rel="stylesheet" href="/static/home.css">
+</head>
+<body>
+<header class="top">
+  <a class="logo" href="/"></a>
+  <nav class="tabs">
+    <button data-tab="videos" class="on">Videos</button>
+    <button data-tab="projects" data-maker>Projects</button>
+    <button data-tab="styles" data-maker>My styles</button>
+    <button data-tab="shared" data-maker>Shared</button>
+    <button data-tab="deleted" data-maker>Recently deleted<em id="deletedCount"></em></button>
+    <button data-tab="team" data-owner hidden>Team</button>
+    <button data-tab="settings">Settings</button>
+  </nav>
+  <div class="spacer"></div>
+  <button class="btn" id="newProjectBtn" data-maker>New project</button>
+  <button class="btn" id="newStyleBtn" data-maker>New style</button>
+  <button class="btn primary" id="newVideoBtn" data-maker>+ New video</button>
+  <button class="ready-pill" id="readyPill" data-owner hidden><span class="dot"></span><span id="readyText">Checking…</span></button>
+  <div class="me" id="me"></div>
+</header>
+
+<main class="wrap">
+  <div class="setup-banner" id="setupBanner" hidden></div>
+  <div class="setup-banner warn" id="renderBanner" data-maker hidden></div>
+  <div class="setup-banner warn" id="brollBanner" data-maker hidden></div>
+  <div class="setup-banner warn" id="approvalBanner" hidden></div>
+  <section id="tab-videos">
+    <section class="hero-clean">
+      <div class="glow"></div>
+      <h1 id="hello">Welcome back</h1>
+      <p class="muted" id="summary"></p>
+      <div class="statline" id="stats"></div>
+    </section>
+    <div class="section-title"><span>Your videos</span></div>
+    <div class="src-tabs video-kinds" id="videoKinds" data-maker></div>
+    <div class="toolbar">
+      <div class="chips" id="statusChips"></div>
+      <div class="spacer"></div>
+      <select id="projectFilter"></select>
+      <select id="styleFilter"></select>
+      <input id="search" placeholder="Search videos" autocomplete="off">
+    </div>
+    <div class="grid" id="videoGrid"></div>
+  </section>
+
+  <section id="tab-projects" hidden>
+    <div class="hero"><div><h1>Projects</h1><p class="muted">One project per client: their details, brandbook, brand guidelines and videos. Pick any style when you make a video, and the client's brand stays separate from it.</p></div><div class="row"><button class="btn" id="importProjectBtn">Import a project</button><button class="btn primary" data-act="new-project">New project</button></div></div>
+    <div class="grid styles" id="projectGrid"></div>
+  </section>
+
+  <section id="tab-styles" hidden>
+    <div class="hero"><div><h1>My styles</h1><p class="muted">Reusable editing looks, with their rules (STYLE.md), references and the videos that train them. Use any style for any client. Your styles are private: only you see them until you share one.</p></div><button class="btn primary" id="importBtn">+ Add a style</button></div>
+    <div class="grid styles" id="styleGrid"></div>
+  </section>
+
+  <section id="tab-deleted" hidden>
+    <div class="hero"><div><h1>Recently deleted</h1><p class="muted">Deleted clients and styles wait here with their videos and files. Restore puts them back. Delete forever erases them for good.</p></div></div>
+    <div id="deletedList"></div>
+  </section>
+
+  <section id="tab-shared" hidden>
+    <div class="hero"><div><h1>Shared</h1><p class="muted">Styles shared with everyone in the studio. Anyone who makes videos can use them; only the person who shared a style, or the owner, can unshare it.</p></div></div>
+    <div class="grid styles" id="sharedGrid"></div>
+    <div class="section-title online-title"><span>Online shared folder</span></div>
+    <p class="muted small-print online-note" id="onlineNote">Styles uploaded online can be downloaded into Editors.Hub on any of your computers.</p>
+    <div class="online-grid uploading-now" id="onlineUploading"></div>
+    <div class="online-grid" id="onlineGrid"></div>
+  </section>
+
+  <section id="tab-setup" hidden>
+    <div class="hero">
+      <div>
+        <h1 id="setupTitle">Get Editors.Hub ready</h1>
+        <p class="muted" id="setupLead">Editors.Hub installs what your edits need on this computer, in this order. It carries on by itself; a few steps need you for a moment.</p>
+      </div>
+      <div class="stats"><div class="stat hot" id="setupCount"><b>0/0</b><span>ready</span></div></div>
+    </div>
+    <div class="panel settings setup-panel">
+      <div class="steps" id="stepList"></div>
+      <div class="row"><button class="btn" id="checkAgain">Check everything again</button><div class="spacer"></div><button class="btn primary" id="setupDone" hidden>Go to my studio</button></div>
+    </div>
+  </section>
+
+  <section id="tab-team" hidden>
+    <div class="hero"><div><h1>Team</h1><p class="muted">Everyone's sign-up and sign-in code comes to you. Give a code only to people you want in.</p></div></div>
+    <div class="panel settings">
+      <h3>Waiting for a code</h3>
+      <div class="skills" id="pendingList"></div>
+    </div>
+    <div class="panel settings">
+      <h3>Members</h3>
+      <p class="muted"><b>Editors</b> make styles and videos, upload drafts and leave notes. <b>Reviewers</b> (for clients) watch, leave notes, approve or ask for changes. Only you, the owner, can do admin things.</p>
+      <div class="skills" id="memberList"></div>
+    </div>
+    <form class="panel settings" id="mailForm">
+      <div class="row"><h3>Email the codes to you</h3><div class="spacer"></div><span class="pill" id="mailState"></span></div>
+      <p class="muted">So codes reach your inbox, Editors.Hub sends them from a Gmail account. Use a Gmail <b>app password</b>, not your normal password: Google Account → Security → 2-Step Verification → App passwords → create one for "Editors.Hub" and paste the 16 letters here. It's kept only on this computer.</p>
+      <label class="field">Gmail address<input name="user" type="email" autocomplete="off"></label>
+      <label class="field">App password<input name="password" type="password" autocomplete="new-password" placeholder="xxxx xxxx xxxx xxxx"></label>
+      <div class="row"><button class="btn small" type="button" id="mailClear">Turn email off</button><div class="spacer"></div><button class="btn primary">Save and send a test</button></div>
+    </form>
+    <div class="panel settings">
+      <div class="row"><h3>Let people on your Wi-Fi in</h3><div class="spacer"></div><label class="switch"><input type="checkbox" id="lanToggle"><span></span></label></div>
+      <p class="muted" id="lanText"></p>
+    </div>
+  </section>
+
+  <section id="tab-settings" hidden>
+    <div class="hero"><div><h1>Settings</h1></div></div>
+    <div class="panel settings">
+      <div class="row"><div class="badge" id="meBadge"></div><div><h3 id="meName"></h3><div class="faint" id="meInfo"></div></div><div class="spacer"></div><button class="btn small" id="renameMeBtn">Change username</button><button class="btn small" id="signOutBtn">Sign out</button></div>
+    </div>
+    <form class="panel settings" id="settingsForm" data-owner hidden>
+      <label class="field">Library folder <small>Where styles and videos are kept. Use an external drive if your footage is big. Styles already made stay in the old folder; move them yourself if you change this.</small><input name="library"></label>
+      <div class="row"><button class="btn" type="button" id="revealLib">Open library folder</button><div class="spacer"></div><button class="btn primary">Save</button></div>
+    </form>
+    <div class="panel settings" data-owner hidden id="keysPanel">
+      <div class="row"><h3>API keys</h3><div class="spacer"></div><button class="btn small" type="button" id="openSetup">See setup</button></div>
+      <p class="muted">The services your edits can use. Paste a key yourself here (never into a chat). Keys stay on this computer, in a file only you can read, outside the studio's folder, so copying the studio never carries them.</p>
+      <div class="skills" id="keyList"></div>
+      <p class="faint" id="keyFile"></p>
+    </div>
+    <div class="panel settings" data-owner hidden>
+      <div class="row"><h3>Skills that come with Editors.Hub</h3><div class="spacer"></div><button class="btn small primary" id="installSkills">Install missing now</button></div>
+      <p class="muted">These Claude skills are packed inside the studio. Whenever Editors.Hub starts on a computer, it installs any that are missing and updates the ones nobody has changed. A skill you've set up (like your brand from <b>creator-setup</b>) or that came from somewhere else is never overwritten.</p>
+      <div class="skill-sum" id="skillSum"></div>
+      <div class="skills" id="skillList"></div>
+      <p class="faint" id="skillFolder"></p>
+    </div>
+    <div class="panel settings" data-owner hidden>
+      <h3>Use it with Claude</h3>
+      <p class="muted">Say <b>"in Editors.Hub"</b> or <b>"my studio"</b> in a Claude session and it will use the right client and style, show its progress in the Live tab, ask for your render settings, add drafts for review and read your notes. The same commands work in a terminal:</p>
+      <pre id="cmds"></pre>
+    </div>
+  </section>
+</main>
+
+<dialog id="videoDlg">
+  <form method="dialog" id="videoForm">
+    <h2>New video</h2>
+    <div class="src-tabs" id="videoFor"><button type="button" data-for="client" class="on">For a client</button><button type="button" data-for="training">To train a style</button></div>
+    <label class="field">Name<input name="name" required placeholder="e.g. Podcast ep 12 - reel 1"></label>
+    <label class="field" id="videoProject">Project <small>The client it's for: their brand is used.</small><select name="project" required style="width:100%"></select></label>
+    <label class="field">Style <small id="videoStyleHint">How it's edited.</small><select name="style" required style="width:100%"></select></label>
+    <label class="field">Brief <small id="videoBriefHint">What this video needs: length, hook, notes from the client.</small><textarea name="brief" rows="4"></textarea></label>
+    <label class="field">Raw footage <small>Optional. Copied into the video's raw folder.</small><input type="file" name="raw" multiple accept="video/*,audio/*,image/*"></label>
+    <div class="progress" hidden><div></div></div>
+    <div class="error"></div>
+    <div class="actions"><button class="btn ghost" type="button" onclick="this.closest('dialog').close()">Cancel</button><button class="btn primary" value="ok">Make video</button></div>
+  </form>
+</dialog>
+
+<dialog id="importDlg">
+  <form method="dialog" id="importForm">
+    <h2>Add a style</h2>
+    <div class="src-tabs" id="srcTabs"><button type="button" data-src="folder" class="on">From a folder</button><button type="button" data-src="online">From the online Shared folder</button></div>
+    <div id="srcFolder" class="src">
+      <p class="muted" style="margin:0">Give the style's folder: one saved from another computer (<b>Save to a drive</b> or <b>Download (.zip)</b>) comes in whole, with its videos. Any other folder of references, B-roll, LUTs, music, fonts or project files becomes a new style, each file sorted into its section.</p>
+      <div class="places" id="foundExports">Looking on your drives…</div>
+      <label class="field">The folder (or .zip) on this computer<input name="path" placeholder="E:\My client - EditorsHub style  or  /Users/you/Desktop/New client" autocomplete="off"></label>
+      <label class="field">Or upload a .zip from this device<input type="file" name="zip" accept=".zip"></label>
+    </div>
+    <div id="srcOnline" class="src" hidden>
+      <p class="muted" style="margin:0">Styles uploaded to the online Shared folder from any computer (⋯ → <b>Upload to the online Shared folder</b>). Pick one to download into this studio.</p>
+      <div class="places" id="onlineList">Looking online…</div>
+    </div>
+    <div class="row where"><label><input type="radio" name="where" value="mine" checked> My styles (private)</label><label><input type="radio" name="where" value="shared"> Shared (everyone in this studio)</label></div>
+    <div class="progress" hidden><div></div></div>
+    <p class="faint small-print" id="importNote"></p>
+    <div class="error"></div>
+    <div class="actions"><button class="btn ghost" type="button" onclick="this.closest('dialog').close()">Close</button><button class="btn primary" id="importGo">Import</button></div>
+  </form>
+</dialog>
+
+<dialog id="projectImportDlg">
+  <form method="dialog" id="projectImportForm">
+    <h2>Import a project</h2>
+    <p class="muted" style="margin:0">Bring in a client saved with <b>Save to a drive</b> or <b>Download (.zip)</b>. Their details, brand files and videos all come along. A client already here keeps theirs.</p>
+    <div class="places" id="foundProjects">Looking on your drives…</div>
+    <label class="field">The folder (or .zip) on this computer<input name="path" placeholder="E:\Client name - EditorsHub project" autocomplete="off"></label>
+    <label class="field">Or upload a .zip from this device<input type="file" name="zip" accept=".zip"></label>
+    <div class="progress" hidden><div></div></div>
+    <p class="faint small-print" id="projectImportNote"></p>
+    <div class="error"></div>
+    <div class="actions"><button class="btn ghost" type="button" onclick="this.closest('dialog').close()">Close</button><button class="btn primary" id="projectImportGo">Import</button></div>
+  </form>
+</dialog>
+
+<dialog id="projectDlg">
+  <form method="dialog" id="projectForm">
+    <h2>New project</h2>
+    <label class="field">Client name<input name="name" required placeholder="e.g. Thrive Coaching"></label>
+    <label class="field">Contact <small>Optional.</small><input name="contact" placeholder="Name, email or phone"></label>
+    <label class="field">Website or socials <small>Optional.</small><input name="website" placeholder="https://"></label>
+    <label class="field">About the client <small>Optional. What they do and who they speak to.</small><textarea name="about" rows="3"></textarea></label>
+    <label class="field">Brand guidelines <small>Optional. Colours, fonts, logo use, tone of voice. You can add more later.</small><textarea name="brand" rows="4"></textarea></label>
+    <label class="field">Brandbook and brand files <small>Optional. PDFs, logos, fonts: each is sorted by its type.</small><input type="file" name="files" multiple></label>
+    <div class="progress" hidden><div></div></div>
+    <div class="error"></div>
+    <div class="actions"><button class="btn ghost" type="button" onclick="this.closest('dialog').close()">Cancel</button><button class="btn primary" value="ok">Make project</button></div>
+  </form>
+</dialog>
+
+<dialog id="styleDlg">
+  <form method="dialog" id="styleForm">
+    <h2>New style</h2>
+    <label class="field">Name<input name="name" required placeholder="e.g. Fast podcast reels"></label>
+    <div class="field-group"><b>Format</b><div class="row where"><label><input type="radio" name="format" value="short" checked> Short-form <span class="faint">reels, shorts</span></label><label><input type="radio" name="format" value="long"> Long-form <span class="faint">YouTube, lessons</span></label></div></div>
+    <p class="muted" style="margin:0">A style is an editing look you can use for any client. It starts <b>private</b>: only you see it. Share it later from My styles.</p>
+    <label class="field">How it's edited <small>Pacing, captions, motion, transitions, B-roll, sound. Client colours, fonts and logos go in their project. You can add to STYLE.md later.</small><textarea name="notes" rows="4"></textarea></label>
+    <label class="field">Reference videos <small>Optional. Videos or images that show this look.</small><input type="file" name="references" multiple accept="video/*,image/*"></label>
+    <label class="field">Reference links <small>Optional. One link on each line, like a YouTube video.</small><textarea name="links" rows="2" placeholder="https://"></textarea></label>
+    <label class="field">Editing project files <small>Optional. XML, Premiere, After Effects, Final Cut, DaVinci or CapCut files from edits in this look.</small><input type="file" name="projects" multiple accept=".xml,.fcpxml,.edl,.aaf,.prproj,.aep,.aepx,.drp,.drt,.mogrt,.capcut"></label>
+    <div class="progress" hidden><div></div></div>
+    <div class="error"></div>
+    <div class="actions"><button class="btn ghost" type="button" onclick="this.closest('dialog').close()">Cancel</button><button class="btn primary" value="ok">Make style</button></div>
+  </form>
+</dialog>
+
+<div id="toast"></div>
+<script src="/static/app.js"></script>
+<script src="/static/home.js"></script>
+</body>
+</html>

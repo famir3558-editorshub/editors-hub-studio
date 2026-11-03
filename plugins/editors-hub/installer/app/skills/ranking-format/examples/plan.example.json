@@ -1,0 +1,12 @@
+{
+ "_note": "Structure reference only: replace every value. Times are seconds in the CUT (from words.json). Optional keys: title_y, captions (true/false), card_char_w.",
+ "title": "Content Tactics",
+ "duration": 15.0,
+ "table_in": 0,
+ "table_out": null,
+ "items": [
+  {"label": "Daily Posting", "image": "assets/items/daily-posting.jpg", "t_in": 0.30, "t_name_end": 1.25, "t_rank": 3.85, "tier": "B"},
+  {"label": "Trending Audio", "image": "assets/items/trending-audio.jpg", "t_in": 5.00, "t_name_end": 5.95, "t_rank": 8.25, "tier": "F"},
+  {"label": "Carousels", "image": "assets/items/carousels.jpg", "t_in": 9.40, "t_name_end": 10.30, "t_rank": 12.85, "tier": "S"}
+ ]
+}

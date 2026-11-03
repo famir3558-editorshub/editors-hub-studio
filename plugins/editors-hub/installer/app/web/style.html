@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Style · Editors.Hub</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/static/app.css">
+<link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+<header class="top">
+  <a class="logo" href="/"></a>
+  <a class="btn ghost small" href="/#styles">← Styles</a>
+  <div class="spacer"></div>
+  <span class="share-tag" id="shareTag"></span>
+</header>
+
+<main class="wrap">
+  <section class="hero-style">
+    <div class="stills" id="stills"></div>
+    <div class="about">
+      <h1 id="sName">…</h1>
+      <p class="faint" id="sSub"></p>
+      <div class="chips" id="chips"></div>
+      <div class="swatches big" id="swatches"></div>
+      <p class="desc" id="sDesc"></p>
+      <p class="faint small-print" id="sClient"></p>
+      <div class="actions">
+        <button class="btn primary" id="promptBtn">Copy a prompt for Claude</button>
+        <button class="btn" id="briefBtn">Edit the description</button>
+        <button class="btn" id="folderBtn">Main folder</button>
+        <button class="btn" id="shareBtn" hidden></button>
+        <button class="btn" id="videoBtn">+ Video</button>
+        <a class="btn" id="downloadBtn" download>Download (.zip)</a>
+        <button class="btn" id="saveBtn">Save to a drive</button>
+        <button class="btn dots" id="menuBtn" data-menu title="More: rename, duplicate, delete" aria-label="More">⋯</button>
+      </div>
+      <div class="page-job" id="pageJob" hidden></div>
+      <p class="faint small-print hint" id="promptHint">Paste the prompt into a Claude session and it works in this style, with its guide and learned rules. It's for no client until you pick one.</p>
+    </div>
+  </section>
+
+  <nav class="stabs" id="tabs"></nav>
+
+  <section class="pane" id="pane"></section>
+</main>
+
+<dialog id="saveDlg">
+  <form method="dialog" id="saveForm">
+    <h2>Save this style to a drive</h2>
+    <p class="muted" style="margin:0">To take it to another computer (Mac or Windows): save it on a USB drive or in a cloud folder, then on the other computer click <b>Import a style</b> on My styles. Everything comes along: guide, learned rules, sections and style videos. Client videos stay in their projects.</p>
+    <div class="places" id="places">Looking for drives…</div>
+    <label class="field">Or another folder<input name="dest" placeholder="/Volumes/USB or E:\" autocomplete="off"></label>
+    <p class="faint small-print" id="saveSize"></p>
+    <div class="progress" hidden><div></div></div>
+    <div class="error"></div>
+    <div class="actions"><button class="btn ghost" type="button" onclick="this.closest('dialog').close()">Close</button><button class="btn primary" id="saveGo">Save</button></div>
+  </form>
+</dialog>
+
+<div class="dropveil" id="dropVeil"><div id="dropText">Drop to add to this style</div></div>
+<div class="uploading" id="uploading" hidden><span id="upText">Adding…</span><div class="progress"><div id="upBar"></div></div></div>
+<input type="file" id="fileInput" multiple hidden>
+<div id="toast"></div>
+<script src="/static/app.js"></script>
+<script src="/static/style.js"></script>
+</body>
+</html>

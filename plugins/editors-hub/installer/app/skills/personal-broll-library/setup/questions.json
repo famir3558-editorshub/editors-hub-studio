@@ -1,0 +1,21 @@
+{
+ "skill": "personal-broll-library",
+ "questions": [
+  {"key": "creator_name", "scope": "shared", "ask": "What name should I use for you: the one that appears in my notes and in the descriptions of your clips?", "default": null, "required": true},
+  {"key": "brand_name", "scope": "shared", "ask": "What is the business or brand called?", "default": "same as the creator's name", "required": false},
+  {"key": "handle", "scope": "shared", "ask": "What is your main handle?", "default": null, "required": false},
+  {"key": "platform", "scope": "shared", "ask": "Which platform do you post on most?", "default": null, "required": false},
+  {"key": "niche", "scope": "shared", "ask": "In one sentence: what do you help people with, and who are they?", "default": null, "required": true},
+  {"key": "transcriber", "scope": "shared", "ask": "Only needed to match B-roll to a video that has no captions yet: transcribe with ElevenLabs (most accurate, about $0.22 per hour) or on this computer (free)? You can skip this now and answer it the first time it is needed.", "default": "elevenlabs", "required": false},
+  {"key": "footage_dir", "scope": "skill", "ask": "Where does your B-roll footage live? Give me the folder.", "default": null, "required": true},
+  {"key": "footage_drive", "scope": "skill", "ask": "Is that folder on an external drive? Which one?", "default": "this computer's internal disk", "required": true},
+  {"key": "library_dir", "scope": "skill", "ask": "Where should the library index live? It is small and should stay on this computer so search works with the drive unplugged.", "default": "~/BrollLibrary", "required": true},
+  {"key": "editing_app", "scope": "skill", "ask": "Which editing app do you finish your videos in?", "default": "none (placement sheet only)", "options": ["Premiere Pro", "DaVinci Resolve", "Final Cut Pro", "CapCut", "none (placement sheet only)"], "required": true},
+  {"key": "sequence_fps", "scope": "skill", "ask": "What frame rate do you usually edit at (24, 25, 30, 60)?", "default": "match the main video", "required": true},
+  {"key": "sequence_format", "scope": "skill", "ask": "Are your edits horizontal, vertical, or both?", "default": "both: horizontal 1920x1080 and vertical 1080x1920 (ask per edit)", "options": ["horizontal 1920x1080", "vertical 1080x1920", "both: horizontal 1920x1080 and vertical 1080x1920 (ask per edit)"], "required": true},
+  {"key": "footage_shows", "scope": "skill", "ask": "What does your B-roll mostly show? (you at your desk, filming, the gym, travel, clients, screens...)", "default": null, "required": true},
+  {"key": "video_topics", "scope": "skill", "ask": "What do you make videos about? The topics and ideas that come up again and again.", "default": null, "required": true},
+  {"key": "never_show", "scope": "skill", "ask": "Is there anything in your footage that must never be used or shown: people, places, private screens?", "default": "nothing listed", "required": true},
+  {"key": "niche_concepts_added", "scope": "skill", "ask": "(not a question) the niche concepts added to the library's concepts.json at setup, as a list of names", "default": [], "required": false}
+ ]
+}

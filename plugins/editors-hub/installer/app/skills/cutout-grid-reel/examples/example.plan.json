@@ -1,0 +1,114 @@
+{
+ "_note": "Worked example from the original style. A reference for structure and API use only: never reuse its wording, names or assets. The image files named here do not exist; the captions are placeholders.",
+ "duration": 12.0,
+ "hook": {
+  "lines": [
+   "Placeholder hook line one",
+   "placeholder line two"
+  ],
+  "sub": "(placeholder sub-line)",
+  "end": 3.0,
+  "y": 330
+ },
+ "captions": [
+  "Placeholder caption number one",
+  "a second short caption",
+  "third caption on the chest",
+  "the subject changes here",
+  "so do all four images",
+  "one more short caption",
+  "and the last caption"
+ ],
+ "sets": [
+  {
+   "t": 0,
+   "images": [
+    {
+     "file": "images/set1_a.jpg",
+     "fx": 0.5,
+     "fy": 0.5
+    },
+    {
+     "file": "images/set1_b.jpg",
+     "fx": 0.5,
+     "fy": 0.5
+    },
+    {
+     "file": "images/set1_c.jpg",
+     "fx": 0.5,
+     "fy": 0.5
+    },
+    {
+     "file": "images/set1_d.jpg",
+     "fx": 0.5,
+     "fy": 0.5
+    }
+   ]
+  },
+  {
+   "t": 3.0,
+   "images": [
+    {
+     "file": "images/set2_a.jpg",
+     "fx": 0.5,
+     "fy": 0.5
+    },
+    {
+     "file": "images/set2_b.jpg",
+     "fx": 0.5,
+     "fy": 0.6
+    },
+    {
+     "file": "images/set2_c.jpg",
+     "fx": 0.5,
+     "fy": 0.5
+    },
+    {
+     "file": "images/set2_d.jpg",
+     "fx": 0.5,
+     "fy": 0.5
+    }
+   ]
+  },
+  {
+   "t": 8.5,
+   "images": [
+    {
+     "file": "images/set3_a.jpg",
+     "fx": 0.5,
+     "fy": 0.5
+    },
+    {
+     "file": "images/set3_b.jpg",
+     "fx": 0.5,
+     "fy": 0.5
+    },
+    {
+     "file": "images/set3_c.jpg",
+     "fx": 0.5,
+     "fy": 0.5
+    },
+    {
+     "file": "images/set3_d.jpg",
+     "fx": 0.5,
+     "fy": 0.5
+    }
+   ]
+  }
+ ],
+ "cutout": {
+  "top": 230,
+  "left": 0,
+  "width": 1080,
+  "height": 1180,
+  "w": 540,
+  "rim": 0.5
+ },
+ "caption": {
+  "size": 46,
+  "lead": 0.08,
+  "up": 140,
+  "track": -0.045
+ },
+ "zoom": 0.05
+}

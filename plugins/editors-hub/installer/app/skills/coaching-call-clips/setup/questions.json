@@ -1,0 +1,168 @@
+{
+ "skill": "coaching-call-clips",
+ "questions": [
+  {
+   "key": "creator_name",
+   "scope": "shared",
+   "ask": "What name should I use for you: the one that appears on screen and in my notes?",
+   "default": null,
+   "required": true
+  },
+  {
+   "key": "brand_name",
+   "scope": "shared",
+   "ask": "What is the business or brand called?",
+   "default": null,
+   "required": true
+  },
+  {
+   "key": "handle",
+   "scope": "shared",
+   "ask": "What is your main handle, and on which platform do you post most?",
+   "default": "not set",
+   "required": false
+  },
+  {
+   "key": "accent",
+   "scope": "shared",
+   "ask": "What is your accent colour (the one colour used for the key word and the focal element)?",
+   "default": null,
+   "required": true
+  },
+  {
+   "key": "font_main_name",
+   "scope": "shared",
+   "ask": "Which font do you use for headlines?",
+   "default": null,
+   "required": true
+  },
+  {
+   "key": "font_main_bold",
+   "scope": "shared",
+   "ask": "(found on their computer) the bold weight of the main font",
+   "default": null,
+   "required": true
+  },
+  {
+   "key": "font_main_regular",
+   "scope": "shared",
+   "ask": "(found on their computer) the regular or medium weight of the main font; left unset, the bold is reused",
+   "default": null,
+   "required": false
+  },
+  {
+   "key": "font_accent_name",
+   "scope": "shared",
+   "ask": "Do you want key words in a second, contrasting font, or the same font in your colour?",
+   "default": "Playfair Display Italic",
+   "required": false
+  },
+  {
+   "key": "font_accent",
+   "scope": "shared",
+   "ask": "(found on their computer) the emphasis font; the shipped Playfair Display Italic if they have no preference",
+   "default": {
+    "file": "PlayfairDisplay-Italic.ttf"
+   },
+   "required": false
+  },
+  {
+   "key": "transcriber",
+   "scope": "shared",
+   "ask": "Transcribe with ElevenLabs (recommended, speaker labels) or on this computer (free, no speaker labels)?",
+   "default": null,
+   "required": true
+  },
+  {
+   "key": "proof_dir",
+   "scope": "shared",
+   "ask": "Where do you keep the real things I can show on screen: client results, reviews, screenshots?",
+   "default": "none yet",
+   "required": false
+  },
+  {
+   "key": "call_recorder",
+   "scope": "skill",
+   "ask": "How do you record your calls: Zoom, Fathom, a separate camera, something else?",
+   "default": "Zoom",
+   "required": false
+  },
+  {
+   "key": "camera_angle",
+   "scope": "skill",
+   "ask": "On the recording, is the camera off to one side while you look at your screen, or facing you?",
+   "default": "off to the side",
+   "required": false
+  },
+  {
+   "key": "call_resolution",
+   "scope": "skill",
+   "ask": "What resolution are the recordings usually: 720p, 1080p, 4K? (I can check a recent one for you.)",
+   "default": "1080p",
+   "required": false
+  },
+  {
+   "key": "clip_consent",
+   "scope": "skill",
+   "ask": "Have the people on your calls agreed to be clipped and posted? (yes / no / ask each call)",
+   "default": null,
+   "required": true
+  },
+  {
+   "key": "quiet_client",
+   "scope": "skill",
+   "ask": "When a client is hard to hear on the recording, should I cut their lines and let the clip run on your words?",
+   "default": "cut their lines",
+   "required": false
+  },
+  {
+   "key": "swear_captions",
+   "scope": "skill",
+   "ask": "Swearing stays in the audio. In the captions: starred (f***) or written as spoken?",
+   "default": "starred",
+   "required": false
+  },
+  {
+   "key": "max_clips",
+   "scope": "skill",
+   "ask": "How many clips at most from one call? I keep every clip that clears the bar, up to this number.",
+   "default": 10,
+   "required": false
+  },
+  {
+   "key": "build_rule",
+   "scope": "skill",
+   "ask": "After I have written the clip list and the editing prompts, should I stop and ask before building, or build everything and report?",
+   "default": "ask",
+   "required": false
+  },
+  {
+   "key": "clip_sound",
+   "scope": "skill",
+   "ask": "Music or sound effects on these clips, or just the call's own sound?",
+   "default": "none",
+   "required": false
+  },
+  {
+   "key": "ratios",
+   "scope": "skill",
+   "ask": "Which versions do you want of each clip: horizontal 16:9, vertical 9:16, or both?",
+   "default": "both",
+   "required": false
+  },
+  {
+   "key": "finals_dir",
+   "scope": "skill",
+   "ask": "Where should finished clips go? Beside the recording is the default.",
+   "default": "beside the recording",
+   "required": false
+  },
+  {
+   "key": "never_clip",
+   "scope": "skill",
+   "ask": "Is there anything that must never be clipped: topics, client names, programmes, numbers?",
+   "default": "nothing listed",
+   "required": false
+  }
+ ]
+}

@@ -1,0 +1,5 @@
+The nine hyperframes* folders in this directory are the HyperFrames agent skills, copied unmodified from the
+HyperFrames project (https://github.com/heygen-com/hyperframes), which is published under the Apache License 2.0
+(https://www.apache.org/licenses/LICENSE-2.0). They are included so the editing skills in this pack work out of the
+box. HyperFrames is a trademark and product of its authors; this pack is not affiliated with them.
+The HyperFrames program itself is not bundled: it runs through `npx hyperframes`, which downloads it from npm.

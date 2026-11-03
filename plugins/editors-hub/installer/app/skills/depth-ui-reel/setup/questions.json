@@ -1,0 +1,217 @@
+{
+ "skill": "depth-ui-reel",
+ "questions": [
+  {
+   "key": "creator_name",
+   "scope": "shared",
+   "ask": "What name should I use for you: the one that appears on screen and in my notes?",
+   "default": null,
+   "required": true
+  },
+  {
+   "key": "brand_name",
+   "scope": "shared",
+   "ask": "What is the business or brand called?",
+   "default": null,
+   "required": true
+  },
+  {
+   "key": "handle",
+   "scope": "shared",
+   "ask": "What is your main handle, and on which platform do you post most?",
+   "default": "not set",
+   "required": false
+  },
+  {
+   "key": "platform",
+   "scope": "shared",
+   "ask": "Which platform do you post on most: Instagram, TikTok, YouTube, LinkedIn?",
+   "default": "Instagram",
+   "required": false
+  },
+  {
+   "key": "niche",
+   "scope": "shared",
+   "ask": "In one sentence: what do you help people with, and who are they?",
+   "default": "not set",
+   "required": false
+  },
+  {
+   "key": "accent",
+   "scope": "shared",
+   "ask": "What is your accent colour (the one colour used for the key word, the focal element and the glow)?",
+   "default": null,
+   "required": true
+  },
+  {
+   "key": "accent_name",
+   "scope": "shared",
+   "ask": "(saved with the accent colour) the plain word for it: blue, gold, lime",
+   "default": "accent colour",
+   "required": false
+  },
+  {
+   "key": "font_main_name",
+   "scope": "shared",
+   "ask": "Which font do you use for headlines?",
+   "default": null,
+   "required": true
+  },
+  {
+   "key": "font_main_bold",
+   "scope": "shared",
+   "ask": "(found on their computer) the bold weight of the main font",
+   "default": null,
+   "required": true
+  },
+  {
+   "key": "font_main_regular",
+   "scope": "shared",
+   "ask": "(found on their computer) the regular or medium weight of the main font; left unset, the bold is reused",
+   "default": null,
+   "required": false
+  },
+  {
+   "key": "font_accent_name",
+   "scope": "shared",
+   "ask": "Do you want key words in a second, contrasting font, or the same font in your colour?",
+   "default": "Playfair Display Italic",
+   "required": false
+  },
+  {
+   "key": "font_accent",
+   "scope": "shared",
+   "ask": "(found on their computer) the emphasis font; the shipped Playfair Display Italic if they have no preference",
+   "default": {
+    "file": "PlayfairDisplay-Italic.ttf"
+   },
+   "required": false
+  },
+  {
+   "key": "font_caption_name",
+   "scope": "shared",
+   "ask": "Captions in the same main font, or a different one?",
+   "default": "the main font",
+   "required": false
+  },
+  {
+   "key": "font_caption",
+   "scope": "shared",
+   "ask": "(found on their computer) the caption font; left unset, the main bold is reused",
+   "default": null,
+   "required": false
+  },
+  {
+   "key": "transcriber",
+   "scope": "shared",
+   "ask": "Transcribe with ElevenLabs (recommended, the most accurate word timings) or on this computer (free)?",
+   "default": null,
+   "required": true
+  },
+  {
+   "key": "output_rule",
+   "scope": "shared",
+   "ask": "Where should finished videos go? Next to the raw file in an '- Edit' folder is the default.",
+   "default": "beside the raw file, in a \"<video name> - Edit\" folder",
+   "required": false
+  },
+  {
+   "key": "media_drive",
+   "scope": "shared",
+   "ask": "Is your raw footage on an external drive? Which one?",
+   "default": "none",
+   "required": false
+  },
+  {
+   "key": "sfx_dir",
+   "scope": "shared",
+   "ask": "Do you have a sound-effects pack (whooshes, pops, clicks)? Tell me the folder.",
+   "default": "none yet (videos are delivered without sound effects)",
+   "required": false
+  },
+  {
+   "key": "music_dir",
+   "scope": "shared",
+   "ask": "Where do you keep music you are allowed to use?",
+   "default": "none yet",
+   "required": false
+  },
+  {
+   "key": "music_rule",
+   "scope": "shared",
+   "ask": "Should I always ask before adding music, or add a favourite and tell you which?",
+   "default": "ask",
+   "required": false
+  },
+  {
+   "key": "proof_dir",
+   "scope": "shared",
+   "ask": "Where do you keep the real things I can show on screen: client results, proof, screenshots?",
+   "default": "none yet",
+   "required": false
+  },
+  {
+   "key": "working_style",
+   "scope": "skill",
+   "ask": "Should I check design choices with you before I build (which interface on which sentence, the wording, the opening), or build the whole reel my way and tell you what I chose?",
+   "default": "build-first",
+   "required": false
+  },
+  {
+   "key": "web_assets",
+   "scope": "skill",
+   "ask": "When they name a platform, account or document, the edit is strongest with the real thing. May I fetch real thumbnails, avatars, logos and screenshots from the web? You decide what you are comfortable publishing; I list every source in my report.",
+   "default": "yes: real over drawn, every source listed in the report",
+   "required": false
+  },
+  {
+   "key": "never_show",
+   "scope": "skill",
+   "ask": "Is there anything that must never be shown on screen: names, clients, competitors, figures, old offers, topics?",
+   "default": "nothing listed",
+   "required": false
+  },
+  {
+   "key": "dim_level",
+   "scope": "skill",
+   "ask": "How dark should the background be behind the graphics, so dark panels read against your room? 0 = none, 0.4 = standard, 0.6 = heavy.",
+   "default": "0.40",
+   "required": false
+  },
+  {
+   "key": "punch_max",
+   "scope": "skill",
+   "ask": "How strong may the punch-in on a sentence cut get? 1.06 gentle, 1.10 standard, 1.14 strong.",
+   "default": "1.10",
+   "required": false
+  },
+  {
+   "key": "caption_size",
+   "scope": "skill",
+   "ask": "How big should the captions be, in pixels on the 1080 x 1920 frame?",
+   "default": "64",
+   "required": false
+  },
+  {
+   "key": "caption_y",
+   "scope": "skill",
+   "ask": "How low on the chest should the captions sit (top edge, in pixels from the top of the frame)? Never above 1100 or below 1250.",
+   "default": "1146",
+   "required": false
+  },
+  {
+   "key": "emph_size",
+   "scope": "skill",
+   "ask": "How big should the one or two emphasis words per sentence be, in pixels?",
+   "default": "132",
+   "required": false
+  },
+  {
+   "key": "head_box",
+   "scope": "skill",
+   "ask": "(measured from a still of your cut, not asked) where your head sits at scale 1: x0 y0 x1 y1 in the 1080 x 1920 frame.",
+   "default": "320 320 840 1120",
+   "required": false
+  }
+ ]
+}

@@ -1,0 +1,203 @@
+{
+ "skill": "glass-explainer-reel",
+ "questions": [
+  {
+   "key": "creator_name",
+   "scope": "shared",
+   "ask": "What name should I use for you: the one that appears on screen and in my notes?",
+   "default": null,
+   "required": true
+  },
+  {
+   "key": "brand_name",
+   "scope": "shared",
+   "ask": "What is the business or brand called?",
+   "default": null,
+   "required": true
+  },
+  {
+   "key": "handle",
+   "scope": "shared",
+   "ask": "What is your main handle, and on which platform do you post most?",
+   "default": "not set",
+   "required": false
+  },
+  {
+   "key": "platform",
+   "scope": "shared",
+   "ask": "(saved with the handle) the platform you post on most: Instagram, TikTok, YouTube or LinkedIn",
+   "default": "instagram",
+   "required": false
+  },
+  {
+   "key": "niche",
+   "scope": "shared",
+   "ask": "In one sentence: what do you help people with, and who are they?",
+   "default": "not set",
+   "required": false
+  },
+  {
+   "key": "accent",
+   "scope": "shared",
+   "ask": "What is your accent colour (the one colour used for the key word, the active element, the chips and the glow)?",
+   "default": null,
+   "required": true
+  },
+  {
+   "key": "accent_name",
+   "scope": "shared",
+   "ask": "(saved with the accent colour) the plain word for it: blue, gold, lime",
+   "default": "accent colour",
+   "required": false
+  },
+  {
+   "key": "font_main_name",
+   "scope": "shared",
+   "ask": "Which font do you use for headlines?",
+   "default": null,
+   "required": true
+  },
+  {
+   "key": "font_main_bold",
+   "scope": "shared",
+   "ask": "(found on their computer) the bold weight of the main font",
+   "default": null,
+   "required": true
+  },
+  {
+   "key": "font_main_regular",
+   "scope": "shared",
+   "ask": "(found on their computer) the regular or medium weight of the main font; left unset, the bold is reused",
+   "default": null,
+   "required": false
+  },
+  {
+   "key": "font_accent_name",
+   "scope": "shared",
+   "ask": "Do you want key words in a second, contrasting font, or the same font in your colour?",
+   "default": "Playfair Display Italic",
+   "required": false
+  },
+  {
+   "key": "font_accent",
+   "scope": "shared",
+   "ask": "(found on their computer) the emphasis font; the shipped Playfair Display Italic if they have no preference",
+   "default": {
+    "file": "PlayfairDisplay-Italic.ttf"
+   },
+   "required": false
+  },
+  {
+   "key": "font_caption_name",
+   "scope": "shared",
+   "ask": "Captions in the same main font, or a different one? (the name of the caption font)",
+   "default": "same as the main font",
+   "required": false
+  },
+  {
+   "key": "font_caption",
+   "scope": "shared",
+   "ask": "(found on their computer) the caption font; left unset, the main bold is reused",
+   "default": null,
+   "required": false
+  },
+  {
+   "key": "transcriber",
+   "scope": "shared",
+   "ask": "Transcribe with ElevenLabs (recommended, the most accurate word timings) or on this computer (free)?",
+   "default": null,
+   "required": true
+  },
+  {
+   "key": "output_rule",
+   "scope": "shared",
+   "ask": "Where should finished videos go? Next to the raw file in an '- Edit' folder is the default.",
+   "default": "beside the raw file, in a \"<video name> - Edit\" folder",
+   "required": false
+  },
+  {
+   "key": "media_drive",
+   "scope": "shared",
+   "ask": "Is your raw footage on an external drive? Which one?",
+   "default": "none",
+   "required": false
+  },
+  {
+   "key": "sfx_dir",
+   "scope": "shared",
+   "ask": "Do you have a sound-effects pack (whooshes, pops, clicks)? Tell me the folder.",
+   "default": "none yet (videos are delivered without sound effects)",
+   "required": false
+  },
+  {
+   "key": "music_dir",
+   "scope": "shared",
+   "ask": "Where do you keep music you are allowed to use?",
+   "default": "none yet",
+   "required": false
+  },
+  {
+   "key": "music_rule",
+   "scope": "shared",
+   "ask": "Should I always ask before adding music, or add a favourite and tell you which?",
+   "default": "ask",
+   "required": false
+  },
+  {
+   "key": "proof_dir",
+   "scope": "shared",
+   "ask": "Where do you keep the real things I can show on screen: client results, screenshots, reel covers?",
+   "default": "none yet",
+   "required": false
+  },
+  {
+   "key": "watermark",
+   "scope": "skill",
+   "ask": "Should your handle sit on the video as a small watermark, or no watermark at all?",
+   "default": "off",
+   "required": false
+  },
+  {
+   "key": "glass_look",
+   "scope": "skill",
+   "ask": "The graphics get a restrained glass finish (translucent cards, a faint light behind them). Keep it as it is (full), soften the light (soft), or turn it off for plain hairline cards (off)?",
+   "default": "full",
+   "required": false
+  },
+  {
+   "key": "sound_effects",
+   "scope": "skill",
+   "ask": "Quiet sound effects on the key reveals when you have a sound pack: on or off?",
+   "default": "on",
+   "required": false
+  },
+  {
+   "key": "asset_dirs",
+   "scope": "skill",
+   "ask": "Besides your proof folder, are there other folders I should search for real things to show: client work, brand assets, screenshots, reel covers?",
+   "default": "none",
+   "required": false
+  },
+  {
+   "key": "web_assets",
+   "scope": "skill",
+   "ask": "When a script names a person, a channel, a post or a page, may I fetch the real picture or screenshot from the web? Rights are yours to manage; I list every source.",
+   "default": "yes: real over drawn, every source listed in the report",
+   "required": false
+  },
+  {
+   "key": "never_show",
+   "scope": "skill",
+   "ask": "Is there anything that must never be shown on screen: names, clients, competitors, figures, old offers, topics?",
+   "default": "nothing listed",
+   "required": false
+  },
+  {
+   "key": "work_rule",
+   "scope": "skill",
+   "ask": "Should I find the assets and write the wording myself, finish the whole reel and then report what to check, or stop and ask at each stage (the cut, the plan, the draft)?",
+   "default": "finish the best version, then report",
+   "required": false
+  }
+ ]
+}

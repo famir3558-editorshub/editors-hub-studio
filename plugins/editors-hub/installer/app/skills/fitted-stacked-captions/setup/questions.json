@@ -1,0 +1,147 @@
+{
+ "skill": "fitted-stacked-captions",
+ "questions": [
+  {
+   "key": "creator_name",
+   "scope": "shared",
+   "ask": "What name should I use for you: the one that appears on screen and in my notes?",
+   "default": null,
+   "required": true
+  },
+  {
+   "key": "brand_name",
+   "scope": "shared",
+   "ask": "What is the business or brand called?",
+   "default": null,
+   "required": true
+  },
+  {
+   "key": "handle",
+   "scope": "shared",
+   "ask": "What is your main handle, and on which platform do you post most?",
+   "default": "not set",
+   "required": false
+  },
+  {
+   "key": "niche",
+   "scope": "shared",
+   "ask": "In one sentence: what do you help people with, and who are they?",
+   "default": "not set",
+   "required": false
+  },
+  {
+   "key": "accent",
+   "scope": "shared",
+   "ask": "What is your accent colour (the one colour used for the key word, the focal element and the glow)?",
+   "default": null,
+   "required": true
+  },
+  {
+   "key": "accent_name",
+   "scope": "shared",
+   "ask": "(saved with the accent colour) the plain word for it: blue, gold, lime",
+   "default": "accent colour",
+   "required": false
+  },
+  {
+   "key": "font_main_name",
+   "scope": "shared",
+   "ask": "Which font do you use for headlines?",
+   "default": null,
+   "required": true
+  },
+  {
+   "key": "font_main_bold",
+   "scope": "shared",
+   "ask": "(found on their computer) the bold weight of the main font",
+   "default": null,
+   "required": true
+  },
+  {
+   "key": "font_main_regular",
+   "scope": "shared",
+   "ask": "(found on their computer) the regular or medium weight of the main font; left unset, the bold is reused",
+   "default": null,
+   "required": false
+  },
+  {
+   "key": "font_accent_name",
+   "scope": "shared",
+   "ask": "Do you want key words in a second, contrasting font, or the same font in your colour?",
+   "default": "Playfair Display Italic",
+   "required": false
+  },
+  {
+   "key": "font_accent",
+   "scope": "shared",
+   "ask": "(found on their computer) the emphasis font; the shipped Playfair Display Italic if they have no preference",
+   "default": {
+    "file": "PlayfairDisplay-Italic.ttf"
+   },
+   "required": false
+  },
+  {
+   "key": "font_caption_name",
+   "scope": "shared",
+   "ask": "Captions in the same main font, or a different one?",
+   "default": null,
+   "required": false
+  },
+  {
+   "key": "font_caption",
+   "scope": "shared",
+   "ask": "(found on their computer) the caption font file or installed name; left unset, the main bold is reused",
+   "default": null,
+   "required": false
+  },
+  {
+   "key": "transcriber",
+   "scope": "shared",
+   "ask": "Transcribe with ElevenLabs (recommended, the most accurate word timings) or on this computer (free)?",
+   "default": null,
+   "required": true
+  },
+  {
+   "key": "output_rule",
+   "scope": "shared",
+   "ask": "Where should finished videos go? Next to the raw file in an '- Edit' folder is the default.",
+   "default": "beside the raw file, in a \"<video name> - Edit\" folder",
+   "required": false
+  },
+  {
+   "key": "lead_seconds",
+   "scope": "skill",
+   "ask": "How far ahead of the voice should each word appear? 0.22 seconds lets the viewer read just before they hear it.",
+   "default": 0.22,
+   "required": false
+  },
+  {
+   "key": "anchor_px",
+   "scope": "skill",
+   "ask": "How big should the one big word be, on a 1080-wide frame? 195 is the signed-off size.",
+   "default": 195,
+   "required": false
+  },
+  {
+   "key": "small_px",
+   "scope": "skill",
+   "ask": "How big should the small fitted words be, on a 1080-wide frame? 48 is the signed-off size.",
+   "default": 48,
+   "required": false
+  },
+  {
+   "key": "bottom_limit",
+   "scope": "skill",
+   "ask": "What is the lowest line the captions may reach, on a 1920-tall frame? 1250 keeps them clear of the platform buttons.",
+   "default": 1250,
+   "required": false
+  },
+  {
+   "key": "review_rule",
+   "scope": "skill",
+   "ask": "Should I show you a quick preview and wait for your yes before the full-quality render, or render the final straight away?",
+   "default": "preview first, wait for approval",
+   "required": false
+  }
+ ]
+}

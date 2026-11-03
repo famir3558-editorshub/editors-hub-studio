@@ -1,0 +1,13 @@
+{
+ "signature": "the ONE visual idea that belongs to this video only (its core framework or metaphor) and where it returns",
+ "intro_plan": "how the first 45 s confirm the click, show the structure and hold curiosity",
+ "moments": [
+  {"id": "hook-title", "t": 0.2, "end": 4.8, "section": "intro", "said": "their words here", "communicates": "what the creator is getting across",
+   "why": "curiosity", "score": 5, "state": "float", "component": "title", "variant": "bottom",
+   "asset": null, "note": ""},
+  {"id": "example", "t": 0, "end": 0, "section": "s1", "said": "", "communicates": "",
+   "why": "example", "score": 4, "state": "split", "component": "browser", "variant": "auto",
+   "asset": {"want": "the exact page the creator names", "tier": 2, "file": null, "source": null}, "note": ""}
+ ],
+ "left_alone": [{"a": 0, "b": 0, "reason": "story: their delivery carries it"}]
+}

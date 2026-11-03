@@ -1,0 +1,99 @@
+<!-- Worked example from the original style. A reference for structure and API use only: never reuse its wording, names or assets. A 15 s placeholder sample: grey stand-in presenter, three made-up items. -->
+<!doctype html><html><head><meta charset="UTF-8"/><meta name="viewport" content="width=1080, height=1920"/>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+<style>
+body{margin:0;background:#000}
+#root{position:relative;width:1080px;height:1920px;overflow:hidden;background:#000;font-family:"Avenir Next",Helvetica,sans-serif}
+/* placeholder presenter kit */
+.ph-cam{position:absolute;overflow:hidden;background:
+  radial-gradient(120% 80% at 70% 18%, #5a5b63 0%, rgba(90,91,99,0) 55%),
+  linear-gradient(180deg,#3b3c43 0%,#2c2d33 62%,#24252a 100%);}
+.ph-cam .ph-shelf{position:absolute;left:6%;top:16%;width:30%;height:1.2%;background:#4a4b53;border-radius:4px;filter:blur(3px);opacity:.8}
+.ph-cam .ph-shelf.b{top:30%;width:24%}
+.ph-cam .ph-lamp{position:absolute;right:9%;top:9%;width:16%;aspect-ratio:1;border-radius:50%;background:radial-gradient(circle,#8d8a86 0%,rgba(141,138,134,0) 68%);filter:blur(6px);opacity:.75}
+.ph-tag{position:absolute;left:3%;top:2.5%;padding:.5em .9em;border:1.5px dashed rgba(255,255,255,.45);border-radius:999px;color:rgba(255,255,255,.7);font:600 20px/1 system-ui,Helvetica,Arial,sans-serif;letter-spacing:.08em}
+.ph-person{position:absolute;overflow:visible}
+/* topic title */
+#title{position:absolute;left:0;width:1080px;top:286px;text-align:center;font-weight:800;font-style:italic;font-size:58px;letter-spacing:-.01em;line-height:1;color:#E8792B;text-transform:uppercase;text-shadow:0 3px 14px rgba(0,0,0,.6);z-index:30}
+/* captions */
+.cap{position:absolute;left:0;width:1080px;top:900px;height:70px;line-height:70px;text-align:center;font-weight:800;font-style:italic;font-size:54px;letter-spacing:-.01em;color:#fff;text-transform:uppercase;text-shadow:0 3px 14px rgba(0,0,0,.85),0 0 4px rgba(0,0,0,.7);z-index:60;opacity:0;visibility:hidden}
+.cap.it{color:#F4D94A}
+/* tier table */
+#table{position:absolute;left:160px;top:1000px;width:760px;height:500px;background:#000;box-shadow:0 0 0 6px #000,0 24px 60px rgba(0,0,0,.55);z-index:40}
+.row{position:absolute;left:0;width:760px;height:68px;background:#1b1a1d}
+.row .lb{position:absolute;left:0;top:0;width:72px;height:68px;display:flex;align-items:center;justify-content:center;font:700 26px/1 Helvetica,Arial,sans-serif;color:#141414}
+.row .fl{position:absolute;left:72px;top:0;width:688px;height:68px;background:#fff;opacity:0}
+/* item card */
+.item{position:absolute;left:260px;top:1092px;width:560px;height:315px;z-index:50;overflow:hidden;opacity:0;box-shadow:0 0 0 3px rgba(255,255,255,.85),0 20px 50px rgba(0,0,0,.6);transform-origin:50% 50%}
+.item .bg{position:absolute;inset:0}
+.item .nm{position:absolute;left:0;right:0;bottom:22px;text-align:center;font-family:"Avenir Next Condensed","Avenir Next",Impact,sans-serif;font-weight:800;font-size:84px;line-height:.92;letter-spacing:-.01em;color:#FFE53B;text-transform:uppercase;-webkit-text-stroke:5px #111;paint-order:stroke fill;text-shadow:0 5px 0 rgba(0,0,0,.55)}
+.item .tg{position:absolute;left:14px;top:12px;padding:6px 12px;border:1.5px dashed rgba(255,255,255,.6);border-radius:999px;color:rgba(255,255,255,.8);font:600 15px/1 "SF Pro Display",Helvetica,sans-serif;letter-spacing:.08em}
+/* placeholder visuals */
+.cal{position:absolute;left:150px;top:28px;display:grid;grid-template-columns:repeat(7,30px);gap:8px}
+.cal i{width:30px;height:30px;border-radius:7px;background:rgba(255,255,255,.22);display:block}.cal i.on{background:#E8792B}
+.wav{position:absolute;left:90px;right:90px;top:22px;height:100px;display:flex;align-items:center;justify-content:space-between}
+.wav i{width:12px;border-radius:6px;background:#fff;opacity:.85;display:block}
+.sl{position:absolute;top:26px;width:150px;height:186px;border-radius:14px;background:#EDECE8;box-shadow:0 10px 24px rgba(0,0,0,.4)}
+.sl b{position:absolute;left:16px;height:10px;border-radius:5px;background:#BDBCB7;display:block}
+</style></head><body>
+<div id="root" data-composition-id="main" data-start="0" data-duration="15" data-width="1080" data-height="1920">
+  <div class="ph-cam" style="left:0;top:0;width:1080px;height:1920px">
+    <div class="ph-shelf"></div><div class="ph-shelf b"></div><div class="ph-lamp"></div>
+    <div class="ph-tag">YOUR VIDEO</div>
+    <svg class="ph-person" style="left:110px;top:320px;width:860px" viewBox="0 0 600 1200" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="phBody" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#b9b9be"/><stop offset="1" stop-color="#8b8b91"/></linearGradient>
+        <linearGradient id="phHead" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#c9c9ce"/><stop offset="1" stop-color="#9c9ca2"/></linearGradient>
+      </defs>
+      <path d="M0 1200 L0 760 C0 540 110 440 235 418 L365 418 C490 440 600 540 600 760 L600 1200 Z" fill="url(#phBody)"/>
+      <path d="M238 300 h124 v128 c-34 40 -90 40 -124 0 Z" fill="#96969c"/>
+      <ellipse cx="300" cy="185" rx="118" ry="146" fill="url(#phHead)"/>
+    </svg>
+  </div>
+
+  <div id="title">Content Tactics</div>
+  <div id="caps"></div>
+  <div id="table"></div>
+
+  <div class="item" id="i1"><div class="bg" style="background:linear-gradient(135deg,#34506b,#1d2a3a)"></div>
+    <div class="cal" id="cal"></div><div class="tg">YOUR IMAGE</div><div class="nm">Daily Posting</div></div>
+  <div class="item" id="i2"><div class="bg" style="background:linear-gradient(135deg,#6a3a63,#2a1830)"></div>
+    <div class="wav" id="wav"></div><div class="tg">YOUR IMAGE</div><div class="nm">Trending Audio</div></div>
+  <div class="item" id="i3"><div class="bg" style="background:linear-gradient(135deg,#3d6350,#182a22)"></div>
+    <div class="sl" style="left:120px;transform:rotate(-7deg)"><b style="top:24px;width:90px"></b><b style="top:48px;width:118px"></b></div>
+    <div class="sl" style="left:205px"><b style="top:24px;width:100px"></b><b style="top:48px;width:118px"></b><b style="top:72px;width:70px"></b></div>
+    <div class="sl" style="left:290px;transform:rotate(7deg)"><b style="top:24px;width:80px"></b><b style="top:48px;width:118px"></b></div>
+    <div class="tg">YOUR IMAGE</div><div class="nm">Carousels</div></div>
+</div>
+<script>
+const TIERS=[["S","#FF7F7E"],["A","#FFBF7F"],["B","#FFFF7F"],["C","#7FFF7F"],["D","#7FBFFF"],["E","#807FFF"],["F","#FF7FFE"]];
+const table=document.getElementById("table");
+TIERS.forEach((t,i)=>{table.insertAdjacentHTML("beforeend",`<div class="row" id="r${t[0]}" style="top:${i*72}px"><div class="fl"></div><div class="lb" style="background:${t[1]}">${t[0]}</div></div>`)});
+const cal=document.getElementById("cal");for(let i=0;i<21;i++)cal.insertAdjacentHTML("beforeend",`<i class="${[0,1,2,3,4,7,8,9,14,15].includes(i)?'on':''}"></i>`);
+const wav=document.getElementById("wav");[30,70,110,60,140,90,40,120,150,80,50,130,100,60,140,70,30,90,120,50,80,40].forEach(h=>wav.insertAdjacentHTML("beforeend",`<i style="height:${Math.round(h*.62)}px"></i>`));
+
+// [start, end, text, isItemName]
+const CAPS=[
+ [0.30,1.25,"Daily posting",1],[1.30,2.40,"Great if you",0],[2.40,3.60,"have a system",0],[3.70,4.80,"B tier",0],
+ [5.00,5.95,"Trending audio",1],[6.00,7.00,"It gets views",0],[7.00,8.00,"but not clients",0],[8.10,9.20,"F tier",0],
+ [9.40,10.30,"Carousels",1],[10.35,11.45,"They teach",0],[11.45,12.60,"and they sell",0],[12.70,13.80,"S tier",0],[13.90,14.80,"Every single time",0]];
+// [id, appear, verdict time, tier index, slot]
+const ITEMS=[["#i1",0.30,3.85,2],["#i2",5.00,8.25,6],["#i3",9.40,12.85,0]];
+
+const tl=gsap.timeline({paused:true});
+tl.to(".ph-person",{y:-6,rotation:0.5,duration:1.5,ease:"sine.inOut",yoyo:true,repeat:9,transformOrigin:"50% 100%"},0);
+const caps=document.getElementById("caps");
+CAPS.forEach(c=>{const d=document.createElement("div");d.className="cap"+(c[3]?" it":"");d.textContent=c[2];caps.appendChild(d);
+  tl.set(d,{autoAlpha:1},c[0]);tl.set(d,{autoAlpha:0},c[1]);});
+ITEMS.forEach(([id,t0,tv,ti])=>{
+  const dy=(1000+ti*72+34)-1249.5, dx=(160+72+8+53.5)-540;
+  tl.fromTo(id,{opacity:0,scale:.55},{opacity:1,scale:1,duration:.32,ease:"back.out(1.7)"},t0);
+  tl.to(id,{scale:1.03,duration:tv-t0-.4,ease:"none"},t0+.32);
+  tl.to(id,{x:dx,y:dy,scale:60/315,duration:.42,ease:"power3.inOut"},tv);
+  const r="#r"+TIERS[ti][0];
+  tl.fromTo(r+" .fl",{opacity:.28},{opacity:0,duration:.5,ease:"power2.out",immediateRender:false},tv+.38);
+  tl.fromTo(r+" .lb",{scale:1.25},{scale:1,duration:.4,ease:"back.out(2)",immediateRender:false},tv+.38);
+});
+tl.set({}, {}, 15);
+window.__timelines=window.__timelines||{};window.__timelines["main"]=tl;
+</script></body></html>
