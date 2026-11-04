@@ -10,7 +10,7 @@ The plugin carries the studio app; a session-start hook copies it to `~/editors-
 
 1. Make sure the app is in place:
    `python3 "${CLAUDE_PLUGIN_ROOT}/installer/check.py" --install` (Windows: `py` instead of `python3`).
-2. Start Home and get its address: `python3 ~/editors-hub/studio.py open`. Open that address in the Claude app's
+2. Start Home and get its address: `python3 ~/editors-hub/studio.py open`. Also run `python3 ~/editors-hub/studio.py wait-new` in the background, so pressing Make video starts the edit in this session (the editors-hub skill says what to do when it prints). Open that address in the Claude app's
    built-in browser beside the chat, never the system browser.
 3. First time on a computer: the owner creates their account there (username and email; the first account on a computer is its owner). The sign-in page asks once for their Gmail app password (Google Account > Security > App passwords,
    one called "Editors.Hub") and then emails the code; they type it in and they're in. If they skip that,

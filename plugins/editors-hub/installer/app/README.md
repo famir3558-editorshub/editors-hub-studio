@@ -120,6 +120,11 @@ Overview each file is sorted by type. Only the style's maker, or the owner, can 
    references, B-roll, LUTs, music, fonts or project files becomes a new style, each file sorted into its section.
 2. **From the online Shared folder:** the styles listed on the **Shared** tab, shared by anyone with **⋯ → Share online**.
 
+## Make video starts the edit
+
+**Make video** puts the video in a queue on this computer, and a Claude session listening for new videos starts the edit by itself. Sessions listen when you open the studio from Claude, or
+use **Copy a prompt for Claude** on a client or style. The client's session goes first, then the style's, then any other. If none is listening, the Live tab says so and gives you a prompt to paste; the edit starts as soon as a session is free.
+
 ## Seeing and stopping long jobs
 
 Uploads, downloads, Save to a drive, Duplicate and Add a style run in the background: a bar shows how far they've

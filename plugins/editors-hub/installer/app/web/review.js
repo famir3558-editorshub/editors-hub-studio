@@ -5,6 +5,7 @@ const SPEEDS = [1, 1.5, 2, 0.5];
 const R = { v: null, raw: "", version: null, frozen: null, hl: null, mode: "render", view: "watch", side: "notes",
             pending: [], role: "editor", cmpA: null, cmpB: null };
 const maker = () => R.role !== "reviewer";
+const firstEdit = () => maker() && !R.v.drafts.length;  // nothing to watch or note yet: the page is only the Live tab
 
 // the video the controls drive: the single player, or the left one when comparing
 const main = () => (R.view === "compare" ? $("vidA") : $("vid"));
@@ -21,6 +22,7 @@ async function load(first) {
   const raw = JSON.stringify(v);
   if (raw === R.raw) return;
   const prevLatest = R.v?.latest;
+  if (R.v && !R.v.drafts.length && v.drafts.length) R.side = "notes";  // the first draft is here: on to watching it
   R.raw = raw;
   R.v = v;
   const hash = parseInt((location.hash.match(/v(\d+)/) || [])[1]);
@@ -54,6 +56,7 @@ function fmtWorked(s) {
 function render() {
   const v = R.v, d = draft();
   document.title = `${v.name} · Editors.Hub`;
+  document.body.classList.toggle("first-edit", firstEdit());
   $("vName").textContent = v.name;
   $("vClient").innerHTML = v.project_name ? `${maker() ? `<a href="/project/${enc(v.project)}">${esc(v.project_name)}</a>` : esc(v.project_name)}<span> / </span>` : "";
   const listening = v.claude?.listening;
@@ -108,18 +111,62 @@ function openBrollDlg() {
   $("brollForm").querySelector(".error").textContent = "";
   $("brollCount").textContent = "";
   $("brollActions").innerHTML = "";
-  if (b.stage === "mode") {
+  if (b.stage === "mode" && R.brollOwn) {
+    drawBrollOwn();
+  } else if (b.stage === "mode") {
     $("brollTitle").textContent = "How should the b-roll be chosen?";
     $("brollIntro").textContent = `For ${R.v.name}. Claude is about to start editing.`;
     $("brollBody").innerHTML = `<div class="broll-modes">
       <button type="button" class="broll-mode" data-mode="manual"><b>Pick manually</b><span>Claude watches the whole video and finds every place b-roll can go. You see 3 or 4 options for each one and choose.</span></button>
-      <button type="button" class="broll-mode" data-mode="auto"><b>Claude picks automatically</b><span>Claude chooses the b-roll itself and carries on with the edit. You can still change any of it on the next draft.</span></button></div>`;
+      <button type="button" class="broll-mode" data-mode="auto"><b>Claude picks automatically</b><span>Claude chooses the b-roll itself and carries on with the edit. You can still change any of it on the next draft.</span></button>
+      <button type="button" class="broll-mode" id="brollAddOwn"><b>Add your b-roll</b><span>Give Claude your own clips: a folder from this computer, or links to online folders like Google Drive or Dropbox.</span></button></div>`;
   } else if (b.stage === "picking") {
     drawBrollPicker();
   } else {
     drawBrollReview();
   }
   if (!dlg.open) dlg.showModal();
+}
+
+const BROLL_FILE = /\.(mp4|mov|m4v|webm|mkv|png|jpe?g|gif|webp)$/i;
+
+function drawBrollOwn() {
+  $("brollTitle").textContent = "Add your b-roll";
+  $("brollIntro").textContent = "Claude uses your clips first. Add a folder, paste links, or both.";
+  $("brollBody").innerHTML = `<div class="broll-own">
+    <label class="btn" id="brollFolderBtn">Choose a folder from this computer<input type="file" id="brollFolder" webkitdirectory multiple hidden></label>
+    <p class="faint small-print" id="brollOwnFiles"></p>
+    <div class="progress" id="brollOwnBar" hidden><div></div></div>
+    <label class="field">Or paste links to online folders <small>One on each line. Google Drive, Dropbox, or any page Claude can open.</small><textarea id="brollLinks" rows="3" placeholder="https://drive.google.com/drive/folders/…"></textarea></label>
+    </div>`;
+  $("brollActions").innerHTML = `<button type="button" class="btn" id="brollOwnBack">Back</button><button type="button" class="btn" data-own="manual">I'll pick from them</button><button type="button" class="btn primary" data-own="auto">Claude picks from them</button>`;
+  const say = () => { const n = R.v.broll_yours; $("brollOwnFiles").textContent = n ? `${n} file${n === 1 ? "" : "s"} added.` : "Copies its videos and images into this video. Other files are skipped."; };
+  say();
+  $("brollOwnBack").onclick = () => { R.brollOwn = false; openBrollDlg(); };
+  $("brollFolder").onchange = async (e) => {
+    const err = $("brollForm").querySelector(".error"), bar = $("brollOwnBar"), buttons = $("brollActions").querySelectorAll("button");
+    const files = [...e.target.files].filter((f) => BROLL_FILE.test(f.name));
+    err.textContent = "";
+    if (!files.length) return (err.textContent = "That folder has no videos or images.");
+    const total = files.reduce((n, f) => n + f.size, 0);
+    let done = 0;
+    bar.hidden = false;
+    buttons.forEach((b) => (b.disabled = true));
+    try {
+      for (const [i, file] of files.entries()) {
+        $("brollOwnFiles").textContent = `Copying ${i + 1} of ${files.length}: ${file.name}`;
+        await upload(`/api/videos/${enc(vidId)}/upload?kind=broll&name=${enc(file.name)}`, file, (p) => (bar.firstElementChild.style.width = `${((done + p * file.size) / total) * 100}%`));
+        done += file.size;
+        R.v.broll_yours = (R.v.broll_yours || 0) + 1;
+      }
+    } catch (ex) {
+      err.textContent = ex.message;
+    }
+    bar.hidden = true;
+    buttons.forEach((b) => (b.disabled = false));
+    e.target.value = "";
+    say();
+  };
 }
 
 function drawBrollPicker() {
@@ -186,6 +233,9 @@ async function answerBroll(body, msg) {
 }
 
 $("brollForm").addEventListener("click", (e) => {
+  if (e.target.closest("#brollAddOwn")) { R.brollOwn = true; return openBrollDlg(); }
+  const own = e.target.closest("[data-own]");
+  if (own) return answerBroll({ own: { mode: own.dataset.own, links: $("brollLinks").value.split(/\s+/).filter(Boolean) } }, "Claude will use your b-roll first");
   const mode = e.target.closest("[data-mode]");
   if (mode) return answerBroll({ mode: mode.dataset.mode }, mode.dataset.mode === "manual" ? "Claude is finding where b-roll can go" : "Claude will choose the b-roll");
   const opt = e.target.closest("[data-opt]");
@@ -242,11 +292,21 @@ function renderLive() {
   if (R.side === "live") R.seen = items.length;
   $("liveNew").hidden = R.side === "live" || !(items.length > (R.seen ?? 0));
   $("liveNew").textContent = items.length - (R.seen ?? 0);
-  const req = v.render_request;
-  $("renderCard").innerHTML = req?.status === "waiting"
+  const req = v.render_request, b = v.broll, start = v.start;
+  const brollCard = firstEdit() && b && ["mode", "picking", "review"].includes(b.stage)  // "Later" on the popup: the way back to it
+    ? `<div class="render-card"><b>Claude is waiting for your b-roll choice.</b><br><button class="btn small primary" id="brollAgain" type="button">Answer now</button></div>` : "";
+  const startCard = start?.state === "starting" ? `<div class="render-card"><b>A Claude session is starting this edit.</b> Its first update shows here in a moment.</div>`
+    : start?.state === "waiting" && start.listening ? `<div class="render-card"><b>Starting the edit…</b> A Claude session is picking this up.</div>`
+    : start?.state === "waiting" ? `<div class="render-card"><b>Waiting for a free Claude session.</b> The edit starts by itself as soon as one is listening. If none is open, paste this into a new session:<div class="start-prompt">${esc(start.prompt)}</div><button class="btn small" id="copyListen" type="button">Copy</button></div>` : "";
+  $("renderCard").innerHTML = startCard + brollCard + (req?.status === "waiting"
     ? `<div class="render-card"><b>Claude is waiting for your render settings.</b><br><button class="btn small primary" id="renderOpen" type="button">Choose the render settings</button></div>`
-    : req?.status === "chosen" ? `<div class="render-card"><b>Render settings chosen.</b> ${v.claude?.listening ? "Claude is starting the render." : "The render starts when Claude picks them up."}</div>` : "";
+    : req?.status === "chosen" ? `<div class="render-card"><b>Render settings chosen.</b> ${v.claude?.listening ? "Claude is starting the render." : "The render starts when Claude picks them up."}</div>` : "");
   if ($("renderOpen")) $("renderOpen").onclick = () => openRenderDlg();
+  if ($("brollAgain")) $("brollAgain").onclick = () => { R.brollLater = null; openBrollDlg(); };
+  if ($("copyListen")) $("copyListen").onclick = async () => {
+    try { await navigator.clipboard.writeText(start.prompt); toast("Copied: paste it into a Claude session"); }
+    catch (e) { await ehPrompt("Copy this and paste it into a Claude session:", start.prompt, { title: "Prompt for Claude", ok: "Done", cancel: "Close" }); }
+  };
   let round = null;
   $("liveFeed").innerHTML = items.slice().reverse().map((u, i) => {
     const head = u.draft !== round ? `<div class="live-round">Working on draft ${u.draft}</div>` : "";
@@ -407,6 +467,7 @@ function noteCard(n, num) {
 
 function renderSide() {
   const v = R.v, d = draft();
+  if (firstEdit()) R.side = "live";
   document.querySelectorAll("#sideSeg button").forEach((b) => b.classList.toggle("on", b.dataset.side === R.side));
   $("notesPane").hidden = R.side !== "notes";
   $("draftsPane").hidden = R.side !== "drafts";

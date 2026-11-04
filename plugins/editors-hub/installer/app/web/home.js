@@ -685,6 +685,7 @@ $("videoForm").addEventListener("submit", async (e) => {
         done += file.size;
       }
     }
+    await api("POST", `/api/videos/${enc(id)}/start`, {});  // every file is in: a Claude session can start the edit
     location.href = `/review/${enc(id)}`;
   } catch (ex) {
     err.textContent = ex.message;
