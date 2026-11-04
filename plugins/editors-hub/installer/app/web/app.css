@@ -205,3 +205,18 @@ dialog.ask form { gap: 14px; }
 .act-stop:hover, .job-stop:hover { background: rgba(229, 25, 43, 0.28); color: #fff; }
 .act.stopped .act-icon { color: var(--muted); font-size: 10px; }
 .act.stopped .act-bar div { background: rgba(255, 255, 255, 0.25); }
+
+/* every dropdown's list, in the studio's look: fully where the browser allows it, dark colours everywhere else */
+select option { background: var(--panel-solid); color: var(--text); }
+@supports (appearance: base-select) {
+  select, select::picker(select) { appearance: base-select; }
+  select { display: inline-flex; align-items: center; justify-content: space-between; gap: 8px; }
+  select::picker-icon { color: var(--muted); font-size: 11px; }
+  select::picker(select) { position-area: block-end span-inline-end; position-try-order: normal; position-try-fallbacks: flip-block, flip-inline, flip-block flip-inline; margin-block: 6px; padding: 6px; color: var(--text); background: var(--panel-solid); border: 1px solid var(--line-strong);
+    border-radius: 12px; box-shadow: 0 16px 40px rgba(0, 0, 0, 0.6); }
+  select option { display: flex; align-items: center; min-height: 32px; padding: 6px 12px; border-radius: 8px; background: transparent; cursor: pointer; font-size: 14px; font-weight: 500; }
+  select option::checkmark { display: none; }
+  select option:hover, select option:focus { outline: none; background: rgba(229, 25, 43, 0.16); }
+  select option:checked { color: var(--red-2); font-weight: 700; }
+  select option:disabled { color: var(--muted); cursor: default; background: transparent; }
+}
