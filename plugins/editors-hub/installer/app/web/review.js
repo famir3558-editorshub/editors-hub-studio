@@ -672,7 +672,22 @@ $("soundBtn").onclick = () => {
   $("soundBtn").textContent = muted ? "Muted" : "Sound";
 };
 $("vidA").muted = false;
-$("fullBtn").onclick = () => (document.fullscreenElement ? document.exitFullscreen() : $("player").requestFullscreen());
+// Full screen fills the window with the video, its controls and timeline. The Claude app's browser pane never answers a real
+// full screen request, so that's only asked for on top of this, for browsers that allow it.
+function setFull(on) {
+  document.body.classList.toggle("player-full", on);
+  $("fullBtn").textContent = on ? "Exit full screen" : "Full screen";
+  if (on) document.documentElement.requestFullscreen?.().catch(() => {});
+  else if (document.fullscreenElement) document.exitFullscreen().catch(() => {});
+}
+const isFull = () => document.body.classList.contains("player-full");
+$("fullBtn").onclick = () => setFull(!isFull());
+document.addEventListener("fullscreenchange", () => { if (!document.fullscreenElement && isFull()) setFull(false); });
+addEventListener("keydown", (e) => {
+  if (!isFull() || e.target.closest?.("input, textarea, select")) return;
+  if (e.key === "Escape") setFull(false);
+  else if (e.key.toLowerCase() === "n" && !e.ctrlKey && !e.metaKey) setFull(false);  // a new note needs the notes panel
+}, true);
 
 $("timeline").addEventListener("pointerdown", (e) => {
   const bubble = e.target.closest(".bubble");

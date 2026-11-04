@@ -25,7 +25,6 @@ body { height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
 }
 .player > video, .player > iframe { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; border: 0; background: #000; }
 .player > iframe { background: #fff; }
-.player:fullscreen { border-radius: 0; height: 100vh; }
 .compare { position: absolute; inset: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 2px; background: #111; }
 .compare figure { margin: 0; position: relative; min-width: 0; }
 .compare video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; background: #000; }
@@ -237,3 +236,9 @@ body { height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
 .tl-clip.now { border-color: var(--red-2); box-shadow: inset 0 0 0 1px var(--red-2); }
 .tl-clip.now::after { content: ""; position: absolute; top: 0; bottom: 0; right: 0; width: 2px; background: var(--red-2); box-shadow: 0 0 8px var(--red-2); }
 #liveTimeline:not(:empty) ~ #liveFeed img { display: block; max-width: 180px; max-height: 110px; object-fit: contain; }
+
+/* Full screen: the video, its controls and timeline fill the window */
+.player-full .stage { position: fixed; inset: 0; z-index: 60; padding: 0 16px 10px; gap: 6px; overflow: hidden; background: #000; }
+.player-full .stage > .bar, .player-full #playNote, .player-full #approvedBar, .player-full .keys, .player-full .info { display: none; }
+.player-full .player { flex: 1 1 auto; min-height: 0; height: auto; margin: 0 -16px; border: 0; border-radius: 0; }
+.player-full .controls, .player-full .timeline { flex-shrink: 0; }
