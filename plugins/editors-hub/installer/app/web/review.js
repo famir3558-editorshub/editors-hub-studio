@@ -287,6 +287,43 @@ $("brollDlg").addEventListener("cancel", brollPutOff);  // Esc is the same as La
 
 // ---------------------------------------------------------------- the Live tab and the render popup
 
+// one layer: a clip for each snapshot of this draft, at its place in the edit, and the one being worked on marked
+function renderTimeline(items) {
+  const box = $("liveTimeline");
+  const round = items.length ? items[items.length - 1].draft : null;
+  const shots = items.filter((u) => u.image && u.draft === round);
+  if (!shots.length) return (box.innerHTML = "");
+  const now = shots[shots.length - 1];
+  const total = [...items].reverse().find((u) => u.draft === round && u.total)?.total;
+  const placed = shots.filter((u) => u.pos != null).sort((a, b) => a.pos - b.pos);
+  const order = [...placed, ...shots.filter((u) => u.pos == null)];
+  const len = (u, i) => {
+    const next = order[i + 1];
+    if (u.pos == null) return 1;
+    const end = next?.pos ?? total ?? u.pos + 1;
+    const whole = total || order[order.length - 1].pos + 1;
+    return Math.max(0.05, (end - u.pos) / whole) * order.length;
+  };
+  const shown = shots.find((u) => u.id === R.shot) || now;
+  const scroll = box.querySelector(".tl-track")?.scrollLeft;
+  box.innerHTML = `<div class="tl">
+    <div class="tl-head"><b>${shown === now ? "Working on now" : "Earlier"}</b>${shown.pos != null ? `<span class="faint">${fmtTime(shown.pos)}${total ? ` of ${fmtTime(total)}` : ""}</span>` : ""}</div>
+    <a class="tl-big" href="${esc(mediaUrl(shown.image))}" target="_blank" rel="noopener"><img src="${esc(mediaUrl(shown.image))}" alt="Snapshot of the edit"></a>
+    ${shown.text ? `<p class="tl-text">${esc(shown.text)}</p>` : ""}
+    <div class="tl-track">${order.map((u, i) => `<button type="button" class="tl-clip${u === now ? " now" : ""}${u === shown ? " on" : ""}" data-shot="${u.id}" style="flex:${len(u, i).toFixed(3)} 0 74px" title="${esc(u.text || "")}"><img src="${esc(mediaUrl(u.image))}" alt="">${u.pos != null ? `<span>${fmtTime(u.pos)}</span>` : ""}</button>`).join("")}</div>
+  </div>`;
+  const track = box.querySelector(".tl-track");
+  if (R.shot == null) box.querySelector(".tl-clip.now")?.scrollIntoView({ block: "nearest", inline: "center" });
+  else if (scroll != null) track.scrollLeft = scroll;
+}
+$("liveTimeline").addEventListener("click", (e) => {
+  const clip = e.target.closest("[data-shot]");
+  if (!clip) return;
+  const id = +clip.dataset.shot, shots = (R.v.updates || []).filter((u) => u.image);
+  R.shot = shots[shots.length - 1]?.id === id ? null : id;  // the newest one goes back to following along
+  renderTimeline(R.v.updates || []);
+});
+
 function renderLive() {
   const v = R.v, items = v.updates || [];
   if (R.side === "live") R.seen = items.length;
@@ -307,6 +344,7 @@ function renderLive() {
     try { await navigator.clipboard.writeText(start.prompt); toast("Copied: paste it into a Claude session"); }
     catch (e) { await ehPrompt("Copy this and paste it into a Claude session:", start.prompt, { title: "Prompt for Claude", ok: "Done", cancel: "Close" }); }
   };
+  renderTimeline(items);
   let round = null;
   $("liveFeed").innerHTML = items.slice().reverse().map((u, i) => {
     const head = u.draft !== round ? `<div class="live-round">Working on draft ${u.draft}</div>` : "";

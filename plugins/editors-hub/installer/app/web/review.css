@@ -221,3 +221,19 @@ body { height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
 .broll-own { display: grid; gap: 10px; }
 .broll-own textarea { width: 100%; resize: vertical; }
 #brollFolderBtn { justify-self: start; cursor: pointer; }
+
+/* the Live timeline: one layer of snapshots */
+.tl { display: grid; gap: 10px; margin-bottom: 14px; padding: 12px; border: 1px solid var(--line); border-radius: 14px; background: rgba(255, 255, 255, 0.03); }
+.tl-head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; font-size: 13px; }
+.tl-big { display: block; border-radius: 10px; overflow: hidden; background: #000; }
+.tl-big img { display: block; width: 100%; max-height: 46vh; object-fit: contain; }
+.tl-text { margin: 0; font-size: 13.5px; line-height: 1.45; }
+.tl-track { display: flex; gap: 3px; overflow-x: auto; padding-bottom: 4px; }
+.tl-clip { position: relative; height: 54px; padding: 0; overflow: hidden; border: 1px solid var(--line-strong); border-radius: 6px; background: #000; cursor: pointer; }
+.tl-clip img { display: block; width: 100%; height: 100%; object-fit: cover; opacity: 0.72; }
+.tl-clip span { position: absolute; left: 3px; bottom: 2px; padding: 0 4px; border-radius: 4px; font-size: 10.5px; background: rgba(0, 0, 0, 0.7); color: #fff; }
+.tl-clip:hover img, .tl-clip.on img { opacity: 1; }
+.tl-clip.on { border-color: var(--text); }
+.tl-clip.now { border-color: var(--red-2); box-shadow: inset 0 0 0 1px var(--red-2); }
+.tl-clip.now::after { content: ""; position: absolute; top: 0; bottom: 0; right: 0; width: 2px; background: var(--red-2); box-shadow: 0 0 8px var(--red-2); }
+#liveTimeline:not(:empty) ~ #liveFeed img { display: block; max-width: 180px; max-height: 110px; object-fit: contain; }

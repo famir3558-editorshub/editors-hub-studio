@@ -18,6 +18,7 @@
     <button data-tab="styles" data-maker>My styles</button>
     <button data-tab="shared" data-maker>Shared</button>
     <button data-tab="deleted" data-maker>Recently deleted<em id="deletedCount"></em></button>
+    <button data-tab="effects" data-maker>Effects</button>
     <button data-tab="team" data-owner hidden>Team</button>
     <button data-tab="settings">Settings</button>
     <button data-tab="report" id="reportTab" hidden><span id="reportLabel">Report to owner</span><em id="reportCount"></em></button>
@@ -67,6 +68,16 @@
   <section id="tab-deleted" hidden>
     <div class="hero"><div><h1>Recently deleted</h1><p class="muted">Deleted clients and styles wait here with their videos and files. Restore puts them back. Delete forever erases them for good.</p></div></div>
     <div id="deletedList"></div>
+  </section>
+
+  <section id="tab-effects" hidden>
+    <div class="hero"><div><h1>Effects</h1><p class="muted">Effects and techniques from your styles and the online Shared folder, mixed in one place. Claude reads them before each edit, so the studio knows more with every style added. Only the owner can remove anything from here.</p></div></div>
+    <div id="effectsOnline"></div>
+    <div class="toolbar effects-bar"><input id="effectsSearch" placeholder="Search effects" autocomplete="off"><select id="effectsStyle"></select><select id="effectsKind"><option value="">Effects and transitions</option><option value="effects">Effects</option><option value="transitions">Transitions</option></select></div>
+    <div class="section-title"><span id="effectsCount">Effects</span></div>
+    <div class="effects-grid" id="effectsGrid"></div>
+    <div class="section-title"><span id="techCount">Techniques</span></div>
+    <div class="tech-list" id="techList"></div>
   </section>
 
   <section id="tab-shared" hidden>

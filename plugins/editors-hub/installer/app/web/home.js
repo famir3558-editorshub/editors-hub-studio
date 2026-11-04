@@ -611,10 +611,11 @@ function setTab(tab, allow) {
   if (tab === "report") openReports();
   if (tab === "deleted") loadTrash();
   if (tab === "shared") loadOnlineGrid();
+  if (tab === "effects") loadEffects();
   if (tab === "setup") loadSetup();
   S.tab = tab;
   document.querySelectorAll(".tabs button").forEach((b) => b.classList.toggle("on", b.dataset.tab === tab));
-  ["videos", "projects", "styles", "shared", "deleted", "team", "report", "settings", "setup"].forEach((t) => ($("tab-" + t).hidden = t !== tab));
+  ["videos", "projects", "styles", "shared", "effects", "deleted", "team", "report", "settings", "setup"].forEach((t) => ($("tab-" + t).hidden = t !== tab));
   history.replaceState(null, "", tab === "videos" ? "/" : "/#" + tab);
 }
 
@@ -965,6 +966,76 @@ $("importForm").addEventListener("submit", async (e) => {
   }
 });
 
+// ---- the Effects tab: the owner's mix of every style's effects
+let effects = null, effectsTimer = null;
+const effectUrl = (source, file) => `/effects-media/${enc(source)}/${file.split("/").map(enc).join("/")}`;
+async function loadEffects() {
+  clearTimeout(effectsTimer);
+  try {
+    effects = await api("GET", "/api/effects");
+  } catch (e) {
+    $("effectsOnline").innerHTML = `<p class="error">${esc(e.message)}</p>`;
+    return;
+  }
+  const keep = $("effectsStyle").value;
+  $("effectsStyle").innerHTML = `<option value="">All styles</option>` + effects.styles.map((s) => `<option value="${esc(s.key)}">${esc(s.name)}${s.online ? " · online" : ""}</option>`).join("");
+  $("effectsStyle").value = effects.styles.some((s) => s.key === keep) ? keep : "";
+  const n = effects.pending.length, gb = effects.pending.reduce((t, p) => t + (p.size || 0), 0) / 1e9;
+  $("effectsOnline").innerHTML = effects.collecting ? `<div class="effects-online"><b>Collecting effects from the online folder…</b><span class="muted">See the progress at the bottom right.</span></div>`
+    : n ? `<div class="effects-online"><div><b>${n} online style${n === 1 ? "" : "s"} not in the library yet</b><br><span class="muted">${esc(effects.pending.map((p) => p.name).join(", "))}. Downloads about ${gb.toFixed(1)} GB; only the effects and guide are kept.</span></div><button class="btn primary small" id="effectsCollect">Collect them</button></div>`
+    : effects.problem ? `<p class="faint small-print">${esc(effects.problem)}</p>` : "";
+  if (effects.can_remove && effects.removed) $("effectsOnline").insertAdjacentHTML("beforeend", `<div class="effects-online"><span class="muted">${effects.removed} removed by you, for everyone.</span><button class="btn small" id="effectsBack">Bring them all back</button></div>`);
+  if ($("effectsBack")) $("effectsBack").onclick = async () => {
+    try {
+      await api("POST", "/api/effects/remove", { ids: [], restore: true });
+      toast("They're back");
+      loadEffects();
+    } catch (e) { toast(e.message, true); }
+  };
+  if ($("effectsCollect")) $("effectsCollect").onclick = async () => {
+    try {
+      await api("POST", "/api/effects/collect", {});
+      window.dispatchEvent(new Event("editorshub:jobs"));
+      loadEffects();
+    } catch (e) { toast(e.message, true); }
+  };
+  drawEffects();
+  if (effects.collecting && S.tab === "effects") effectsTimer = setTimeout(loadEffects, 4000);
+}
+function drawEffects() {
+  if (!effects) return;
+  const q = $("effectsSearch").value.trim().toLowerCase(), style = $("effectsStyle").value, kind = $("effectsKind").value;
+  const fits = (x, words) => (!style || x.source === style) && (!q || words.toLowerCase().includes(q));
+  const items = effects.items.filter((i) => fits(i, `${i.name} ${i.style} ${i.section}`) && (!kind || i.section === kind));
+  const tech = effects.techniques.filter((t) => fits(t, `${t.text} ${t.heading} ${t.style}`));
+  $("effectsCount").textContent = `Effects · ${items.length}`;
+  $("techCount").textContent = `Techniques · ${tech.length}`;
+  $("effectsGrid").innerHTML = items.slice(0, 300).map((i) => {
+    const url = effectUrl(i.source, i.file);
+    const view = i.kind === "video" ? `<video src="${esc(url)}#t=0.1" muted loop playsinline preload="metadata"${i.poster ? ` poster="${esc(effectUrl(i.source, i.poster))}"` : ""}></video>`
+      : i.kind === "image" ? `<img src="${esc(url)}" alt="" loading="lazy">`
+      : i.kind === "audio" ? `<audio src="${esc(url)}" controls preload="none"></audio>` : `<div class="effect-file">${esc((i.name.split(".").pop() || "").toUpperCase())}</div>`;
+    return `<a class="effect" href="${esc(url)}" target="_blank" rel="noopener"><div class="effect-view">${view}</div><b title="${esc(i.name)}">${esc(i.name)}</b><small>${esc(i.style)} · ${i.section === "transitions" ? "Transition" : "Effect"}</small>${effects.can_remove ? `<button type="button" class="btn small effect-remove" data-effect-remove="${esc(i.rid)}">Remove</button>` : ""}</a>`;
+  }).join("") || `<p class="faint" style="margin:0">No effects here yet. Add files to the Effects or Transitions section of any style.</p>`;
+  $("techList").innerHTML = tech.slice(0, 400).map((t) => `<div class="tech"><p>${esc(t.text)}</p><small>${esc(t.style)}${t.heading ? ` · ${esc(t.heading)}` : ""}</small>${effects.can_remove ? `<button type="button" class="btn small effect-remove" data-effect-remove="${esc(t.rid)}">Remove</button>` : ""}</div>`).join("")
+    || `<p class="faint" style="margin:0">Nothing here yet. Techniques come from each style's guide.</p>`;
+}
+$("tab-effects").addEventListener("click", async (e) => {
+  const b = e.target.closest("[data-effect-remove]");
+  if (!b) return;
+  e.preventDefault();
+  if (!(await ehConfirm("It leaves the Effects section for everyone, and Claude stops using it. The style it came from keeps it.", { title: "Remove this effect?", ok: "Remove", danger: true }))) return;
+  try {
+    await api("POST", "/api/effects/remove", { ids: [b.dataset.effectRemove] });
+    loadEffects();
+  } catch (ex) { toast(ex.message, true); }
+});
+$("effectsSearch").addEventListener("input", drawEffects);
+$("effectsStyle").addEventListener("change", drawEffects);
+$("effectsKind").addEventListener("change", drawEffects);
+$("effectsGrid").addEventListener("mouseover", (e) => e.target.closest(".effect")?.querySelector("video")?.play().catch(() => {}));
+$("effectsGrid").addEventListener("mouseout", (e) => e.target.closest(".effect")?.querySelector("video")?.pause());
+
 // the online Shared folder, listed on the Shared tab
 async function loadOnlineGrid() {
   try {
@@ -1059,7 +1130,7 @@ async function tellIfUpdated() {
 }
 
 load().then(() => {
-  if (["projects", "styles", "shared", "deleted", "team", "report", "settings", "setup"].includes(location.hash.slice(1))) setTab(location.hash.slice(1), true);
+  if (["projects", "styles", "shared", "effects", "deleted", "team", "report", "settings", "setup"].includes(location.hash.slice(1))) setTab(location.hash.slice(1), true);
   if (S.state?.report?.send) loadReports(true).catch(() => {});  // for the count of new answers
   const wanted = location.hash.match(/^#new-video:(.+)$/);  // "+ Video" on a style page
   if (wanted) {

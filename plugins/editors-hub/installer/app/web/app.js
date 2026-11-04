@@ -280,6 +280,7 @@ function doneText(j) {
   const r = j.result || {};
   if (j.kind === "online-upload") return "Done: it's in the online Shared folder" + (r.original_bytes ? `. Lighter copy: ${(r.bytes / 1e9).toFixed(2)} GB, down from ${(r.original_bytes / 1e9).toFixed(2)} GB` : "");
   if (j.kind === "export") return `Done: saved to ${r.path || "the drive"}`;
+  if (j.kind === "effects") return `Done: ${r.collected || 0} collected into Effects` + (r.failed?.length ? `. Not collected: ${r.failed.join("; ")}` : "");
   if (j.kind === "project-import") return `Done: "${r.name || "the client"}" is in Projects`;
   if (j.kind === "duplicate") return `Done: "${r.name || "the copy"}" is in My styles`;
   if (j.kind === "import" || j.kind === "online-download") return `Done: "${r.name || "the style"}" is in My styles`;

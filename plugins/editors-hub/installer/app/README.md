@@ -120,10 +120,19 @@ Overview each file is sorted by type. Only the style's maker, or the owner, can 
    references, B-roll, LUTs, music, fonts or project files becomes a new style, each file sorted into its section.
 2. **From the online Shared folder:** the styles listed on the **Shared** tab, shared by anyone with **⋯ → Share online**.
 
+## The Effects tab
+
+Everyone who makes videos can see it. It's mainly for Claude: it reads the library before each edit, for ideas, so the studio knows more with every style added. The video's style and the client's brand still decide the look. It mixes the effects, transitions and techniques from your styles and the online Shared folder, with search and a filter by style. **Collect them** downloads the online styles not in it yet and keeps only their effects and guide. A style someone keeps private stays on their computer, so nobody else sees it until they share it online.
+Only the owner can remove something, and that removes it for everyone, for Claude too. **Bring them all back** undoes it. The style it came from keeps it.
+
 ## Make video starts the edit
 
 **Make video** puts the video in a queue on this computer, and a Claude session listening for new videos starts the edit by itself. Sessions listen when you open the studio from Claude, or
 use **Copy a prompt for Claude** on a client or style. The client's session goes first, then the style's, then any other. If none is listening, the Live tab says so and gives you a prompt to paste; the edit starts as soon as a session is free.
+
+## The Live timeline
+
+While Claude edits, the Live tab shows one layer of snapshots at their places in the edit, with the one being worked on marked in red. Click any snapshot to see it bigger with what Claude said about it.
 
 ## Seeing and stopping long jobs
 
