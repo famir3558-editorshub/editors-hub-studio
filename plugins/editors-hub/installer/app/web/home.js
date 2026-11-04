@@ -998,9 +998,7 @@ async function loadOnlineGrid() {
         <small>${onlineLine(x)}</small>
         ${x.client ? `<small>Client: ${esc(x.client)}</small>` : ""}
         ${x.notes ? `<small>${esc(x.notes)}</small>` : ""}
-        ${x.status === "waiting" ? `<span class="share-tag private" style="justify-self:start">${x.is_owner ? "Waiting for your check" : "Waiting for the owner's check"}</span>` : ""}
         <div class="row" style="flex-wrap:wrap"><div class="spacer"></div>
-          ${x.is_owner && o.drive ? (x.status === "waiting" ? `<button class="btn small" data-online-status="live" data-tag="${esc(x.tag)}">Approve</button>` : `<button class="btn small" data-online-status="waiting" data-tag="${esc(x.tag)}">Take it down</button>`) : ""}
           ${(x.mine || x.is_owner) && o.drive ? `<button class="btn small" data-online-remove="${esc(x.tag)}" data-name="${esc(x.name)}">Remove</button>` : ""}
           ${x.complete ? `<button class="btn small primary" data-online-get="${esc(x.tag)}">Download</button>` : ""}</div>
       </div>`).join("") || `<p class="faint" style="margin:0">Nothing shared yet. On any of your styles: ⋯ → Share online.</p>`;
@@ -1011,16 +1009,12 @@ async function loadOnlineGrid() {
 $("onlineGrid").addEventListener("click", async (e) => {
   const b = e.target.closest("[data-online-get]");
   if (b) return openAddStyle("online", b.dataset.onlineGet);
-  const status = e.target.closest("[data-online-status]"), gone = e.target.closest("[data-online-remove]");
+  const gone = e.target.closest("[data-online-remove]");
+  if (!gone) return;
   try {
-    if (status) {
-      await api("POST", `/api/online/${enc(status.dataset.tag)}/status`, { status: status.dataset.onlineStatus });
-      toast(status.dataset.onlineStatus === "live" ? "Approved: everyone can download it now" : "Taken down: only you and whoever shared it can see it");
-    } else if (gone) {
-      if (!(await ehConfirm(`It's deleted from the online Shared folder. Copies people have already downloaded stay with them.`, { title: `Remove "${gone.dataset.name}"?`, ok: "Remove", danger: true }))) return;
-      await api("DELETE", `/api/online/${enc(gone.dataset.onlineRemove)}`);
-      toast("Removed from the online Shared folder");
-    } else return;
+    if (!(await ehConfirm(`It's deleted from the online Shared folder. Copies people have already downloaded stay with them.`, { title: `Remove "${gone.dataset.name}"?`, ok: "Remove", danger: true }))) return;
+    await api("DELETE", `/api/online/${enc(gone.dataset.onlineRemove)}`);
+    toast("Removed from the online Shared folder");
     loadOnlineGrid();
   } catch (ex) {
     toast(ex.message, true);

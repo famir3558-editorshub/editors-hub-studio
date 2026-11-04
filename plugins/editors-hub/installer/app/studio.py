@@ -2645,6 +2645,18 @@ ONLINE_MARK = "editors-hub-style:"
 ONLINE_REPO_NAME = "editors-hub-styles"
 DRIVE_PIECE = 32 * 256 * 1024  # Google takes pieces in multiples of 256 KB
 DRIVE_TRIES = 8
+SHARE_LIMIT = {"short": 3_000_000_000, "long": 7_000_000_000}  # the service holds to these too
+SHARE_LEAVE_OUT = ("videos/", "library/approved/", "library/previews/", "previews/", "brief/session/")  # raw footage and finished client edits
+SHARE_JUNK = {".us-bg-remover", ".transcode-cache", "__pycache__", "node_modules"}
+# references only have to show the look, so they can go smaller than clips an edit might really use
+LIGHT_STEPS = [
+    {"references": {"edge": 1280, "crf": 30, "audio": 96, "over": 5_000_000}, "other": {"edge": 1920, "crf": 24, "audio": 128, "over": 25_000_000}},
+    {"references": {"edge": 854, "crf": 34, "audio": 64, "over": 1_000_000}, "other": {"edge": 1280, "crf": 30, "audio": 96, "over": 5_000_000}},
+]
+LIGHT_VIDEO = {".mp4", ".m4v", ".mov", ".mkv"}
+LIGHT_IMAGE = {".png", ".jpg", ".jpeg"}
+LIGHT_IMAGE_OVER = 5_000_000
+LIGHT_IMAGE_EDGE = 2000
 
 
 def gh(*args, timeout=900, check=True):
@@ -2726,26 +2738,123 @@ def drive_upload_file(url, path, job):
             job["stage"] = "Uploading"
 
 
+def share_files(sdir):
+    return [(rel, f) for rel, f in transfer_files(sdir)
+            if not rel.startswith(SHARE_LEAVE_OUT) and not rel.endswith(".bak") and not SHARE_JUNK.intersection(rel.split("/"))]
+
+
+def can_lighten_video(path):
+    """A clip with see-through parts stays as it is: making it smaller here would lose them."""
+    ffprobe = shutil.which("ffprobe")
+    if not ffprobe:
+        return False
+    try:
+        r = subprocess.run([ffprobe, "-v", "error", "-select_streams", "v:0", "-show_streams", "-of", "json", str(path)],
+                           capture_output=True, text=True, timeout=60)
+        stream = (json.loads(r.stdout or "{}").get("streams") or [None])[0]
+    except (OSError, ValueError, subprocess.TimeoutExpired):
+        return False
+    if not stream:
+        return False
+    tags = {k.lower(): v for k, v in (stream.get("tags") or {}).items()}
+    return not (re.search(r"yuva|rgba|argb|abgr|bgra|gbrap|^ya", stream.get("pix_fmt") or "") or tags.get("alpha_mode") == "1")
+
+
+def run_lightening(cmd, job):
+    proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, stdin=subprocess.DEVNULL)
+    try:
+        while proc.poll() is None:
+            check_stop(job)
+            time.sleep(0.2)
+    finally:
+        if proc.poll() is None:
+            proc.kill()
+            proc.wait()
+    return proc.returncode == 0
+
+
+def lighten_file(src, dest, step, job):
+    """Makes dest a smaller copy of src under the same name, and says whether it managed. Nothing changes src."""
+    ffmpeg = shutil.which("ffmpeg")
+    ext = src.suffix.lower()
+    if not ffmpeg:
+        return False
+    box = lambda edge: f"scale='min({edge},iw)':'min({edge},ih)':force_original_aspect_ratio=decrease:force_divisible_by=2"
+    if ext in LIGHT_VIDEO:
+        if not can_lighten_video(src):
+            return False
+        cmd = [ffmpeg, "-y", "-loglevel", "error", "-i", str(src), "-map", "0:v:0", "-map", "0:a?", "-vf", box(step["edge"]), "-c:v", "libx264", "-preset", "veryfast",
+               "-crf", str(step["crf"]), "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", f"{step['audio']}k", str(dest)]
+    else:
+        cmd = [ffmpeg, "-y", "-loglevel", "error", "-i", str(src), "-vf", box(LIGHT_IMAGE_EDGE).replace(":force_divisible_by=2", ""), "-frames:v", "1"]
+        cmd += ["-q:v", "3", "-update", "1", str(dest)] if ext != ".png" else ["-update", "1", str(dest)]
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        worked = run_lightening(cmd, job)
+    except OSError:
+        worked = False
+    if worked and dest.is_file() and 0 < dest.stat().st_size < src.stat().st_size:
+        return True
+    dest.unlink(missing_ok=True)
+    return False
+
+
+def lighter_files(sdir, tmp, job, limit):
+    """A lighter copy of the style to share, as (name, file) pairs: every file kept, large videos and pictures made smaller under the
+    same names so the guide and lists still point at them. Tries harder if the first go is still over the limit. The style itself isn't touched."""
+    files = share_files(sdir)
+    out = files
+    for number, step in enumerate(LIGHT_STEPS):
+        place = tmp / f"lighter-{number}"
+        chosen = []
+        for rel, f in files:
+            ext, size = f.suffix.lower(), f.stat().st_size
+            kind = step["references" if "references/" in rel else "other"]
+            if (ext in LIGHT_VIDEO and size > kind["over"]) or (ext in LIGHT_IMAGE and size > LIGHT_IMAGE_OVER):
+                chosen.append((rel, f, kind))
+        job["done_bytes"], job["total_bytes"] = 0, sum(f.stat().st_size for _, f, _ in chosen) or 1
+        made = {}
+        for n, (rel, f, kind) in enumerate(chosen, 1):
+            check_stop(job)
+            job["stage"] = f"Making a lighter copy ({n} of {len(chosen)})"
+            dest = place / rel
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            if lighten_file(f, dest, kind, job):
+                made[rel] = dest
+            job["done_bytes"] += f.stat().st_size
+        out = [(rel, made.get(rel, f)) for rel, f in files]
+        if sum(f.stat().st_size for _, f in out) + 400 * len(out) <= limit:
+            return out
+    total = sum(f.stat().st_size for _, f in out)
+    biggest = ", ".join(f"{Path(rel).name} ({f.stat().st_size / 1e9:.1f} GB)" for rel, f in sorted(out, key=lambda x: -x[1].stat().st_size)[:3])
+    raise StudioError(f"This style is still {total / 1e9:.1f} GB after making it lighter, and the limit is {limit / 1e9:.0f} GB. "
+                      f"Move some large files out of it first. The biggest are {biggest}.")
+
+
 def drive_share_style(style_id, user=None):
     sdir = style_dir(style_id, user)
     meta = style_meta(sdir)
     if not can_manage(meta, user):
         raise auth.Forbidden("Only the person who made this style, or the owner, can share it online.")
-    # its videos stay here: raw footage is big, and it's often someone else's
-    files = [(rel, f) for rel, f in transfer_files(sdir) if not rel.startswith("videos/")]
-    manifest = style_manifest(sdir, files)
-    manifest["videos"] = 0
-    if shutil.disk_usage(library()).free < manifest["bytes"] * 1.05 + 100_000_000:
-        raise StudioError(f"Not enough space to pack it: sharing needs about {manifest['bytes'] / 1e9:.1f} GB free for a moment.")
+    original = sum(f.stat().st_size for _, f in share_files(sdir))
+    if shutil.disk_usage(library()).free < original * 2.1 + 100_000_000:
+        raise StudioError(f"Not enough space to pack it: sharing needs about {original * 2.1 / 1e9:.1f} GB free for a moment.")
+    limit = SHARE_LIMIT["long" if meta.get("format") == "long" else "short"]
     named = {}
     if user is not None and user["email"] != (approval.status(DATA).get("email") or "").strip().lower():
         named = {"from_name": user["username"]}
 
     def work(job):
-        job["total_bytes"] = manifest["bytes"]
         tmp = library() / f".online-{secrets.token_hex(4)}"
         tmp.mkdir()
         try:
+            files = lighter_files(sdir, tmp, job, limit)
+            described_style = {k: v for k, v in (read_json(sdir / "style.json", {}) or {}).items() if k not in ("online", "maker", "maker_name", "imported_from")}
+            write_json(tmp / "style.json", {**described_style, "lighter_copy": True})
+            files = [(rel, tmp / "style.json" if rel == "style.json" else f) for rel, f in files]
+            manifest = style_manifest(sdir, files)
+            manifest.update(videos=0, lighter=True, maker=None, maker_name=None)
+            job["done_bytes"], job["total_bytes"] = 0, manifest["bytes"]
             job["stage"] = "Packing the style"
             writer = PartWriter(tmp, f"{style_id}{ZIP_SUFFIX}", 1 << 62, job)
             with zipfile.ZipFile(writer, "w", zipfile.ZIP_STORED, allowZip64=True) as zf:
@@ -2773,7 +2882,7 @@ def drive_share_style(style_id, user=None):
                 data = read_json(sdir / "style.json", {}) or {}
                 data["online"] = {"repo": "drive", "tag": entry["key"], "at": now()}
                 write_json(sdir / "style.json", data)
-            return {"name": meta["name"], "repo": "drive", "bytes": manifest["bytes"], "status": entry["status"]}
+            return {"name": meta["name"], "repo": "drive", "bytes": manifest["bytes"], "original_bytes": original, "status": entry["status"]}
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
     return start_job("online-upload", f"Sharing {meta['name']}", user, work, style=style_id)
@@ -3693,13 +3802,6 @@ class Handler(BaseHTTPRequestHandler):
             return self.send_json(upload_style_online(parts[2], self.user))
         if method == "POST" and parts[:2] == ["api", "online"] and parts[3:] == ["download"]:
             return self.send_json(download_online_style(parts[2], body.get("where", "mine"), self.user))
-        if method == "POST" and parts[:2] == ["api", "online"] and parts[3:] == ["status"]:
-            self.need("owner")
-            try:
-                approval.shared_call(DATA, "/owner/style-status", key=parts[2], status=body.get("status"))
-            except approval.ApprovalError as e:
-                raise StudioError(str(e))
-            return self.send_json({"ok": True})
         if method == "DELETE" and parts[:2] == ["api", "online"] and len(parts) == 3:
             return self.send_json(remove_online_style(parts[2], self.user))
         if method == "POST" and parts[:2] == ["api", "styles"] and parts[3:] == ["rename"]:

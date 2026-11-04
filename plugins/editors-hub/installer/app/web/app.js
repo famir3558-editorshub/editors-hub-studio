@@ -182,7 +182,7 @@ function openStyleMenu(btn, s, done) {
       toast("Duplicating: see the progress at the bottom right");
     })],
     s.can_manage && [s.online ? "Update the online copy" : "Share online", () => act(async () => {
-      if (!(await ehConfirm(`"${s.name}" goes online, and everyone approved can download it from their Shared tab once the studio's owner has checked it. Its videos stay on this computer. Share only what you have the right to share: no client files, and nobody else's work. Big styles take a while: the progress shows at the bottom right, and you can keep working.`, { title: s.online ? "Update the online copy?" : "Share this style online?", ok: s.online ? "Update" : "Share" }))) return;
+      if (!(await ehConfirm(`"${s.name}" goes online as a lighter copy, and everyone using Editors.Hub can download it from their Shared tab right away. Large videos are made smaller, and its style videos and finished edits aren't included. Your own style doesn't change. The limit is 3 GB, or 7 GB for a long-form style. Share only what you have the right to share: no client files, and nobody else's work. The progress shows at the bottom right, and you can keep working.`, { title: s.online ? "Update the online copy?" : "Share this style online?", ok: s.online ? "Update" : "Share" }))) return;
       await api("POST", `/api/styles/${enc(s.id)}/online`, {});
       window.dispatchEvent(new Event("editorshub:jobs"));
       toast("Sharing: see the progress at the bottom right");
@@ -288,7 +288,7 @@ function activityBox() {
 function doneText(j) {
   if (j.state === "stopped") return j.message || "Stopped";
   const r = j.result || {};
-  if (j.kind === "online-upload") return r.status === "waiting" ? "Done: it's waiting for the owner's check" : "Done: it's in the online Shared folder";
+  if (j.kind === "online-upload") return "Done: it's in the online Shared folder" + (r.original_bytes ? `. Lighter copy: ${(r.bytes / 1e9).toFixed(2)} GB, down from ${(r.original_bytes / 1e9).toFixed(2)} GB` : "");
   if (j.kind === "export") return `Done: saved to ${r.path || "the drive"}`;
   if (j.kind === "project-import") return `Done: "${r.name || "the client"}" is in Projects`;
   if (j.kind === "duplicate") return `Done: "${r.name || "the copy"}" is in My styles`;

@@ -166,8 +166,7 @@ Everyone signs in with a **username, an email and a 6-digit code**. There are no
   approve or ask for changes. The owner picks each person's role on the Team page.
 - **Email:** on the Team page, add a Gmail address and a Gmail *app password* so codes reach your inbox. Until then
   they show on the Team page and with `studio.py codes` on this computer.
-- **Sharing styles online:** on any style, ⋯ → Share online. Once the studio's owner has checked it, everyone approved can download it from
-  their Shared tab. Its videos stay on your computer.
+- **Sharing styles online:** on any style, ⋯ → Share online. Everyone using Editors.Hub can download it from their Shared tab right away. What goes online is a lighter copy, at most 3 GB (7 GB for a long-form style), with large videos made smaller. Your own style doesn't change.
 - **Something wrong, or need help?** "Report to owner" sends it to the studio's owner, and their answer shows up there. The
   owner gets it by email and answers from their approvals page (the Reports tab links to it).
 - **Other devices:** turn on "Let people on your Wi-Fi in" on the Team page, then restart Editors.Hub. Only the owner's
