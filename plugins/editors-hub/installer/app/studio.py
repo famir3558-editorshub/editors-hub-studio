@@ -2960,10 +2960,29 @@ def drive_download_style(key, user=None):
     return start_job("online-download", f"Downloading {item['name']}", user, work, style=item.get("id"))
 
 
+def online_rights(item, user):
+    """The service only knows this computer's approval, so to it every account here looks like the person approved.
+    The studio's owner and that person get the service's answer; anyone else here is "mine" only for what they shared themselves."""
+    if user is None or user["role"] == "owner" or user["email"] == (approval.status(DATA).get("email") or "").strip().lower():
+        return item
+    theirs = item.get("maker_name") == user["username"] or any(
+        (d := read_json(sdir / "style.json", {}) or {}).get("maker") == user["email"] and (d.get("online") or {}).get("tag") == item.get("tag")
+        for sdir in style_dirs().values())
+    return {**item, "mine": bool(item.get("mine") and theirs and user["role"] != "reviewer"), "is_owner": False}
+
+
+def online_for(user):
+    repo, items = online_styles()
+    return repo, [online_rights(i, user) for i in items]
+
+
 def drive_remove_style(key, user=None):
     item = next((i for i in drive_styles() if i["tag"] == key), None)
     if not item:
         raise NotFound("That style isn't in the online Shared folder.")
+    seen = online_rights(item, user)
+    if not (seen.get("mine") or seen.get("is_owner")):
+        raise auth.Forbidden("Only the person who shared it, or the studio's owner, can remove it.")
     try:
         approval.shared_call(DATA, "/styles/remove", key=key)
     except approval.ApprovalError as e:
@@ -3634,7 +3653,7 @@ class Handler(BaseHTTPRequestHandler):
             if parts == ["api", "online"]:
                 self.need("owner", "editor")
                 try:
-                    repo, items = online_styles()
+                    repo, items = online_for(self.user)
                     return self.send_json({"ready": True, "repo": repo, "styles": items, "drive": bool(approval.config())})
                 except StudioError as e:
                     return self.send_json({"ready": False, "message": str(e), "styles": []})

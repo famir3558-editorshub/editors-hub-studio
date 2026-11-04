@@ -1,5 +1,5 @@
 {
-"version": "1.14.2",
+"version": "1.14.3",
 "files": {
 "approval-service.json": "5fbc80d9bce24d1de021f328df110e8957c35ad0bf10b8d143af9865820cda86",
 "approval.py": "4dd58b069c1bb765dea79e0022b0ed778953120785c2ff8f005ef6f074dbcbca",
@@ -8,7 +8,7 @@
 "Editors.Hub.command": "a7a12b2401eada2a19b800aa31b888373efde3f52c1c746b6dbf7661ce83113e",
 "hubsetup.py": "422e2a8212bbc8313a4a135eb4b17662b10647d0a5cef047e6cc3ba7095b4e68",
 "keys.py": "e0716cefcec92782f4f660ee513e712131a8336f7f6c5826ed0c9eace449f46d",
-"README.md": "d8852b0ba2ac32b68e442ea2d2bc5e3cd4708005dd1690b1a4acecaa54f2049d",
+"README.md": "2d36eca281370130e78eb113d2b572f70d907621e0e39567efbf15fd3676917b",
 "skills/broll-stacked-text-edit/assets/fonts/PlayfairDisplay-Italic.ttf": "66f68e2ec819f94126719ec65107dd3613338d28db2c4822a2902140afd1762c",
 "skills/broll-stacked-text-edit/references/text-reference.md": "c9d688b553901026695a61b080dc7db01e1f2027003c8a83ac2a3e792c854bb6",
 "skills/broll-stacked-text-edit/scripts/01_prep.py": "fdeae28cd67f3f583997424818848c782e2d931b795044917c21d38fc83802d0",
@@ -749,9 +749,9 @@
 "skills/youtube-clips/setup/SETUP.md": "c94401cce3da40a4c254de4c6443389df3a0fee8784e37489e6794fff5f1efe4",
 "skills/youtube-clips/setup/SHARED-SETUP.md": "8675064726241ddc8f19a715fff7cf16ea1b955dbd589d34df551a0f081159d2",
 "skills/youtube-clips/SKILL.md": "c6ef731482a70f87b951eb5312e2118fee0148fee78a5ee7c238e4dbe871e5e8",
-"studio.py": "8af9080b51bc5bc4abea40cf0fbbc69d4857771cb6db82af60588ad99e20107c",
+"studio.py": "9a979ab4269201a1918ca687cab4a571fcdb720086e5afd0ffddf2deaeae4019",
 "updater.py": "899c734ab2f79b3f41402cb755d80c977f5de29419660df739a3fb81a0da475d",
-"VERSION": "4e12ffb459297fa29c9126a418f2dc4277555f345555403e33d95a9faef353c8",
+"VERSION": "03defee81094b32ccb1977b6e539b8ea0f14ca675503c2be3d265a28e8b00bca",
 "web/app.css": "02884b7339fbfc7f1a3811c01798aeaf54be5985b129ca9f2b2adcb2c811fbbf",
 "web/app.js": "d6fa348b1dc33c0b861eca20ca5892c1a30e7c74c86e26681c29063f41b0ef08",
 "web/approve.html": "05632b78433c7f81e14e9be9c6236380db3f607d44113ba669c6f1091148ccb4",

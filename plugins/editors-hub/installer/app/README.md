@@ -146,7 +146,7 @@ It comes into My styles. Every file is checked. Commands:
 - Everyone who makes videos (the owner and editors) can make their own styles. A style is **private**: only the
   person who made it sees it and its videos (`library/private/<username>/`).
 - **⋯ → Share online** is the only way to share one. It appears on the **Shared** tab of everyone using Editors.Hub,
-  and a download becomes that person's own private copy. Sharing inside one studio no longer exists: a style older
+  and a download becomes that person's own private copy. Only the person who shared it, or the owner, can remove it. Sharing inside one studio no longer exists: a style older
   studios shared that way goes back to its maker the next time Home starts.
 - **Clients (reviewers)** see no styles at all: only the videos they're invited to under "Who can review" on the
   review page.
