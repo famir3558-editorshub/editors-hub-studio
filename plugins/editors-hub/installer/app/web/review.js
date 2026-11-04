@@ -332,9 +332,9 @@ function renderLive() {
   const req = v.render_request, b = v.broll, start = v.start;
   const brollCard = firstEdit() && b && ["mode", "picking", "review"].includes(b.stage)  // "Later" on the popup: the way back to it
     ? `<div class="render-card"><b>Claude is waiting for your b-roll choice.</b><br><button class="btn small primary" id="brollAgain" type="button">Answer now</button></div>` : "";
-  const startCard = start?.state === "starting" ? `<div class="render-card"><b>A Claude session is starting this edit.</b> Its first update shows here in a moment.</div>`
-    : start?.state === "waiting" && start.listening ? `<div class="render-card"><b>Starting the edit…</b> A Claude session is picking this up.</div>`
-    : start?.state === "waiting" ? `<div class="render-card"><b>Waiting for a free Claude session.</b> The edit starts by itself as soon as one is listening. If none is open, paste this into a new session:<div class="start-prompt">${esc(start.prompt)}</div><button class="btn small" id="copyListen" type="button">Copy</button></div>` : "";
+  const startCard = start?.state === "starting" ? `<div class="render-card"><b>The parent session is starting this edit.</b> Its first update shows here in a moment.</div>`
+    : start?.state === "waiting" && start.listening ? `<div class="render-card"><b>Starting the edit…</b> ${esc(start.parent)}'s session is picking this up.</div>`
+    : start?.state === "waiting" ? `<div class="render-card"><b>Waiting for ${esc(start.parent)}'s Claude session.</b> The edit starts by itself as soon as that session is listening. If it isn't open, open it. If it doesn't exist yet, paste this into a new session:<div class="start-prompt">${esc(start.prompt)}</div><button class="btn small" id="copyListen" type="button">Copy</button></div>` : "";
   $("renderCard").innerHTML = startCard + brollCard + (req?.status === "waiting"
     ? `<div class="render-card"><b>Claude is waiting for your render settings.</b><br><button class="btn small primary" id="renderOpen" type="button">Choose the render settings</button></div>`
     : req?.status === "chosen" ? `<div class="render-card"><b>Render settings chosen.</b> ${v.claude?.listening ? "Claude is starting the render." : "The render starts when Claude picks them up."}</div>` : "");

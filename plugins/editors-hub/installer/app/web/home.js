@@ -695,6 +695,16 @@ $("videoForm").addEventListener("submit", async (e) => {
   }
 });
 
+// a new client or style gets its own parent session: the page can't create one, so this is the one paste it takes
+async function askForParentSession(url, name) {
+  try {
+    const page = await api("GET", url);
+    let copied = true;
+    try { await navigator.clipboard.writeText(page.claude_prompt); } catch (e) { copied = false; }  // it's in the box to copy by hand
+    await ehPrompt(`Start a new session in Claude and paste this${copied ? " (it's already copied)" : ""}. It becomes ${name}'s parent session, and each of their videos then starts by itself in its own subsession.`, page.claude_prompt, { title: `Give ${name} a Claude session`, ok: "Done", cancel: "Later" });
+  } catch (e) { /* the page has it too: Copy a prompt for Claude */ }
+}
+
 $("projectForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   const f = e.target, err = f.querySelector(".error"), bar = f.querySelector(".progress"), btn = f.querySelector(".btn.primary");
@@ -715,6 +725,8 @@ $("projectForm").addEventListener("submit", async (e) => {
         done += file.size;
       }
     }
+    $("projectDlg").close();
+    await askForParentSession(`/api/projects/${enc(p.id)}`, el.name.value.trim());
     location.href = `/project/${enc(p.id)}`;
   } catch (ex) {
     err.textContent = ex.message;
@@ -757,6 +769,8 @@ $("styleForm").addEventListener("submit", async (e) => {
     await load();
     return;
   }
+  $("styleDlg").close();
+  await askForParentSession(`/api/styles/${enc(s.id)}`, s.name);
   location.href = `/style/${enc(s.id)}`;
 });
 

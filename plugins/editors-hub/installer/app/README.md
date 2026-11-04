@@ -125,10 +125,9 @@ Overview each file is sorted by type. Only the style's maker, or the owner, can 
 Everyone who makes videos can see it. It's mainly for Claude: it reads the library before each edit, for ideas, so the studio knows more with every style added. The video's style and the client's brand still decide the look. It mixes the effects, transitions and techniques from your styles and the online Shared folder, with search and a filter by style. **Collect them** downloads the online styles not in it yet and keeps only their effects and guide. A style someone keeps private stays on their computer, so nobody else sees it until they share it online.
 Only the owner can remove something, and that removes it for everyone, for Claude too. **Bring them all back** undoes it. The style it came from keeps it.
 
-## Make video starts the edit
+## Make video starts the edit, in its own session
 
-**Make video** puts the video in a queue on this computer, and a Claude session listening for new videos starts the edit by itself. Sessions listen when you open the studio from Claude, or
-use **Copy a prompt for Claude** on a client or style. The client's session goes first, then the style's, then any other. If none is listening, the Live tab says so and gives you a prompt to paste; the edit starts as soon as a session is free.
+Each client and each style has one parent Claude session, and each video gets its own subsession of it. When you make a client or style, the page gives you one line to paste into a new Claude session (the page can't create sessions itself; it's also under **Copy a prompt for Claude**). That session then only listens. **Make video** puts the video in a queue on this computer, and the client's parent session starts a subsession that edits it. A client's video goes only to that client's parent, and a style's training video only to that style's. If the parent session isn't open, the video waits, and the Live page says which session it needs. Only the parent has to stay open for new videos to start. Depending on the Claude app, it may show a card for you to click to start the subsession.
 
 ## The Live timeline
 
