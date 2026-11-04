@@ -62,12 +62,10 @@ function render() {
   $("projectGrid").innerHTML = projects.length ? projects.map(projectCard).join("") :
     `<div class="empty"><h3>No clients yet</h3><p>A project holds one client: their details, brandbook, brand guidelines and videos.</p><button class="btn primary" data-act="new-project">Add your first client</button></div>`;
 
-  const mine = styles.filter((s) => s.mine), shared = styles.filter((s) => s.shared);
+  const mine = styles.filter((s) => s.mine || s.shared);
   $("styleGrid").innerHTML = mine.length ? mine.map(styleCard).join("") :
-    `<div class="empty"><h3>No styles of your own yet</h3><p>A style holds one editing look you can use for any client: its rules and references. It's private to you until you share it.</p><button class="btn primary" data-act="new-style">Make your first style</button></div>`;
+    `<div class="empty"><h3>No styles of your own yet</h3><p>A style holds one editing look you can use for any client: its rules and references. It's private to you until you share it online.</p><button class="btn primary" data-act="new-style">Make your first style</button></div>`;
   queueMicrotask(applyJobBars);
-  $("sharedGrid").innerHTML = shared.length ? shared.map(styleCard).join("") :
-    `<div class="empty"><h3>Nothing shared yet</h3><p>When someone shares one of their styles, everyone in the studio sees it here.</p></div>`;
 
   const f = $("settingsForm");
   if (me.role === "owner" && document.activeElement?.form !== f) f.elements.library.value = settings.library;
@@ -129,7 +127,7 @@ function styleCard(s) {
   const swatches = (s.palette || []).slice(0, 6).map((c) => `<i style="background:${esc(c)}" title="${esc(c)}"></i>`).join("");
   return `<div class="card" data-style="${esc(s.id)}">
     <div class="row"><div class="badge">${esc(initials)}</div><div><h3>${esc(s.name)}</h3><div class="faint">${esc(STYLE_FORMATS[s.format] || (s.client ? "Client: " + s.client : "Editing style"))}</div></div>
-      <div class="spacer"></div>${s.online ? `<span class="share-tag online" title="In the online Shared folder">Online</span>` : ""}<span class="share-tag ${s.shared ? "shared" : "private"}">${s.shared ? "Shared" : "Private"}</span></div>
+      <div class="spacer"></div>${s.online ? `<span class="share-tag online" title="In the online Shared folder">Online</span>` : `<span class="share-tag private">Private</span>`}</div>
     ${swatches ? `<div class="swatches">${swatches}</div>` : ""}
     <div class="notes">${esc(s.notes || "No style notes yet. Add the rules to STYLE.md in its folder.")}</div>
     ${s.shared ? `<div class="faint small-print">Made by ${esc(s.mine ? "you" : s.maker_name || "the owner")}${s.shared_at ? " · shared " + ago(s.shared_at) : ""}</div>` : ""}
@@ -573,7 +571,7 @@ const restoreFromTrash = async (e) => {
     toast(`"${r.name}" is back`);
     await load();
     loadTrash();
-    setTab(r.kind === "project" ? "projects" : r.shared ? "shared" : "styles");
+    setTab(r.kind === "project" ? "projects" : "styles");
   } catch (ex) { toast(ex.message, true); }
 };
 $("deletedList").addEventListener("click", restoreFromTrash);
@@ -793,21 +791,6 @@ document.addEventListener("click", async (e) => {
       else if (where) setTab(where);
     });
   }
-  if (act === "share" || act === "unshare") {
-    e.stopPropagation();
-    const share = act === "share";
-    const name = S.state.styles.find((s) => s.id === t.dataset.id)?.name || "this style";
-    if (!(await ehConfirm(share ? `Everyone in the studio will see "${name}". Client videos stay in their projects.` : `"${name}" goes back to its maker's private styles.`, { title: share ? "Share to the Shared folder?" : "Make it private again?", ok: share ? "Share" : "Make private" }))) return;
-    try {
-      await api("POST", `/api/styles/${enc(t.dataset.id)}/share`, { share });
-      await load();
-      toast(share ? `"${name}" is shared` : `"${name}" is private again`);
-      setTab(share ? "shared" : "styles");
-    } catch (ex) {
-      toast(ex.message, true);
-    }
-    return;
-  }
   if (act === "reveal-style") {
     e.stopPropagation();
     return api("POST", "/api/reveal", { style: t.dataset.id }).catch((ex) => toast(ex.message, true));
@@ -941,7 +924,6 @@ $("importBtn").onclick = () => openAddStyle("folder");
 $("importForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   const f = e.target, err = f.querySelector(".error"), bar = f.querySelector(".progress");
-  const where = f.querySelector("input[name=where]:checked").value;
   const zip = addSource === "folder" ? f.elements.zip.files[0] : null;
   const path = addSource === "folder" ? (f.elements.path.value.trim() || f.querySelector("input[name=found]:checked")?.value) : null;
   const tag = addSource === "online" ? f.querySelector("input[name=online]:checked")?.value : null;
@@ -953,13 +935,13 @@ $("importForm").addEventListener("submit", async (e) => {
   try {
     let job;
     if (tag) {
-      job = await api("POST", `/api/online/${enc(tag)}/download`, { where });
+      job = await api("POST", `/api/online/${enc(tag)}/download`, {});
       window.dispatchEvent(new Event("editorshub:jobs"));
     } else if (zip) {
       $("importNote").textContent = `Uploading ${zip.name}…`;
-      job = await upload(`/api/import/upload?name=${enc(zip.name)}&where=${where}`, zip, (p) => (bar.firstElementChild.style.width = `${p * 50}%`));
+      job = await upload(`/api/import/upload?name=${enc(zip.name)}`, zip, (p) => (bar.firstElementChild.style.width = `${p * 50}%`));
     } else {
-      job = await api("POST", "/api/import", { path, where });
+      job = await api("POST", "/api/import", { path });
     }
     $("importNote").textContent = job.title + "…";
     while (job.state === "running") {
@@ -973,9 +955,9 @@ $("importForm").addEventListener("submit", async (e) => {
     const r = job.result;
     $("importDlg").close();
     const sorted = r.sorted ? " · " + Object.entries(r.sorted).map(([k, n]) => `${n} in ${k}`).join(", ") : "";
-    toast(`${r.name} is in ${r.shared ? "Shared" : "My styles"} (${r.videos} videos${sorted})`);
+    toast(`${r.name} is in My styles (${r.videos} videos${sorted})`);
     await load();
-    setTab(r.shared ? "shared" : "styles");
+    setTab("styles");
   } catch (ex) {
     err.textContent = ex.message;
     $("importGo").disabled = false;
@@ -991,7 +973,7 @@ async function loadOnlineGrid() {
       $("onlineNote").textContent = o.message;
       return;
     }
-    $("onlineNote").textContent = o.drive ? "Styles people have shared online. Download one and it's added to your styles. To share your own: on any of your styles, ⋯ → Share online."
+    $("onlineNote").textContent = o.drive ? "Download one and it's added to your styles. To share your own: on any of your styles, ⋯ → Share online."
       : `Styles uploaded online (${o.repo}) can be downloaded into Editors.Hub on any of your computers.`;
     $("onlineGrid").innerHTML = o.styles.map((x) => `<div class="online-card">
         <div class="row"><b>${esc(x.name)}</b><div class="spacer"></div>${(x.palette || []).length ? `<span class="swatches">${x.palette.slice(0, 5).map((c) => `<i style="background:${esc(c)}"></i>`).join("")}</span>` : ""}</div>
@@ -1037,7 +1019,7 @@ $("videoFor").onclick = (e) => {
 S.jobs = [];
 function applyJobBars() {
   const running = S.jobs.filter((j) => j.state === "running");
-  document.querySelectorAll("#styleGrid .card[data-style], #sharedGrid .card[data-style]").forEach((card) => {
+  document.querySelectorAll("#styleGrid .card[data-style]").forEach((card) => {
     const job = running.find((j) => j.style === card.dataset.style);
     let box = card.querySelector(".card-job");
     if (!job) return box && box.remove();

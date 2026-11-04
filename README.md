@@ -6,7 +6,7 @@ of the work, a b-roll picker and render settings. It runs on your own computer, 
 ## Install
 
 ```bash
-claude plugin marketplace add famir3558-editorshub/editors-hub-studio
+claude plugin marketplace add https://github.com/famir3558-editorshub/editors-hub-studio
 ```
 
 ```bash
@@ -17,5 +17,5 @@ Then start a new Claude session and say **"set up Editors.Hub"**. The first acco
 
 It updates itself, keeping that computer's accounts, settings, videos, brand and keys.
 
-Version 1.14.1. All rights reserved, except for the third-party parts: the HyperFrames skills are Apache-2.0 (see `skills/NOTICE-HyperFrames.txt`)
+Version 1.14.2. All rights reserved, except for the third-party parts: the HyperFrames skills are Apache-2.0 (see `skills/NOTICE-HyperFrames.txt`)
 and the watch skill is MIT (see `skills/watch/LICENSE`). Fonts keep their own licenses.

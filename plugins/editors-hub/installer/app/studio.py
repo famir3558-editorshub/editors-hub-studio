@@ -16,14 +16,12 @@ Everything is plain Python (3.9+, no packages to install). ffmpeg is optional (u
     studio.py export-project <project> <folder>  copy a client, with their brand files and videos, into <folder>
     studio.py import-project <folder or .zip>   bring a saved client into this studio
     studio.py export-style <style> <folder>     copy a style into <folder> (a drive, a cloud folder) to take elsewhere
-    studio.py import-style <folder or .zip> [--shared]   bring an exported style into this studio
+    studio.py import-style <folder or .zip>     bring an exported style into this studio
     studio.py rename-style <style> "<new name>" / duplicate-style <style> / delete-style <style>
     studio.py deleted-styles / restore-style <name from deleted-styles>   (deleting only moves to Recently deleted)
     studio.py online-styles                     what's in the online Shared folder (a private GitHub repo)
     studio.py upload-style <style>              put a style in the online Shared folder (or update it there)
-    studio.py download-style <tag> [--shared]   bring a style from the online Shared folder into this studio
-    studio.py share-style <style>               move a style to the Shared folder: everyone signed in sees it
-    studio.py unshare-style <style>             back to its maker's private styles
+    studio.py download-style <tag>              bring a style from the online Shared folder into this studio
     studio.py update <video> "<plain words>" [--snapshot <image or video>] [--at S]   show progress in the Live tab
     studio.py ask-render <video> [--note "..."] [--size WxH] [--fps N] [--duration S]   open the render popup, wait for the choice
     studio.py finish-render <video> <file> [--note "..."]   encode with the chosen settings and add it as the next draft
@@ -212,8 +210,7 @@ def update_settings(changes):
                     raise StudioError("the library folder can't be empty")
                 value = str(Path(value).expanduser().resolve())
                 try:
-                    for sub in (SHARED, PRIVATE):
-                        Path(value, sub).mkdir(parents=True, exist_ok=True)
+                    Path(value, PRIVATE).mkdir(parents=True, exist_ok=True)
                 except OSError as e:
                     raise StudioError(f"can't use that folder: {e}")
             if key == "studio_name" and not value:
@@ -223,16 +220,14 @@ def update_settings(changes):
         return s
 
 
-# The library keeps each person's styles private until they share them:
-#   shared/<style>/              everyone signed in sees it (and the older styles/<style>/ layout counts as shared)
-#   private/<username>/<style>/  only the person who made it
+# Each person's styles are private to them: private/<username>/<style>/. The only way to share one is online (⋯ → Share online).
+# Older studios also had shared/<style>/ and styles/<style>/, seen by everyone: retire_local_shared() moves those to their makers.
 SHARED, PRIVATE, OLD_STYLES = "shared", "private", "styles"
 
 
 def library():
     lib = Path(settings()["library"]).expanduser()
-    for sub in (SHARED, PRIVATE):
-        (lib / sub).mkdir(parents=True, exist_ok=True)
+    (lib / PRIVATE).mkdir(parents=True, exist_ok=True)
     return lib
 
 
@@ -280,7 +275,7 @@ def style_meta(d):
 
 
 def can_see(meta, user):
-    """None is this computer itself (Claude's commands): it sees everything. A person sees shared styles and their own."""
+    """None is this computer itself (Claude's commands): it sees everything. A person sees their own (and any older shared one not moved yet)."""
     return user is None or meta["shared"] or meta.get("maker") == user["email"]
 
 
@@ -345,31 +340,38 @@ def create_style(name, client="", notes="", user=None, format="", links=()):
     return {"id": sid, "name": name, "folder": str(d), "shared": False}
 
 
-def share_style(style_id, share=True, user=None):
-    """Move a style into the Shared folder (everyone sees it) or back to its maker's private styles."""
-    with LOCK:
-        d = style_dir(style_id, user)
-        meta = style_meta(d)
-        owner = user is None or user["role"] == "owner"
-        mine = user is None or meta.get("maker") == user["email"]
-        if share and not mine:
-            raise auth.Forbidden("Only the person who made a style can share it.")
-        if not share and not (mine or owner):
-            raise auth.Forbidden("Only the person who made it, or the owner, can unshare a style.")
-        if meta["shared"] == share:
-            return meta
-        maker_name = meta.get("maker_name") or _maker(None)[1]
-        dest = library() / SHARED / style_id if share else library() / PRIVATE / maker_name / style_id
-        if dest.exists():
-            raise StudioError(f"{dest} is already there")
-        dest.parent.mkdir(parents=True, exist_ok=True)
-        shutil.move(str(d), str(dest))
-        data = read_json(dest / "style.json", {}) or {}
-        data.update(shared_at=now() if share else None, shared_by=(user or {}).get("username", maker_name) if share else None)
-        if not data.get("maker"):  # a style from before sharing existed belongs to the owner
-            data["maker"], data["maker_name"] = _maker(None)
-        write_json(dest / "style.json", data)
-    return style_meta(dest)
+def retire_local_shared():
+    """Sharing is online only now: a style older studios kept in shared/ or styles/ goes back to its maker's private styles.
+    One that can't move yet (Claude is working in it, a file is open) stays usable where it is and is tried at the next start."""
+    moved = []
+    lib = library()
+    for old in (SHARED, OLD_STYLES):
+        for d in sorted(lib.glob(f"{old}/*")):
+            if d.name.startswith(".") or not (d / "style.json").exists():
+                continue
+            try:
+                with LOCK:
+                    if any((v / "video.json").exists() and claude_status(v)["listening"] for v in (d / "videos").glob("*")):
+                        continue
+                    data = read_json(d / "style.json", {}) or {}
+                    if not data.get("maker"):  # a style from before sharing existed belongs to the owner
+                        data["maker"], data["maker_name"] = _maker(None)
+                    dest = lib / PRIVATE / (data.get("maker_name") or _maker(None)[1]) / d.name
+                    if dest.exists():
+                        continue
+                    dest.parent.mkdir(parents=True, exist_ok=True)
+                    shutil.move(str(d), str(dest))
+                    data.pop("shared_at", None)
+                    data.pop("shared_by", None)
+                    write_json(dest / "style.json", data)
+                    moved.append(d.name)
+            except OSError:
+                continue
+        try:
+            (lib / old).rmdir()  # only goes if nothing is left in it
+        except OSError:
+            pass
+    return moved
 
 
 # ---------------------------------------------------------------- renaming, duplicating, deleting a style
@@ -510,7 +512,7 @@ def restore_style(trash_name, user=None):
         taken = project_dirs() if is_project else style_dirs()
         while sid in taken:
             sid, n = f"{info['id']}-{n}", n + 1
-        dest = library() / PROJECTS / sid if is_project else library() / SHARED / sid if info.get("shared") else \
+        dest = library() / PROJECTS / sid if is_project else \
             library() / PRIVATE / (info.get("maker_name") or _maker(None)[1]) / sid
         dest.parent.mkdir(parents=True, exist_ok=True)
         taken_videos = set(video_dirs())
@@ -2298,7 +2300,7 @@ def export_style_to(style_id, dest_parent, user=None):
     return start_job("export", f"Saving {manifest['name']}", user, work, style=style_id)
 
 
-def place_style(src, manifest, where, user, job, move=False):
+def place_style(src, manifest, user, job, move=False):
     """Check the files against the manifest, then put the style in this studio (My styles or Shared)."""
     bad = [rel for rel, size in manifest["files"].items()
            if not (src / rel).is_file() or (src / rel).stat().st_size != size]
@@ -2312,7 +2314,7 @@ def place_style(src, manifest, where, user, job, move=False):
         n = 2
         while sid in taken:
             sid, n = f"{base}-{n}", n + 1
-        dest = library() / SHARED / sid if where == "shared" else library() / PRIVATE / username / sid
+        dest = library() / PRIVATE / username / sid
         dest.parent.mkdir(parents=True, exist_ok=True)
         tmp = dest.with_name(f".{sid}.importing")
         if tmp.exists():
@@ -2342,11 +2344,10 @@ def place_style(src, manifest, where, user, job, move=False):
         if sid != base:
             data["name"] = f"{manifest['name']} ({sid.rsplit('-', 1)[-1]})"
         data.pop("shared_at", None)
-        if where == "shared":
-            data.update(shared_at=now(), shared_by=username)
+        data.pop("shared_by", None)
         write_json(tmp / "style.json", data)
         os.replace(tmp, dest)
-    return {"id": sid, "name": data.get("name", manifest["name"]), "shared": where == "shared",
+    return {"id": sid, "name": data.get("name", manifest["name"]),
             "videos": len(list((dest / "videos").glob("*/video.json"))), "bytes": manifest["bytes"]}
 
 
@@ -2381,7 +2382,7 @@ def read_export(path):
 FONT_EXTS = {".ttf", ".otf", ".woff", ".woff2"}
 
 
-def style_from_folder(folder, where, user, job):
+def style_from_folder(folder, user, job):
     """Make a new style from a folder of material: footage to B-roll, LUTs to Colour grading, project files to
     Project files, audio to Music, images to Graphics, fonts to fonts/, anything else to files/ (paths kept)."""
     files = transfer_files(folder)
@@ -2394,9 +2395,7 @@ def style_from_folder(folder, where, user, job):
     except BaseException:
         shutil.rmtree(sdir, ignore_errors=True)  # stopped or failed: the half-made style goes
         raise
-    if where == "shared":
-        share_style(made["id"], True, user)
-    return {"id": made["id"], "name": made["name"], "shared": where == "shared", "videos": 0,
+    return {"id": made["id"], "name": made["name"], "videos": 0,
             "bytes": job["total_bytes"], "sorted": sorted_into}
 
 
@@ -2413,12 +2412,10 @@ def _fill_from_folder(files, sdir, sorted_into, job):
         sorted_into[label] = sorted_into.get(label, 0) + 1
 
 
-def import_style_from(path, where="mine", user=None, remove_after=False):
+def import_style_from(path, user=None, remove_after=False):
     path = Path(str(path or "").strip()).expanduser()
     manifest, kind = read_export(path)
     manifest["source"] = str(path)
-    if where not in ("mine", "shared"):
-        raise StudioError("where must be mine or shared")
     if shutil.disk_usage(library()).free < manifest.get("bytes", 0) * (1.02 if kind == "folder" else 2.05) + 50_000_000:
         raise StudioError(f"Not enough space in the library: the style needs {manifest.get('bytes', 0) / 1e9:.1f} GB.")
 
@@ -2426,9 +2423,9 @@ def import_style_from(path, where="mine", user=None, remove_after=False):
         job["stage"] = "Copying and checking every file"
         try:
             if kind == "folder":
-                return place_style(path, manifest, where, user, job)
+                return place_style(path, manifest, user, job)
             if kind == "plain":
-                return style_from_folder(path, where, user, job)
+                return style_from_folder(path, user, job)
             job["total_bytes"] = manifest.get("bytes", 0)
             unpack = library() / f".unpacking-{secrets.token_hex(4)}"
             try:
@@ -2450,7 +2447,7 @@ def import_style_from(path, where="mine", user=None, remove_after=False):
                                     break
                                 fo.write(chunk)
                                 job["done_bytes"] += len(chunk)
-                return place_style(unpack, manifest, where, user, job, move=True)
+                return place_style(unpack, manifest, user, job, move=True)
             finally:
                 if unpack.exists():
                     shutil.rmtree(unpack, ignore_errors=True)
@@ -2921,7 +2918,7 @@ def drive_download_file(key, dest, size, job):
         job["stage"] = "Downloading"
 
 
-def drive_download_style(key, where="mine", user=None):
+def drive_download_style(key, user=None):
     if user is not None and user["role"] == "reviewer":
         raise auth.Forbidden("Your account can't do that. Ask the owner.")
     item = next((i for i in drive_styles() if i["tag"] == key), None)
@@ -2940,7 +2937,7 @@ def drive_download_style(key, where="mine", user=None):
             drive_download_file(key, whole, item["size"], job)
             job["stage"] = "Unpacking and checking every file"
             job["done_bytes"] = 0
-            inner = import_style_from(whole, where, user, remove_after=True)
+            inner = import_style_from(whole, user, remove_after=True)
             while inner["state"] == "running":
                 if job.get("stop"):
                     inner["stop"] = True
@@ -3189,9 +3186,9 @@ def upload_style_online(style_id, user=None):
     return start_job("online-upload", f"Uploading {meta['name']}", user, work, style=style_id)
 
 
-def download_online_style(tag, where="mine", user=None):
+def download_online_style(tag, user=None):
     if approval.config():
-        return drive_download_style(tag, where, user)
+        return drive_download_style(tag, user)
     if user is not None and user["role"] == "reviewer":
         raise auth.Forbidden("Your account can't do that. Ask the owner.")
     repo, items = online_styles()
@@ -3223,7 +3220,7 @@ def download_online_style(tag, where="mine", user=None):
                     (tmp / name).unlink()
             job["stage"] = "Unpacking and checking every file"
             job["done_bytes"] = 0
-            inner = import_style_from(whole, where, user, remove_after=True)
+            inner = import_style_from(whole, user, remove_after=True)
             while inner["state"] == "running":
                 if job.get("stop"):
                     inner["stop"] = True
@@ -3709,7 +3706,7 @@ class Handler(BaseHTTPRequestHandler):
                 raise StudioError("Choose the style's .zip file.")
             incoming = self.receive(library() / ".incoming", q("name"))
             try:
-                job = import_style_from(incoming, q("where", "mine"), self.user, remove_after=True)
+                job = import_style_from(incoming, self.user, remove_after=True)
             except Exception:
                 incoming.unlink(missing_ok=True)
                 raise
@@ -3801,7 +3798,7 @@ class Handler(BaseHTTPRequestHandler):
         if method == "POST" and parts[:2] == ["api", "styles"] and parts[3:] == ["online"]:
             return self.send_json(upload_style_online(parts[2], self.user))
         if method == "POST" and parts[:2] == ["api", "online"] and parts[3:] == ["download"]:
-            return self.send_json(download_online_style(parts[2], body.get("where", "mine"), self.user))
+            return self.send_json(download_online_style(parts[2], self.user))
         if method == "DELETE" and parts[:2] == ["api", "online"] and len(parts) == 3:
             return self.send_json(remove_online_style(parts[2], self.user))
         if method == "POST" and parts[:2] == ["api", "styles"] and parts[3:] == ["rename"]:
@@ -3817,11 +3814,9 @@ class Handler(BaseHTTPRequestHandler):
         if method == "POST" and parts[:2] == ["api", "styles"] and parts[3:] == ["export"]:
             return self.send_json(export_style_to(parts[2], body.get("dest"), self.user))
         if method == "POST" and parts == ["api", "import"]:
-            return self.send_json(import_style_from(body.get("path"), body.get("where", "mine"), self.user))
+            return self.send_json(import_style_from(body.get("path"), self.user))
         if method == "POST" and parts[:2] == ["api", "styles"] and len(parts) == 3:
             return self.send_json(save_style_text(parts[2], body, self.user))
-        if method == "POST" and parts[:2] == ["api", "styles"] and parts[3:] == ["share"]:
-            return self.send_json(share_style(parts[2], bool(body.get("share", True)), self.user))
         if method == "POST" and parts == ["api", "projects"]:
             return self.send_json(create_project(body.get("name", ""), body.get("contact", ""), body.get("website", ""),
                                                  body.get("about", ""), body.get("brand", ""), self.user))
@@ -4177,6 +4172,7 @@ def update_to_tell(email):
 def serve(port):
     settings()
     library()
+    retire_local_shared()
     note_version()
     try:
         # only this computer, unless the owner lets people on the same Wi-Fi in (Team page)
@@ -4260,7 +4256,7 @@ def print_status(as_json):
     if not styles:
         print('  None yet. Make one: studio.py new-style "Look name"')
     for st in styles:
-        where = "shared" if st["shared"] else f"private to {st.get('maker_name') or 'owner'}"
+        where = f"private to {st.get('maker_name') or 'owner'}" + (", shared online" if st.get("online") else "")
         print(f"{st['name']}  [{st['id']}]  ({where})  {st['folder']}")
         video_lines(v for v in videos if v["style"] == st["id"] and not v["project"])
         print()
@@ -4454,7 +4450,6 @@ def main(argv=None):
     ex.add_argument("dest")
     im = sub.add_parser("import-style")
     im.add_argument("path")
-    im.add_argument("--shared", action="store_true")
     rn = sub.add_parser("rename-style")
     rn.add_argument("style")
     rn.add_argument("name")
@@ -4466,11 +4461,6 @@ def main(argv=None):
     sub.add_parser("upload-style").add_argument("style")
     dl = sub.add_parser("download-style")
     dl.add_argument("tag")
-    dl.add_argument("--shared", action="store_true")
-    sh = sub.add_parser("share-style")
-    sh.add_argument("style")
-    us = sub.add_parser("unshare-style")
-    us.add_argument("style")
     sub.add_parser("codes")
     sub.add_parser("users")
     ur = sub.add_parser("user-role")
@@ -4624,7 +4614,7 @@ def main(argv=None):
                     print(f"Not in this studio yet, so bring them in too: {', '.join(r['missing_styles'])}")
         elif a.cmd in ("export-style", "import-style"):
             job = export_style_to(a.style, a.dest) if a.cmd == "export-style" else \
-                import_style_from(a.path, "shared" if a.shared else "mine")
+                import_style_from(a.path)
             last = -1
             while job["state"] == "running":
                 pct = int(job["done_bytes"] * 100 / job["total_bytes"]) if job["total_bytes"] else 0
@@ -4636,7 +4626,7 @@ def main(argv=None):
                 raise StudioError(job["message"])
             r = job["result"]
             print(f"Saved {r['name']} ({r['bytes'] / 1e9:.2f} GB) to {r['path']}" if a.cmd == "export-style" else
-                  f"{r['name']} is in this studio ({'Shared' if r['shared'] else 'My styles'}), {r['videos']} videos.")
+                  f"{r['name']} is in this studio (My styles), {r['videos']} videos.")
         elif a.cmd == "online-styles":
             repo, items = online_styles()
             print(f"Online Shared folder: {repo}")
@@ -4647,7 +4637,7 @@ def main(argv=None):
                 print("  nothing yet")
         elif a.cmd in ("upload-style", "download-style"):
             job = upload_style_online(a.style) if a.cmd == "upload-style" else \
-                download_online_style(a.tag, "shared" if a.shared else "mine")
+                download_online_style(a.tag)
             last = -1
             while job["state"] == "running":
                 pct = int(job["done_bytes"] * 100 / job["total_bytes"]) if job["total_bytes"] else 0
@@ -4659,7 +4649,7 @@ def main(argv=None):
                 raise StudioError(job["message"])
             r = job["result"]
             print(f"{r['name']} is in the online Shared folder ({r['repo']})" if a.cmd == "upload-style" else
-                  f"{r['name']} is in this studio ({'Shared' if r['shared'] else 'My styles'}), {r['videos']} videos.")
+                  f"{r['name']} is in this studio (My styles), {r['videos']} videos.")
         elif a.cmd == "rename-style":
             print(f"Renamed: {rename_style(a.style, a.name)['name']}")
         elif a.cmd == "duplicate-style":
@@ -4677,9 +4667,6 @@ def main(argv=None):
             print("\n".join(f"  {i['trash']:<50} {i['name']}  ({i['videos']} videos, deleted {i['deleted']})" for i in items) or "Nothing in Recently deleted.")
         elif a.cmd == "restore-style":
             print(f"Restored: {restore_style(a.trash)['name']}")
-        elif a.cmd in ("share-style", "unshare-style"):
-            st = share_style(a.style, a.cmd == "share-style")
-            print(f"{st['name']} is now {'shared: everyone signed in sees it' if st['shared'] else 'private again'} ({st['folder']})")
         elif a.cmd == "codes":
             codes = accounts().all_codes()
             if not codes:

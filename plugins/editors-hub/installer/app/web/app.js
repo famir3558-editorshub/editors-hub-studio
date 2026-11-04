@@ -160,16 +160,6 @@ function openStyleMenu(btn, s, done) {
   const act = async (fn) => { closeMenus(); try { await fn(); } catch (e) { toast(e.message, true); } };
   const items = [
     !onPage && ["Open", () => (location.href = `/style/${enc(s.id)}`)],
-    !s.shared && s.mine && ["Share to the Shared folder", () => act(async () => {
-      if (!(await ehConfirm(`Everyone in the studio will see "${s.name}". Client videos stay in their projects.`, { title: "Share to the Shared folder?", ok: "Share" }))) return;
-      await api("POST", `/api/styles/${enc(s.id)}/share`, { share: true });
-      toast(`"${s.name}" is in Shared`); done("shared");
-    })],
-    s.shared && s.can_manage && ["Make private again", () => act(async () => {
-      if (!(await ehConfirm(`"${s.name}" goes back to its maker's private styles.`, { title: "Make it private again?", ok: "Make private" }))) return;
-      await api("POST", `/api/styles/${enc(s.id)}/share`, { share: false });
-      toast(`"${s.name}" is private again`); done("styles");
-    })],
     s.can_manage && ["Rename", () => act(async () => {
       const name = await ehPrompt("The style's new name:", s.name, { title: "Rename the style" });
       if (!name || name.trim() === s.name) return;
@@ -292,7 +282,7 @@ function doneText(j) {
   if (j.kind === "export") return `Done: saved to ${r.path || "the drive"}`;
   if (j.kind === "project-import") return `Done: "${r.name || "the client"}" is in Projects`;
   if (j.kind === "duplicate") return `Done: "${r.name || "the copy"}" is in My styles`;
-  if (j.kind === "import" || j.kind === "online-download") return `Done: "${r.name || "the style"}" is in ${r.shared ? "Shared" : "My styles"}`;
+  if (j.kind === "import" || j.kind === "online-download") return `Done: "${r.name || "the style"}" is in My styles`;
   return "Done";
 }
 

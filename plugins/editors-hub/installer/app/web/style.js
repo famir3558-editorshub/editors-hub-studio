@@ -23,8 +23,8 @@ function renderHero() {
   $("sName").textContent = s.name;
   const last = s.last_finished;
   $("sSub").textContent = `/${s.id}` + (last ? ` · last finished: ${last.name}, ${(last.at || last.updated).slice(0, 10)}` : "");
-  $("shareTag").textContent = s.shared ? `Shared${s.maker_name ? " · made by " + (s.mine ? "you" : s.maker_name) : ""}` : "Private";
-  $("shareTag").className = "share-tag " + (s.shared ? "shared" : "private");
+  $("shareTag").textContent = s.online ? "Online" : "Private";
+  $("shareTag").className = "share-tag " + (s.online ? "online" : "private");
   const stills = s.videos.filter((v) => v.thumb).slice(0, 4);
   $("stills").dataset.count = stills.length;
   $("stills").innerHTML = stills.length
@@ -43,8 +43,6 @@ function renderHero() {
   $("sDesc").textContent = s.notes || "No description yet. Add one in the About tab.";
   $("sClient").textContent = s.client ? `Client: ${s.client}` : "";
   $("briefBtn").hidden = !s.can_edit;
-  $("shareBtn").hidden = !(s.mine && !s.shared) && !(s.shared && s.can_edit);
-  $("shareBtn").textContent = s.shared ? "Unshare" : "Share";
   $("downloadBtn").href = `/api/styles/${enc(styleId)}/download`;
 }
 
@@ -224,15 +222,6 @@ $("promptBtn").onclick = async () => {
 $("briefBtn").onclick = () => { setTab("brief"); P.editing = "brief"; renderPane(); };
 $("folderBtn").onclick = () => api("POST", "/api/reveal", { style: styleId }).catch((e) => toast(e.message, true));
 $("videoBtn").onclick = () => (location.href = `/#new-video:${enc(styleId)}`);
-$("shareBtn").onclick = async () => {
-  const share = !P.page.shared;
-  if (!(await ehConfirm(share ? `Everyone in the studio will see "${P.page.name}". Client videos stay in their projects.` : `"${P.page.name}" goes back to its maker's private styles.`, { title: share ? "Share to the Shared folder?" : "Make it private again?", ok: share ? "Share" : "Make private" }))) return;
-  try {
-    await api("POST", `/api/styles/${enc(styleId)}/share`, { share });
-    await load();
-    toast(share ? "Shared" : "Private again");
-  } catch (e) { toast(e.message, true); }
-};
 
 // ---------------------------------------------------------------- saving the style to a drive
 

@@ -118,10 +118,7 @@ Overview each file is sorted by type. Only the style's maker, or the owner, can 
 
 1. **From a folder:** a style saved on another computer comes in whole, with its videos; any other folder of
    references, B-roll, LUTs, music, fonts or project files becomes a new style, each file sorted into its section.
-2. **From the online Shared folder:** styles uploaded with **⋯ → Upload to the online Shared folder**, from any of
-   your computers. The online folder is a private GitHub repository on your account (`editors-hub-styles`); big
-   styles go up in 1.9 GB parts. Every computer signed in to that GitHub account (`gh auth login`) can download
-   them; the **Shared** tab lists them too.
+2. **From the online Shared folder:** the styles listed on the **Shared** tab, shared by anyone with **⋯ → Share online**.
 
 ## Seeing and stopping long jobs
 
@@ -132,26 +129,25 @@ from the online folder, a stopped copy or import leaves nothing half done, and t
 
 ## Managing a style
 
-The **⋯** button on a style's card (My styles, Shared) or page: **Share to the Shared folder** / **Make private
-again**, **Rename**, **Duplicate** (a private copy for you), **Download (.zip)**, **Save to a drive**, **Open
+The **⋯** button on a style's card or page: **Share online**, **Rename**, **Duplicate** (a private copy for you), **Download (.zip)**, **Save to a drive**, **Open
 folder** and **Delete**. Delete moves the style and its videos to the **Recently deleted** tab, with deleted clients, where **Delete forever** erases them for good;
-**Restore** puts it back where it was. Only the person who made a style, or the owner, can share, rename or delete
-it; anyone who can see it can duplicate or download it.
+**Restore** puts it back. Only the person who made a style, or the owner, can share, rename or delete it.
 
 ## Taking a style to another computer (Mac or Windows)
 
 On a style's page: **Download (.zip)** saves it to the device you're using; **Save to a drive** copies it onto a USB
 drive or cloud folder (fast, any size). On the other computer: **My styles → Import a style**, pick it (Editors.Hub
-finds saved styles on drives, Desktop, Downloads and cloud folders, or upload the .zip), choose My styles or Shared.
-Every file is checked. Anyone who makes videos can take a shared style; a private one only its maker. Commands:
-`studio.py export-style <style> <folder>`, `studio.py import-style <folder or .zip> [--shared]`.
+finds saved styles on drives, Desktop, Downloads and cloud folders, or upload the .zip).
+It comes into My styles. Every file is checked. Commands:
+`studio.py export-style <style> <folder>`, `studio.py import-style <folder or .zip>`.
 
-## Private and shared styles
+## Private styles, and sharing online
 
-- Everyone who makes videos (the owner and editors) can make their own styles. A new style is **private**: only the
+- Everyone who makes videos (the owner and editors) can make their own styles. A style is **private**: only the
   person who made it sees it and its videos (`library/private/<username>/`).
-- **Share** on a style moves it to the **Shared** folder (`library/shared/`) and the **Shared** tab: everyone signed
-  in sees it and can make videos in it. The person who made it, or the owner, can **Unshare** it.
+- **⋯ → Share online** is the only way to share one. It appears on the **Shared** tab of everyone using Editors.Hub,
+  and a download becomes that person's own private copy. Sharing inside one studio no longer exists: a style older
+  studios shared that way goes back to its maker the next time Home starts.
 - **Clients (reviewers)** see no styles at all: only the videos they're invited to under "Who can review" on the
   review page.
 

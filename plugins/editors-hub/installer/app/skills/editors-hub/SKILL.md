@@ -170,19 +170,17 @@ train a style go into the matching section folder (LUTs to grades, Premiere / Af
 CapCut and XML files to the `projects/` folder (Editing files), audio to music or sfx, footage to broll, images to graphics); then write what they teach
 into STYLE.md.
 
-## Private and shared styles
+## Private styles, and sharing online
 
-A new style is private to the person who made it (`library/private/<username>/<style>`); it moves to
-`library/shared/<style>` when its maker shares it, and then everyone signed in sees it and its videos. Claude's
-commands see every style. `studio.py share-style <style>` / `unshare-style <style>` only when the person who made it
-(or, to unshare, the owner) asks. `status` shows which styles are shared and whose the private ones are.
+A style is private to the person who made it (`library/private/<username>/<style>`). The only way to share one is online,
+with ⋯ → Share online; there is no sharing inside a studio. Claude's commands see every style. `status` shows whose each one is.
 
 - Moving a style to another computer: `studio.py export-style <style> <folder>` saves it (with a list of every
-  file) onto a drive or cloud folder; `studio.py import-style <folder or .zip> [--shared]` brings it in and checks
+  file) onto a drive or cloud folder; `studio.py import-style <folder or .zip>` brings it in and checks
   every file. On the pages: Download (.zip) or Save to a drive on the style page, Import a style on My styles.
-  Anyone who makes videos can take a shared style; a private one only its maker.
+  A style can be taken only by the person who made it.
 
-- Each style's ⋯ menu (on its card and its page): Share to the Shared folder / Make private again, Rename,
+- Each style's ⋯ menu (on its card and its page): Share online, Rename,
   Duplicate (a private copy), Download, Save to a drive, Open folder, Delete. Delete only moves a style and its
   videos to Recently deleted (bottom of My styles), where Restore puts it back. Commands: `rename-style`,
   `duplicate-style`, `delete-style`, `deleted-styles`, `restore-style` (delete only when the user asks).
@@ -195,9 +193,8 @@ commands see every style. `studio.py share-style <style>` / `unshare-style <styl
 
 - Adding a style: **+ Add a style** on My styles. From a folder: a style saved elsewhere comes in whole; any other
   folder of material becomes a new style, each file sorted into its section (`studio.py import-style <folder>`).
-  From the online Shared folder (a private GitHub repo, <account>/editors-hub-styles): `studio.py online-styles`,
-  `download-style <tag> [--shared]`; a style goes up with ⋯ → Upload to the online Shared folder
-  (`studio.py upload-style <style>`). Upload only when the user asks: it sends the style to GitHub.
+  From the online Shared folder: `studio.py online-styles`, `download-style <tag>`, or Download on the Shared tab. A style goes up with
+  ⋯ → Share online (`studio.py upload-style <style>`). Share only when the user asks: it sends the style online for everyone.
 
 Clients (reviewers) see only the videos they're invited to: an editor or the owner adds their email under "Who can
 review" on the review page.
