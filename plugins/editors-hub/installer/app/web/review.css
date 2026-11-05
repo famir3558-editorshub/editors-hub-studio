@@ -237,6 +237,10 @@ body { height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
 .lv-now { display: grid; gap: 11px; }
 .lv-frame { display: block; width: 100%; aspect-ratio: 16 / 9; border-radius: 9px; overflow: hidden; background: #000; }
 .lv-frame img { display: block; width: 100%; height: 100%; object-fit: contain; }
+.lv-frame[hidden] { display: none; }
+a.lv-frame { position: relative; }
+#lvTag { position: absolute; left: 8px; bottom: 8px; padding: 3px 9px; border-radius: 999px; background: rgba(0, 0, 0, 0.75); font-size: 11.5px; color: var(--text); }
+#lvTag[hidden] { display: none; }
 .lv-doing b { font-size: 13.5px; }
 .lv-doing p { margin: 4px 0 0; color: var(--muted); font-size: 13px; line-height: 1.45; overflow-wrap: anywhere; }
 .lv-tracks { position: relative; margin-top: 12px; padding-top: 17px; }
@@ -250,12 +254,13 @@ body { height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
 .lv-track i.a { background: #7c5cbf; }
 .lv-track i.c { background: #c9a227; }
 .lv-track i.s { background: rgba(52, 211, 153, 0.55); }
-.lv-head { position: absolute; top: 14px; bottom: 0; width: 2px; background: var(--red-2); pointer-events: none; transition: left 0.9s ease; }
+.lv-head { position: absolute; top: 14px; bottom: 0; width: 2px; background: var(--red-2); pointer-events: none; transition: left 0.35s ease; }
 .lv-head.picked { background: var(--text); transition: none; }
 .lv-head[hidden] { display: none; }
 .lv-tracks { cursor: pointer; touch-action: none; user-select: none; }
 .lv-frames { height: 50px; }
-.lv-frames img { position: absolute; top: 2px; bottom: 2px; height: 46px; width: 26px; transform: translateX(-50%); object-fit: cover; border-radius: 3px; background: #000; box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6); }
+.lv-frames img { position: absolute; top: 2px; bottom: 2px; height: 46px; width: 26px; transform: translateX(-50%); object-fit: cover; border-radius: 3px; background: #000; box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6); opacity: 0.6; }
+.lv-frames img.on { opacity: 1; z-index: 2; box-shadow: 0 0 0 2px var(--red-2); }
 .lv-empty { display: grid; place-items: center; padding: 10px; text-align: center; font-size: 12px; line-height: 1.4; color: var(--faint); background: rgba(0, 0, 0, 0.45); }
 .lv-doing .btn { margin-top: 8px; }
 .lv-line { margin-bottom: 9px; font-size: 13px; }

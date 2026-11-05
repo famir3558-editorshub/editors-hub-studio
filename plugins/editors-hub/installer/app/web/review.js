@@ -328,41 +328,112 @@ function renderLiveTop(v) {
   </div>`);
 }
 
-// the preview and the tracks. The line follows Claude; click or drag the tracks to look back at a snapshot.
-// The line and its parts stay on the page between updates, so it glides to its new place.
+// the preview and the tracks. One frame at a time, from anywhere in the video, changing every 2 seconds, with the line
+// at that frame's place. New snapshots join in; the studio's own frames fill in until there are enough of them.
+const SHOW_EVERY = 2000, SHOW_ENOUGH = 10;
+
+function livePool(v, total) {
+  const p = v.progress, round = p ? p.draft : v.updates?.at(-1)?.draft;
+  const shots = (v.updates || []).filter((u) => u.draft === round && u.image);
+  const pool = shots.map((u, i) => ({ id: `s${u.id}`, src: mediaUrl(u.image), text: u.text, tag: "",
+    where: u.pos != null && total ? Math.min(1, u.pos / total) : (i + 0.5) / shots.length }));  // a snapshot with no place still gets one, or the line couldn't follow it
+  const frames = v.preview_frames;
+  if (shots.length < SHOW_ENOUGH && frames?.items?.length) {
+    frames.items.forEach((f, i) => pool.push({ id: `f${frames.label}${i}`, src: mediaUrl(f.file), text: "", tag: frames.label, where: Math.min(1, f.at / frames.duration) }));
+  }
+  return pool;
+}
+
+function liveShowFrame(item) {
+  const img = $("lvImg");
+  if (!img) return;
+  R.showNow = item?.id;
+  $("lvFrame").hidden = !item;
+  $("lvNone").hidden = !!item;
+  if (item && img.getAttribute("src") !== item.src) {
+    const next = new Image();
+    next.onload = () => {  // only once it's loaded, so the picture and the line change together
+      if (R.showNow !== item.id || !$("lvImg")) return;
+      $("lvImg").src = item.src;
+      $("lvFrame").href = item.src;
+      $("lvTag").textContent = item.tag;
+      $("lvTag").hidden = !item.tag;
+      liveShowLine(item);
+    };
+    next.src = item.src;
+  } else if (item) {
+    $("lvTag").textContent = item.tag;
+    $("lvTag").hidden = !item.tag;
+    liveShowLine(item);
+  }
+}
+
+function liveShowLine(item) {
+  const head = $("lvHead"), p = R.v?.progress;
+  if (!head) return;
+  const where = R.liveAt != null && R.liveTotal ? R.liveAt / R.liveTotal : item ? item.where : R.liveTotal && p?.pos != null ? Math.min(1, p.pos / R.liveTotal) : null;
+  head.hidden = where == null;
+  head.classList.toggle("picked", R.liveAt != null);
+  if (where != null) head.style.left = `calc(66px + (100% - 66px) * ${where.toFixed(4)})`;
+  document.querySelectorAll(".lv-frames img").forEach((t) => t.classList.toggle("on", t.dataset.id === item?.id));
+}
+
+function liveNextFrame() {
+  const pool = R.showPool || [];
+  if (!pool.length) return liveShowFrame(null);
+  const known = R.showSeen || (R.showSeen = new Set());
+  const fresh = pool.filter((x) => !known.has(x.id));
+  fresh.forEach((x) => known.add(x.id));
+  R.showBag = (R.showBag || []).filter((id) => pool.some((x) => x.id === id));
+  if (!R.showBag.length) {  // every frame once, in a new random order each time round
+    R.showBag = pool.map((x) => x.id).sort(() => Math.random() - 0.5);
+    if (R.showBag.length > 1 && R.showBag[0] === R.showNow) R.showBag.push(R.showBag.shift());
+  }
+  // a new snapshot of Claude's goes next; the first set of frames just joins the shuffle
+  const news = R.showStarted ? fresh.filter((x) => x.id[0] === "s").map((x) => x.id) : [];
+  R.showBag = [...news, ...R.showBag.filter((id) => !news.includes(id))];
+  R.showStarted = true;
+  const next = R.showBag.shift();
+  liveShowFrame(pool.find((x) => x.id === next));
+}
+
+setInterval(() => {
+  if (!R.v || R.side !== "live" || R.liveAt != null || document.visibilityState !== "visible") return;
+  liveNextFrame();
+}, SHOW_EVERY);
+
 function renderLiveBoard(v) {
   const box = $("liveBoard"), p = v.progress, round = p ? p.draft : v.updates?.at(-1)?.draft;
   const mine = (v.updates || []).filter((u) => u.draft === round);
-  const shots = mine.filter((u) => u.image);
-  if (!p && !shots.length) { box.innerHTML = ""; return; }
-  if (!$("lvNow")) box.innerHTML = `<div class="lv-box"><div class="lv-now" id="lvNow"></div><div class="lv-tracks" id="lvTracks" hidden><div id="lvRows"></div><div class="lv-head" id="lvHead"></div></div></div>`;
-  if (R.liveRound !== round) { R.liveRound = round; R.liveAt = null; }
+  const frames = v.preview_frames;
+  if (!p && !mine.some((u) => u.image) && !frames?.items?.length) { box.innerHTML = ""; delete box.dataset.html; return; }
+  if (!$("lvNow")) box.innerHTML = `<div class="lv-box"><div class="lv-now" id="lvNow">
+      <a class="lv-frame" id="lvFrame" target="_blank" rel="noopener" hidden><img id="lvImg" alt="Preview of the edit"><span id="lvTag" hidden></span></a>
+      <div class="lv-frame lv-empty" id="lvNone">The preview shows here with the first frame</div>
+      <div class="lv-doing" id="lvWords"></div>
+    </div><div class="lv-tracks" id="lvTracks" hidden><div id="lvRows"></div><div class="lv-head" id="lvHead" hidden></div></div></div>`;
+  if (R.liveRound !== round) { R.liveRound = round; R.liveAt = null; R.showBag = []; R.showSeen = null; R.showStarted = false; }
   const clips = p?.clips || [];
-  const total = p?.total || Math.max(0, ...clips.map((c) => c.end));
+  const total = p?.total || Math.max(0, ...clips.map((c) => c.end)) || frames?.duration || 0;  // the line needs a timeline before the edit has a length
   R.liveTotal = total;
-  const placed = total ? shots.filter((u) => u.pos != null) : [];
+  const pool = R.showPool = livePool(v, total);
   const picked = R.liveAt != null && total ? R.liveAt : null;
-  const before = picked == null ? [] : placed.filter((u) => u.pos <= picked).sort((a, b) => a.pos - b.pos);
-  const shot = picked == null ? shots.at(-1) : before.at(-1) || [...placed].sort((a, b) => a.pos - b.pos)[0];
+  const near = picked == null ? null : [...pool].sort((a, b) => Math.abs(a.where * total - picked) - Math.abs(b.where * total - picked))[0];
   // what's said here belongs to the step named here, not whatever message came last
   const newest = !p?.finished && p?.step ? [...mine].reverse().find((u) => u.step === p.step) : mine.at(-1);
   const title = picked != null ? `At ${liveClock(picked)}` : p?.finished ? `Draft ${p.draft}` : p?.step || "Working on it";
-  const words = picked != null ? shot?.text : newest?.text;
-  setHtml($("lvNow"), `${shot ? `<a class="lv-frame" href="${esc(mediaUrl(shot.image))}" target="_blank" rel="noopener"><img src="${esc(mediaUrl(shot.image))}" alt="Preview of the edit"></a>` : `<div class="lv-frame lv-empty">The preview shows here with Claude's first snapshot</div>`}
-    <div class="lv-doing"><b>${esc(title)}</b>${words ? `<p>${esc(words)}</p>` : ""}${picked != null ? `<button class="btn small" id="liveFollow" type="button">Back to live</button>` : ""}</div>`);
+  const words = picked != null ? near?.text : newest?.text;
+  setHtml($("lvWords"), `<b>${esc(title)}</b>${words ? `<p>${esc(words)}</p>` : ""}${picked != null ? `<button class="btn small" id="liveFollow" type="button">Back to live</button>` : ""}`);
   const pct = (x) => Math.min(100, (x / total) * 100).toFixed(2);
   const tracks = ["Video", "B-roll", "Animation", "Captions", "Sound"].filter((t) => t === "Video" || p?.steps.includes(t) || clips.some((c) => c.track === t));
   const cls = { Video: "v", "B-roll": "b", Animation: "a", Captions: "c", Sound: "s" };
   $("lvTracks").hidden = !total;
-  if (!total) return;
-  setHtml($("lvRows"), `<div class="lv-ruler">${[0, 1, 2, 3, 4].map((i) => `<span>${liveClock((total * i) / 4)}</span>`).join("")}</div>
-    ${placed.length ? `<div class="lv-track lv-frames"><span>Frames</span><div>${placed.map((u) => `<img src="${esc(mediaUrl(u.image))}" alt="" style="left:${pct(u.pos)}%" title="${liveClock(u.pos)}" draggable="false">`).join("")}</div></div>` : ""}
+  if (total) setHtml($("lvRows"), `<div class="lv-ruler">${[0, 1, 2, 3, 4].map((i) => `<span>${liveClock((total * i) / 4)}</span>`).join("")}</div>
+    ${pool.length ? `<div class="lv-track lv-frames"><span>Frames</span><div>${pool.map((x) => `<img src="${esc(x.src)}" alt="" data-id="${esc(x.id)}" style="left:${(x.where * 100).toFixed(2)}%" draggable="false">`).join("")}</div></div>` : ""}
     ${tracks.map((t) => `<div class="lv-track"><span>${esc(t)}</span><div>${clips.filter((c) => c.track === t && c.start < total).map((c) => `<i class="${cls[t]}" style="left:${pct(c.start)}%;width:${(pct(c.end) - pct(c.start)).toFixed(2)}%" title="${liveClock(c.start)} to ${liveClock(c.end)}"></i>`).join("")}</div></div>`).join("")}`);
-  const at = picked ?? (p?.finished ? null : p?.pos);
-  const head = $("lvHead");
-  head.hidden = at == null;
-  head.classList.toggle("picked", picked != null);
-  if (at != null) head.style.left = `calc(66px + (100% - 66px) * ${Math.min(1, at / total).toFixed(4)})`;
+  if (near) liveShowFrame(near);
+  else if (!pool.some((x) => x.id === R.showNow)) liveNextFrame();  // the first frame, or the one showing has gone: don't wait for the next change
+  else liveShowLine(pool.find((x) => x.id === R.showNow));
 }
 
 function liveScrub(e) {
@@ -380,7 +451,7 @@ $("liveBoard").addEventListener("pointerdown", (e) => {
 window.addEventListener("pointermove", (e) => { if (R.liveDrag) liveScrub(e); });
 window.addEventListener("pointerup", () => { R.liveDrag = false; });
 $("liveBoard").addEventListener("click", (e) => {
-  if (e.target.id === "liveFollow") { R.liveAt = null; renderLiveBoard(R.v); }
+  if (e.target.id === "liveFollow") { R.liveAt = null; renderLiveBoard(R.v); liveNextFrame(); }
 });
 
 // only the steps this edit uses

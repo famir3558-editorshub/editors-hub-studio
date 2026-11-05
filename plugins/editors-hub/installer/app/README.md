@@ -141,7 +141,7 @@ While Claude edits, the Live tab shows, from the top:
 
 - **The video:** its name, how long Claude has worked on this draft, the draft number, client, style, start time and raw clip length. The counter stops while Claude waits for your answer, and when the draft is ready. If there's no update for 30 minutes, it stops and says so, as the session may have stopped.
 - **The timeline:** the newest frame with what Claude is doing, and tracks for the video, b-roll, animation, captions and sound that fill in as the edit builds. Until Claude reports each clip, a track can show a solid block for the whole length, and animation stays empty.
-- **The preview:** the newest snapshot shows beside the timeline, and the red line moves to where Claude says it's working. The line only moves when Claude reports, so it jumps from place to place and doesn't run like a playhead. Click or drag on the tracks to look back at any snapshot, then **Back to live**.
+- **The preview:** one frame at a time above the timeline, in random order from anywhere in the video, changing every 2 seconds, with the red line at that frame's place. So it shows what has been made, not exactly where Claude is working now. Claude's snapshots play as they arrive; until there are ten, the studio mixes in frames it makes from the last draft or the raw clip, labelled with where they came from. Click or drag on the tracks to stop on a moment, then **Back to live**.
 - **The steps:** the progress bar and each step. The percentage and time left are estimates from the steps. Only the steps this edit uses show, so a video with no b-roll has no B-roll step or track.
 - **Updates:** the latest update, then the earlier ones with their frames.
 

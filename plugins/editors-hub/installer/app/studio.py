@@ -976,6 +976,65 @@ def video_summary(v, styles=None, projects=None):
             "broll_waiting": (v.get("broll") or {}).get("stage") in BROLL_ASKING}
 
 
+PREVIEW_FRAMES = 12
+_frames_making = set()
+_frames_lock = threading.Lock()
+
+
+def make_preview_frames(src, out, label):
+    """Frames from start to end of a video, for the Live preview to play until Claude's own snapshots take over."""
+    ffmpeg, duration = shutil.which("ffmpeg"), probe_media(src).get("duration")
+    if not ffmpeg or not duration:
+        return None
+    out.mkdir(parents=True, exist_ok=True)
+    items = []
+    for i in range(PREVIEW_FRAMES):
+        at = (i + 0.5) / PREVIEW_FRAMES * duration
+        name = f"{i:02d}.jpg"
+        try:
+            subprocess.run([ffmpeg, "-y", "-loglevel", "error", "-ss", f"{at:.2f}", "-i", str(src), "-frames:v", "1", "-vf", "scale=-2:540", str(out / name)],
+                           timeout=60, capture_output=True)
+        except (OSError, subprocess.TimeoutExpired):
+            continue
+        if (out / name).exists():
+            items.append({"file": f"{out.parent.name}/{out.name}/{name}", "at": round(at, 2)})
+    index = {"label": label, "duration": round(duration, 2), "items": items}
+    write_json(out / "index.json", index)  # last, so the page never sees half a set
+    return index
+
+
+def preview_frames(v):
+    """The frames for the latest draft, or the raw clip until there is one. Made in the background the first time the page asks."""
+    folder = Path(v["folder"])
+    if v["drafts"]:
+        src, key, label = folder / v["drafts"][-1]["file"], f"v{v['drafts'][-1]['version']}", f"Draft {v['drafts'][-1]['version']}"
+    else:
+        raw = folder / "raw"
+        clips = sorted(f for f in raw.iterdir() if f.is_file() and kind_of(f.name) == "video") if raw.is_dir() else []
+        if not clips:
+            return None
+        src, key, label = clips[0], "raw", "The raw clip"
+    out = folder / "frames" / key
+    done = read_json(out / "index.json", None)
+    if done:
+        return done
+    job = str(out)
+    with _frames_lock:
+        if job in _frames_making or not src.is_file():
+            return None
+        _frames_making.add(job)
+
+    def work():
+        try:
+            make_preview_frames(src, out, label)
+        finally:
+            with _frames_lock:
+                _frames_making.discard(job)
+
+    threading.Thread(target=work, daemon=True).start()
+    return None
+
+
 def video_view(v):
     d = Path(v["folder"])
 
@@ -988,7 +1047,7 @@ def video_view(v):
 
     live = v.get("live")
     return {**v, **video_summary(v), "raw": files("raw"), "exports": files("exports"), "statuses": STATUSES,
-            "updates": v.get("updates", [])[-200:], "render_options": RENDER_OPTIONS, "start": start_state(v),
+            "updates": v.get("updates", [])[-200:], "render_options": RENDER_OPTIONS, "start": start_state(v), "preview_frames": preview_frames(v),
             "broll_yours": len(broll_own_files(d)),
             "claude": claude_status(d), "live": {**live, "running": live_ok(live["url"])} if live else None}
 
@@ -4305,6 +4364,7 @@ class Handler(BaseHTTPRequestHandler):
             if parts[:2] == ["api", "videos"] and len(parts) == 3:
                 view = video_view(load_video(parts[2]))
                 if role == "reviewer":
+                    view.pop("preview_frames", None)
                     for private in ("reviewers", "updates", "render_request", "last_render_choice", "render_options", "broll"):
                         view.pop(private, None)
                 return self.send_json(view)
