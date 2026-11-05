@@ -1436,6 +1436,16 @@ def effects_board_sync(files=True, force=False):
         threading.Thread(target=board_fetch_files, args=(items,), daemon=True).start()
 
 
+def board_repeats(source, files, points, known_files, known_points):
+    """Something sent online from this studio comes back as Studio training: show it once, where it's kept."""
+    if source["base"] != BOARD_TAG:
+        known_files.update((i["name"], i["size"]) for i in files)
+        known_points.update(t["text"].lower() for t in points)
+        return files, points
+    return ([i for i in files if (i["name"].split("-", 1)[-1], i["size"]) not in known_files],
+            [t for t in points if t["text"].lower() not in known_points])
+
+
 def effects_access(user):
     """The panel is the owner's own: every effect from everyone is in it. Everyone else's Claude still gets the written rules in its guide."""
     if not can_remove_effects(user):
@@ -1447,6 +1457,7 @@ def effects_library(user=None):
     items, techniques, styles = [], [], []
     gone = removed_effects()
     hidden = 0
+    known_files, known_points = set(), set()
     for s in effects_sources(user):
         files = [{**i, "source": s["key"], "style": s["name"], "by": s["by"], "section": sec, "rid": effect_id(s, "f", i["file"])}
                  for sec in EFFECT_SECTIONS for i in section_items(s["dir"], sec)]
@@ -1454,6 +1465,9 @@ def effects_library(user=None):
         hidden += sum(1 for x in files + points if x["rid"] in gone)
         files = [x for x in files if x["rid"] not in gone]
         points = [x for x in points if x["rid"] not in gone]
+        files, points = board_repeats(s, files, points, known_files, known_points)
+        if s["base"] == BOARD_TAG and not files and not points:
+            continue
         items += files
         techniques += points
         styles.append({"key": s["key"], "name": s["name"], "by": s["by"], "online": s["online"], "effects": len(files), "techniques": len(points)})
