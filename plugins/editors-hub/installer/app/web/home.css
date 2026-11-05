@@ -252,8 +252,8 @@ pre { margin: 0; padding: 14px; background: rgba(0, 0, 0, 0.45); border: 1px sol
 .effect:hover { border-color: var(--line-strong); }
 .effect b { overflow: hidden; font-size: 13px; text-overflow: ellipsis; white-space: nowrap; }
 .effect small { color: var(--muted); font-size: 11.5px; }
-.effect-view { display: grid; place-items: center; aspect-ratio: 16 / 10; overflow: hidden; border-radius: 8px; background: #000; }
-.effect-view video, .effect-view img { width: 100%; height: 100%; object-fit: cover; }
+.effect-view { display: grid; place-items: center; aspect-ratio: 9 / 16; overflow: hidden; border-radius: 8px; background: #000; }
+.effect-view video, .effect-view img { width: 100%; height: 100%; object-fit: contain; }
 .effect-view audio { width: 92%; }
 .effect-file { color: var(--muted); font-size: 13px; font-weight: 700; }
 .tech-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 10px; }

@@ -731,7 +731,7 @@ def section_items(sdir, section):
         for f in root.rglob("*"):
             if not f.is_file() or f.name.startswith(".") or f.suffix.lower() in (".json", ".bak", ".md"):
                 continue
-            key = str(f.relative_to(sdir).with_suffix("")).removesuffix(".poster")
+            key = str(f.relative_to(sdir).with_suffix("")).removesuffix(".poster").removesuffix(".still")
             groups.setdefault(key, []).append(f)
     items = []
     for files in groups.values():
