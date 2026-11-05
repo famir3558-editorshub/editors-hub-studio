@@ -199,6 +199,11 @@ def send_report(data_dir, **report):
     return _signed_call(data_dir, "/report", report)["report"]
 
 
+def owner_reports(data_dir):
+    """For the owner's bell; the service only answers the owner's own pass."""
+    return _signed_call(data_dir, "/owner/reports", {})["reports"]
+
+
 def my_reports(data_dir, from_email=""):
     return [r for r in _signed_call(data_dir, "/my-reports", {})["reports"] if (r.get("from_email") or "") == from_email]
 

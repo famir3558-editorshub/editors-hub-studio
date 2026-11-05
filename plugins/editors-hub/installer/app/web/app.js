@@ -401,7 +401,7 @@ const BELL_ICON = `<svg viewBox="0 0 24 24" width="17" height="17" fill="none" s
 
 function bellRow(item) {
   const inner = `<i class="bell-dot ${esc(item.icon || "")}"></i><span class="bell-words"><b>${esc(item.text)}</b>${item.sub ? `<small>${esc(item.sub)}</small>` : ""}${item.at ? `<small>${esc(ago(item.at))}</small>` : ""}</span>`;
-  return item.url ? `<a class="bell-row${item.new ? " new" : ""}" href="${esc(item.url)}">${inner}</a>` : `<div class="bell-row${item.new ? " new" : ""}">${inner}</div>`;
+  return item.url ? `<a class="bell-row${item.new ? " new" : ""}" href="${esc(item.url)}"${item.out ? ' target="_blank" rel="noopener"' : ""}>${inner}</a>` : `<div class="bell-row${item.new ? " new" : ""}">${inner}</div>`;
 }
 
 function bellDraw() {

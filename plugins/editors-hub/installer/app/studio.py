@@ -1078,7 +1078,7 @@ def create_video(style_id, name, brief="", raw=(), user=None, project="", traini
         for sub in ("raw", "drafts", "exports"):
             (d / sub).mkdir(parents=True)
         v = {"name": name, "style": style_id, "project": project, "status": "editing", "created": now(),
-             "brief": brief.strip(), "drafts": [], "notes": [], "next_note": 1, "approved": None, "id": vid, "folder": str(d)}
+             "brief": brief.strip(), "drafts": [], "notes": [], "next_note": 1, "approved": None, "maker": (user or {}).get("email", ""), "id": vid, "folder": str(d)}
         save_video(v)
         about = f"Client: {project_meta(pdir)['name']} (project {project}; brand in ../../BRAND.md)\n" if pdir else \
             "Made to train this style, for no client. What it teaches goes in ../../STYLE.md\n"
@@ -2869,6 +2869,39 @@ def claude_signed_in():
 # Worked out fresh from the videos and jobs each time, so it can't drift from what's true, and each person only gets what they can see.
 
 NOTIFY_RECENT = 25
+NOTIFY_REPORTS_EVERY = 60
+_notify_reports = {"at": 0, "busy": False}
+
+
+def notify_refresh_reports():
+    """Asked for in the background, at most once a minute, so a slow service never holds up the bell."""
+    if _notify_reports["busy"] or time.time() - _notify_reports["at"] < NOTIFY_REPORTS_EVERY:
+        return
+    _notify_reports.update(busy=True, at=time.time())
+
+    def work():
+        try:
+            write_json(DATA / "owner-reports.json", {"reports": [{k: r.get(k) for k in ("id", "kind", "message", "created", "status", "username", "from_name")} for r in approval.owner_reports(DATA)]})
+        except (approval.ApprovalError, OSError, KeyError, TypeError):
+            pass  # what we last heard stays
+        finally:
+            _notify_reports["busy"] = False
+
+    threading.Thread(target=work, daemon=True).start()
+
+
+def notify_report_items():
+    """Reports people sent the owner, from the last time the service was asked."""
+    items = []
+    inbox = (approval.config() or {}).get("url", "").rstrip("/") + "/admin"
+    for r in read_quiet(DATA / "owner-reports.json").get("reports", []):
+        created = r.get("created")
+        if not isinstance(created, (int, float)) or not r.get("id"):
+            continue
+        at = time.strftime("%Y-%m-%dT%H:%M:%S", time.localtime(created / 1000 if created > 1e11 else created))
+        what = "needs help" if r.get("kind") == "help" else "reported a glitch"
+        items.append({"id": f"report:{r['id']}", "icon": "warn", "text": f"{r.get('from_name') or r.get('username') or 'Someone'} {what}", "sub": " ".join(str(r.get("message") or "").split())[:120], "at": at, "url": inbox, "out": True})
+    return items
 
 
 def notify_seen_file():
@@ -2886,12 +2919,16 @@ def notify_mark_seen(user, at=None):
 def notifications(user=None):
     maker = user is None or user["role"] != "reviewer"
     needs, working, recent = [], [], []
+    owner = user is not None and user["role"] == "owner"
     me = (user or {}).get("email", "")
     dirs = video_dirs(user)
     for vid in dirs:
         try:
             v = load_video(vid, dirs)
         except StudioError:
+            continue
+        # each person hears about their own work. A video with no maker is the owner's: from before this, or made by Claude's commands
+        if maker and user is not None and v.get("maker", "") != me and not (owner and not v.get("maker")):
             continue
         url, name = f"/review/{vid}", v["name"]
         for d in v["drafts"][-3:]:
@@ -2927,6 +2964,8 @@ def notifications(user=None):
             working.append({"id": f"edit:{vid}", "icon": "edit", "text": f"Editing {name}", "sub": p.get("step") or "", "url": url})
     if user is not None:
         for j in recent_jobs(user):
+            if j.get("by") != me:
+                continue
             if j.get("state") == "running":
                 working.append({"id": f"job:{j['id']}", "icon": "job", "text": j.get("title") or "Working", "sub": j.get("stage") or ""})
             elif j.get("state") == "failed":
@@ -2936,6 +2975,9 @@ def notifications(user=None):
         recent.append({"id": "studio", "icon": "studio", "text": f"The studio updated to {version_file.read_text(encoding='utf-8').strip()}", "at": time.strftime("%Y-%m-%dT%H:%M:%S", time.localtime(version_file.stat().st_mtime))})
     except OSError:
         pass
+    if can_remove_effects(user) and approval.config():  # the real owner, not someone else's copy of the studio
+        notify_refresh_reports()
+        recent += notify_report_items()
     recent = sorted((r for r in recent if r.get("at")), key=lambda r: r["at"], reverse=True)[:NOTIFY_RECENT]
     seen = read_quiet(notify_seen_file()).get(me)
     if seen is None:  # the first look: what's already happened isn't news

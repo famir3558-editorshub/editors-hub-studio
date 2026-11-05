@@ -150,7 +150,7 @@ It trains the studio from everyone's work, and only the owner can see it.
 
 ## Notifications
 
-The bell at the top of every page shows what needs you, what's running now, and what just happened: new drafts, approvals, notes from others, what the studio learned, and studio updates. Each person only sees what they can already see. It's worked out from the videos each time, so it can't go out of step with them, and opening it clears the count, apart from what still needs you.
+The bell at the top of every page shows what needs you, what's running now, and what just happened: new drafts, approvals, notes from others, what the studio learned, and studio updates. Everyone hears about studio updates. Otherwise each person hears about their own work, including the owner: an editor gets the videos they made, and a client the videos they're invited to. The owner also hears about every report sent with **Report to owner**, within about a minute, and clicking one opens the reports page. It's worked out from the videos each time, so it can't go out of step with them, and opening it clears the count, apart from what still needs you.
 
 ## The Live tab
 
