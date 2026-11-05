@@ -135,6 +135,8 @@ Each client and each style has one parent Claude session, and each video gets it
 
 ## The Live tab
 
+Drag the left edge of the panel beside the video to make it wider or narrower. Your choice is remembered on that browser; double-click the edge to reset it.
+
 While Claude edits, the Live tab shows, from the top:
 
 - **The video:** its name, how long Claude has worked on this draft, the draft number, client, style, start time and raw clip length. The counter stops while Claude waits for your answer, and when the draft is ready. If there's no update for 30 minutes, it stops and says so, as the session may have stopped.

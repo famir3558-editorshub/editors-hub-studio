@@ -1072,3 +1072,52 @@ $("renderForm").addEventListener("submit", async (e) => {
   }
 });
 setInterval(() => document.visibilityState === "visible" && load(), 3000);
+
+// ---------------------------------------------------------------- drag the panel's edge: wider for Live, narrower for the video
+
+const SIDE_KEY = "eh-side-width", SIDE_MIN = 300, STAGE_MIN = 360;
+
+function sideWidth(px) {
+  const whole = document.querySelector(".review");
+  const w = Math.round(Math.max(SIDE_MIN, Math.min(px, whole.clientWidth - STAGE_MIN)));
+  whole.style.setProperty("--side-w", `${w}px`);
+  return w;
+}
+function sideSave(px) {
+  try { if (px) localStorage.setItem(SIDE_KEY, px); else localStorage.removeItem(SIDE_KEY); } catch (e) { /* it just isn't remembered */ }
+}
+function sideSaved() {
+  try { return +localStorage.getItem(SIDE_KEY) || 0; } catch (e) { return 0; }
+}
+if (sideSaved()) sideWidth(sideSaved());
+window.addEventListener("resize", () => { if (sideSaved()) sideWidth(sideSaved()); });  // the saved width stays what you chose, and fits the window
+
+$("sideGrip").addEventListener("pointerdown", (e) => {
+  const grip = $("sideGrip"), right = document.querySelector(".review").getBoundingClientRect().right;
+  grip.setPointerCapture(e.pointerId);
+  grip.classList.add("on");
+  document.body.classList.add("side-dragging");
+  const move = (m) => sideWidth(right - m.clientX);
+  const up = (u) => {
+    grip.removeEventListener("pointermove", move);
+    grip.removeEventListener("pointerup", up);
+    grip.removeEventListener("pointercancel", up);
+    grip.classList.remove("on");
+    document.body.classList.remove("side-dragging");
+    sideSave(sideWidth(right - u.clientX));
+  };
+  grip.addEventListener("pointermove", move);
+  grip.addEventListener("pointerup", up);
+  grip.addEventListener("pointercancel", up);
+  e.preventDefault();
+});
+$("sideGrip").addEventListener("dblclick", () => {
+  sideSave(0);
+  document.querySelector(".review").style.removeProperty("--side-w");
+});
+$("sideGrip").addEventListener("keydown", (e) => {
+  const step = { ArrowLeft: 30, ArrowRight: -30 }[e.key];
+  if (!step) return;
+  e.preventDefault();
+  sideSave(sideWidth($("sideGrip").parentElement.getBoundingClientRect().width + step));
+});
