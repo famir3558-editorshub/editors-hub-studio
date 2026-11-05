@@ -1772,8 +1772,13 @@ def progress_gaps(v):
         elif not has("Video"):
             gaps.append('each piece of the cut: --clip "Video:<from>-<to>" for each (it shows as one solid block until then)')
     gaps += [f'the {t} clips you placed: --clip "{t}:<from>-<to>" for each' for t in ("B-roll", "Animation") if t in passed and not has(t)]
-    if at and not any(u.get("image") and u.get("draft") == p["draft"] for u in v.get("updates", [])):
-        gaps.append("a snapshot of the edit: --snapshot <image or video>")
+    if at and not p.get("pos"):
+        gaps.append("where you're working now, so the line moves: --at <seconds>")
+    shots = [u for u in v.get("updates", []) if u.get("image") and u.get("draft") == p["draft"]]
+    if at and not shots:
+        gaps.append("a snapshot of what you're making: --snapshot <image or video> --at <seconds>")
+    elif any(u.get("pos") is None for u in shots):
+        gaps.append("a place on the timeline for each snapshot: send --at <seconds> with --snapshot")
     return gaps
 
 
@@ -1830,6 +1835,8 @@ def post_update(vid, text, snapshot=None, at=None, draft=None, total=None, step=
                 p["total"] = round(float(total), 2)
             if at is not None:
                 p["pos"] = max(0.0, round(float(at), 2))
+            elif clips:
+                p["pos"] = max(c["end"] for c in clips)
         elif add_step and v.get("progress") and not v["progress"].get("finished"):
             progress_add_step(v["progress"], add_step)
         item = None

@@ -328,31 +328,60 @@ function renderLiveTop(v) {
   </div>`);
 }
 
-// the tracks fill in as Claude reports each clip; a step the edit doesn't use has no track
+// the preview and the tracks. The line follows Claude; click or drag the tracks to look back at a snapshot.
+// The line and its parts stay on the page between updates, so it glides to its new place.
 function renderLiveBoard(v) {
-  const p = v.progress, round = p ? p.draft : v.updates?.at(-1)?.draft;
+  const box = $("liveBoard"), p = v.progress, round = p ? p.draft : v.updates?.at(-1)?.draft;
   const mine = (v.updates || []).filter((u) => u.draft === round);
-  // what's said here belongs to the step named here, not whatever message came last
-  const newest = !p?.finished && p?.step ? [...mine].reverse().find((u) => u.step === p.step) : mine.at(-1);
-  const shot = [...mine].reverse().find((u) => u.image);
-  if (!p && !shot) return setHtml($("liveBoard"), "");
+  const shots = mine.filter((u) => u.image);
+  if (!p && !shots.length) { box.innerHTML = ""; return; }
+  if (!$("lvNow")) box.innerHTML = `<div class="lv-box"><div class="lv-now" id="lvNow"></div><div class="lv-tracks" id="lvTracks" hidden><div id="lvRows"></div><div class="lv-head" id="lvHead"></div></div></div>`;
+  if (R.liveRound !== round) { R.liveRound = round; R.liveAt = null; }
   const clips = p?.clips || [];
   const total = p?.total || Math.max(0, ...clips.map((c) => c.end));
-  const tracks = ["Video", "B-roll", "Animation", "Captions", "Sound"].filter((t) => t === "Video" || p?.steps.includes(t) || clips.some((c) => c.track === t));
+  R.liveTotal = total;
+  const placed = total ? shots.filter((u) => u.pos != null) : [];
+  const picked = R.liveAt != null && total ? R.liveAt : null;
+  const before = picked == null ? [] : placed.filter((u) => u.pos <= picked).sort((a, b) => a.pos - b.pos);
+  const shot = picked == null ? shots.at(-1) : before.at(-1) || [...placed].sort((a, b) => a.pos - b.pos)[0];
+  // what's said here belongs to the step named here, not whatever message came last
+  const newest = !p?.finished && p?.step ? [...mine].reverse().find((u) => u.step === p.step) : mine.at(-1);
+  const title = picked != null ? `At ${liveClock(picked)}` : p?.finished ? `Draft ${p.draft}` : p?.step || "Working on it";
+  const words = picked != null ? shot?.text : newest?.text;
+  setHtml($("lvNow"), `${shot ? `<a class="lv-frame" href="${esc(mediaUrl(shot.image))}" target="_blank" rel="noopener"><img src="${esc(mediaUrl(shot.image))}" alt="Preview of the edit"></a>` : `<div class="lv-frame lv-empty">The preview shows here with Claude's first snapshot</div>`}
+    <div class="lv-doing"><b>${esc(title)}</b>${words ? `<p>${esc(words)}</p>` : ""}${picked != null ? `<button class="btn small" id="liveFollow" type="button">Back to live</button>` : ""}</div>`);
   const pct = (x) => Math.min(100, (x / total) * 100).toFixed(2);
-  const marks = total ? [0, 1, 2, 3, 4].map((i) => `<span>${liveClock((total * i) / 4)}</span>`).join("") : "";
+  const tracks = ["Video", "B-roll", "Animation", "Captions", "Sound"].filter((t) => t === "Video" || p?.steps.includes(t) || clips.some((c) => c.track === t));
   const cls = { Video: "v", "B-roll": "b", Animation: "a", Captions: "c", Sound: "s" };
-  setHtml($("liveBoard"), `<div class="lv-box">
-    <div class="lv-now${shot ? "" : " no-frame"}">
-      ${shot ? `<a class="lv-frame" href="${esc(mediaUrl(shot.image))}" target="_blank" rel="noopener"><img src="${esc(mediaUrl(shot.image))}" alt="Snapshot of the edit"></a>` : ""}
-      <div class="lv-doing"><b>${esc(p?.finished ? `Draft ${p.draft}` : p?.step || "Working on it")}</b>${newest?.text ? `<p>${esc(newest.text)}</p>` : ""}</div>
-    </div>
-    ${total ? `<div class="lv-tracks"><div class="lv-ruler">${marks}</div>
-      ${tracks.map((t) => `<div class="lv-track"><span>${esc(t)}</span><div>${clips.filter((c) => c.track === t && c.start < total).map((c) => `<i class="${cls[t]}" style="left:${pct(c.start)}%;width:${(pct(c.end) - pct(c.start)).toFixed(2)}%" title="${liveClock(c.start)} to ${liveClock(c.end)}"></i>`).join("")}</div></div>`).join("")}
-      ${p.pos != null && !p.finished ? `<div class="lv-head" style="left:calc(66px + (100% - 66px) * ${(Math.min(1, p.pos / total)).toFixed(4)})"></div>` : ""}
-    </div>` : ""}
-  </div>`);
+  $("lvTracks").hidden = !total;
+  if (!total) return;
+  setHtml($("lvRows"), `<div class="lv-ruler">${[0, 1, 2, 3, 4].map((i) => `<span>${liveClock((total * i) / 4)}</span>`).join("")}</div>
+    ${placed.length ? `<div class="lv-track lv-frames"><span>Frames</span><div>${placed.map((u) => `<img src="${esc(mediaUrl(u.image))}" alt="" style="left:${pct(u.pos)}%" title="${liveClock(u.pos)}" draggable="false">`).join("")}</div></div>` : ""}
+    ${tracks.map((t) => `<div class="lv-track"><span>${esc(t)}</span><div>${clips.filter((c) => c.track === t && c.start < total).map((c) => `<i class="${cls[t]}" style="left:${pct(c.start)}%;width:${(pct(c.end) - pct(c.start)).toFixed(2)}%" title="${liveClock(c.start)} to ${liveClock(c.end)}"></i>`).join("")}</div></div>`).join("")}`);
+  const at = picked ?? (p?.finished ? null : p?.pos);
+  const head = $("lvHead");
+  head.hidden = at == null;
+  head.classList.toggle("picked", picked != null);
+  if (at != null) head.style.left = `calc(66px + (100% - 66px) * ${Math.min(1, at / total).toFixed(4)})`;
 }
+
+function liveScrub(e) {
+  const box = $("lvTracks"), rect = box.getBoundingClientRect(), left = rect.left + 66;
+  if (e.clientX < left - 4 || !R.liveTotal) return false;
+  R.liveAt = Math.max(0, Math.min(1, (e.clientX - left) / (rect.right - left))) * R.liveTotal;
+  renderLiveBoard(R.v);
+  return true;
+}
+$("liveBoard").addEventListener("pointerdown", (e) => {
+  if (!e.target.closest("#lvTracks") || !liveScrub(e)) return;
+  R.liveDrag = true;
+  e.preventDefault();
+});
+window.addEventListener("pointermove", (e) => { if (R.liveDrag) liveScrub(e); });
+window.addEventListener("pointerup", () => { R.liveDrag = false; });
+$("liveBoard").addEventListener("click", (e) => {
+  if (e.target.id === "liveFollow") { R.liveAt = null; renderLiveBoard(R.v); }
+});
 
 // only the steps this edit uses
 function renderLiveSteps(v) {
