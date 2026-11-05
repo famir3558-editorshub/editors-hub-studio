@@ -138,7 +138,7 @@ Each client and each style has one parent Claude session, and each video gets it
 While Claude edits, the Live tab shows, from the top:
 
 - **The video:** its name, how long Claude has worked on this draft, the draft number, client, style, start time and raw clip length. The counter stops while Claude waits for your answer, and when the draft is ready. If there's no update for 30 minutes, it stops and says so, as the session may have stopped.
-- **The timeline:** the newest frame with what Claude is doing, and tracks for the video, b-roll, animation, captions and sound that fill in as the edit builds.
+- **The timeline:** the newest frame with what Claude is doing, and tracks for the video, b-roll, animation, captions and sound that fill in as the edit builds. Until Claude reports each clip, a track can show a solid block for the whole length, and animation stays empty.
 - **The steps:** the progress bar and each step. The percentage and time left are estimates from the steps. Only the steps this edit uses show, so a video with no b-roll has no B-roll step or track.
 - **Updates:** the latest update, then the earlier ones with their frames.
 

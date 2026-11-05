@@ -898,6 +898,7 @@ def load_video(vid, dirs=None):
 
 def save_video(v):
     v["updated"] = now()
+    progress_fill(v)
     progress_clock(v)
     write_json(Path(v["folder"]) / "video.json", {k: x for k, x in v.items() if k not in ("id", "folder")})
 
@@ -1736,6 +1737,46 @@ def progress_of(v, draft):
     return p
 
 
+def progress_fill(v, finishing=False):
+    """Tracks the studio can fill in by itself, marked auto, so Live isn't empty when clips weren't reported. What Claude reports replaces them."""
+    p = v.get("progress")
+    if not p or p.get("finished"):
+        return
+    mine = [c for c in p["clips"] if not c.get("auto")]
+    reported = {c["track"] for c in mine}
+    auto = lambda track, start, end: {"track": track, "start": start, "end": end, "auto": True}
+    filled = []
+    total, steps = p.get("total"), p["steps"]
+    if total:
+        if "Video" not in reported:  # the length is known, so the cut exists
+            filled.append(auto("Video", 0, total))
+        passed = steps if finishing else steps[:steps.index(p["step"])] if p.get("step") in steps else []
+        filled += [auto(t, 0, total) for t in ("Captions", "Sound") if t in passed and t not in reported]
+    if "B-roll" in steps and "B-roll" not in reported:  # what the owner picked, or the clips Claude recorded
+        filled += [auto("B-roll", x["start"], x["end"]) for x in (v.get("broll") or {}).get("parts", [])
+                   if x.get("picked") and x.get("start") is not None and x.get("end") is not None]
+    p["clips"] = mine + filled
+
+
+def progress_gaps(v):
+    """What Live is still missing, told to Claude each time it posts, as the instructions alone aren't enough."""
+    p = v.get("progress")
+    if not p or p.get("finished") or p.get("step") not in p["steps"]:
+        return []
+    at, gaps = p["steps"].index(p["step"]), []
+    passed = p["steps"][:at]
+    has = lambda track: any(c["track"] == track and not c.get("auto") for c in p["clips"])
+    if "Tight cut" in passed or (at and "Tight cut" not in p["steps"]):
+        if not p.get("total"):
+            gaps.append("the edit's length: --total <seconds>")
+        elif not has("Video"):
+            gaps.append('each piece of the cut: --clip "Video:<from>-<to>" for each (it shows as one solid block until then)')
+    gaps += [f'the {t} clips you placed: --clip "{t}:<from>-<to>" for each' for t in ("B-roll", "Animation") if t in passed and not has(t)]
+    if at and not any(u.get("image") and u.get("draft") == p["draft"] for u in v.get("updates", [])):
+        gaps.append("a snapshot of the edit: --snapshot <image or video>")
+    return gaps
+
+
 def progress_clock(v):
     """Claude waiting for the owner's answer stops the clock; the answer starts it again."""
     p = v.get("progress")
@@ -1754,6 +1795,7 @@ def progress_finish(v):
     """The draft is here: the clock stops for good and every step is done."""
     p = v.get("progress")
     if p and not p.get("finished"):
+        progress_fill(v, finishing=True)
         if p["since"]:
             p["worked"] += min(time.time(), p["last"] + PROGRESS_IDLE) - p["since"]
         p.update(since=None, finished=now(), step=None)
@@ -5148,6 +5190,9 @@ def main(argv=None):
             post_update(a.video, a.text, a.snapshot, a.at, total=a.total, step=a.step, steps=(a.steps or "").split(","), clips=a.clip,
                         clear_tracks=a.clear_track, active=True)
             print("Posted to the Live tab.")
+            gaps = progress_gaps(load_video(a.video))
+            if gaps:
+                print("Live is still missing, so send these with your next update:\n" + "\n".join(f"- {g}" for g in gaps))
         elif a.cmd == "ask-render":
             req = ask_render(a.video, a.note, a.size, a.fps, a.duration)
             print(f"The render popup is open: {home_url('/review/' + a.video)}\nWaiting for the settings...", flush=True)

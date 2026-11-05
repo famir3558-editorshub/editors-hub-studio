@@ -332,7 +332,9 @@ function renderLiveTop(v) {
 function renderLiveBoard(v) {
   const p = v.progress, round = p ? p.draft : v.updates?.at(-1)?.draft;
   const mine = (v.updates || []).filter((u) => u.draft === round);
-  const newest = mine.at(-1), shot = [...mine].reverse().find((u) => u.image);
+  // what's said here belongs to the step named here, not whatever message came last
+  const newest = !p?.finished && p?.step ? [...mine].reverse().find((u) => u.step === p.step) : mine.at(-1);
+  const shot = [...mine].reverse().find((u) => u.image);
   if (!p && !shot) return setHtml($("liveBoard"), "");
   const clips = p?.clips || [];
   const total = p?.total || Math.max(0, ...clips.map((c) => c.end));
