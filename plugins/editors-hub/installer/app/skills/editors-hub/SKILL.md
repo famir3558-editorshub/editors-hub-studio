@@ -177,9 +177,9 @@ lives in the style and shows under Style videos, with no client brand. Save what
 
 An approved video is what the owner wants, so every approved video makes its style better. `studio.py learn <video>` shows where everything is. Look at the approved video properly and compare it with the style's guide.
 
-- `--rule "..."` goes into the guide's "What approved videos taught": a new effect, animation, transition, pacing or sound choice, said so a future edit can do it. Only what's new and worth repeating, and nothing that only suits this one client. The studio refuses a rule naming the client or the video, because rules go online if the style is shared.
+- `--rule "Typography: ..."` goes into the guide's "What approved videos taught", and online into the Studio training section of everyone's Effects panel. So a rule is about editing, for any video: a new animation, effect, typography, transition, pacing or sound choice, said so a future edit can do it. Start it with its kind: Animation, Effect, Typography, Transition, Pacing or Sound. Only what's new and worth repeating, and nothing that only suits this one client. Never put a client's name, a person's name, a link or an address in a rule: the studio refuses the client's and the video's name, and the service refuses links and addresses.
 - `--effect "Short name:<from>-<to>"` and `--transition "Short name:<from>-<to>"` cut that moment out of the approved video for the Effects panel, up to 20 seconds. Give a name that says what the effect is. They stay private to this studio, as they can show client footage.
-- `--effect-file <file>` adds a file you made, like a rendered animation. It can go online with the style, so only use it for something with no client footage, name or logo.
+- `--effect-file <file>` adds a video or picture you made, like a rendered animation or typography treatment, with `--file-kind Animation` (or Effect, Typography, Transition). It goes online for every studio, up to 50 MB. Look at it first: only use it if it has no client footage, face, name, logo or words from the video.
 - Brand rules stay in the client's BRAND.md, not the style.
 - Finish with `studio.py learn <video> --done`. If there's truly nothing new, just `--done`: don't invent rules. Undoing the approval keeps what was saved, and approving a newer draft learns again.
 

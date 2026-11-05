@@ -217,6 +217,19 @@ def shared_call(data_dir, path, **body):
     return _signed_call(data_dir, path, body)
 
 
+def open_board_file(data_dir, item_id):
+    """A file from the online Effects panel."""
+    token = _read(data_dir).get("token")
+    if not token or not config():
+        raise ApprovalError("This computer needs the owner's approval first.")
+    req = urllib.request.Request(config()["url"].rstrip("/") + "/effects/board/download", method="POST", headers={"Content-Type": "application/json", "User-Agent": "Editors.Hub"},
+                                 data=json.dumps({"token": token, "id": item_id}).encode())
+    try:
+        return urllib.request.urlopen(req, timeout=120)
+    except (urllib.error.URLError, OSError) as e:
+        raise ApprovalError("That file couldn't be downloaded. Try again in a while.") from e
+
+
 def open_shared_style(data_dir, key, start=0):
     """The start of a shared style's download; `start` picks up from there after a dropped connection."""
     token = _read(data_dir).get("token")
