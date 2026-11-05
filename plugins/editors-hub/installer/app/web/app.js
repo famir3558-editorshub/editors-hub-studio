@@ -303,7 +303,11 @@ async function refreshActivity() {
   Activity.last = jobs;
   window.dispatchEvent(new CustomEvent("editorshub:jobs-updated", { detail: jobs }));  // for bars on cards and pages
   const shown = jobs.filter((j) => !Activity.dismissed.has(j.id) && (j.state === "running" || now - (j.finished_ts || 0) < (j.state === "failed" ? 3600 : j.state === "stopped" ? 20 : 12)));
-  activityBox().innerHTML = shown.map((j) => {
+  // each job's box is made once and then only its numbers change: building it again every second replayed its pop-in, so it popped on a loop
+  const box = activityBox();
+  const keep = new Set(shown.map((j) => j.id));
+  box.querySelectorAll(":scope > .act").forEach((el) => { if (!keep.has(el.dataset.jobId)) el.remove(); });
+  for (const j of shown) {
     const pct = j.total_bytes ? Math.min(100, (j.done_bytes / j.total_bytes) * 100) : 0;
     // speed and time left, from how far it moved since the last look
     const prev = Activity.seen[j.id];
@@ -312,18 +316,38 @@ async function refreshActivity() {
     Activity.seen[j.id] = { bytes: j.done_bytes, t: now, speed: speed ?? prev?.speed };
     const left = speed ? fmtLeft((j.total_bytes - j.done_bytes) / speed) : "";
     const state = j.state === "done" ? "done" : j.state === "failed" ? "failed" : j.state === "stopped" ? "stopped" : "running";
+    // all sent, still finishing: say so, and keep the bar moving, or it looks frozen at 100%
+    const finishing = state === "running" && (/^Finishing/.test(j.stage || "") || (j.total_bytes && j.done_bytes >= j.total_bytes));
+    const stage = finishing && j.kind === "online-upload" ? "Adding it to Shared…" : finishing && /^Finishing/.test(j.stage || "") ? "Finishing…" : (j.stage || "Working");
     const detail = state === "running"
-      ? `${esc(j.stage || "Working")}${j.total_bytes ? ` · ${fmtBytes(j.done_bytes)} of ${fmtBytes(j.total_bytes)}` : ""}${speed ? ` · ${fmtBytes(speed)}/s` : ""}${left ? ` · ${left}` : ""}`
+      ? `${esc(stage)}${j.total_bytes && !finishing ? ` · ${fmtBytes(j.done_bytes)} of ${fmtBytes(j.total_bytes)}` : ""}${speed && !finishing ? ` · ${fmtBytes(speed)}/s` : ""}${left && !finishing ? ` · ${left}` : ""}`
       : state === "done" ? esc(doneText(j)) : esc(j.message || "It stopped");
     const stopping = state === "running" && /^Stopping|^Removing the unfinished/.test(j.stage || "");
-    return `<div class="act ${state}">
-      <div class="act-top"><span class="act-icon">${state === "done" ? "✓" : state === "failed" ? "!" : state === "stopped" ? "■" : ""}</span><b>${esc(j.title)}</b>
-        <span class="act-pct">${state === "running" ? `${Math.floor(pct)}%` : ""}</span>
+    const look = `${state}|${stopping}|${j.title}`;  // what only changes now and then: when it does, the box is drawn again
+    let el = box.querySelector(`:scope > .act[data-job-id="${CSS.escape(j.id)}"]`);
+    if (!el || el.dataset.look !== look) {
+      const html = `<div class="act-top"><span class="act-icon">${state === "done" ? "✓" : state === "failed" ? "!" : state === "stopped" ? "■" : ""}</span><b>${esc(j.title)}</b>
+        <span class="act-pct"></span>
         ${state === "running" && !stopping ? `<button class="act-stop" data-stop-job="${esc(j.id)}" title="Stop">Stop</button>` : ""}
         ${state !== "running" ? `<button class="act-x" data-dismiss="${esc(j.id)}" title="Close">✕</button>` : ""}</div>
-      <div class="act-bar"><div style="width:${state === "done" ? 100 : pct}%"></div></div>
-      <div class="act-detail">${detail}</div></div>`;
-  }).join("");
+      <div class="act-bar"><div></div></div>
+      <div class="act-detail"></div>`;
+      if (!el) {
+        el = document.createElement("div");
+        el.dataset.jobId = j.id;
+        box.appendChild(el);
+      } else {
+        el.classList.add("act-same");  // already on screen: no pop-in again
+      }
+      el.innerHTML = html;
+      el.dataset.look = look;
+    }
+    el.className = `act ${state}${finishing ? " finishing" : ""}${el.classList.contains("act-same") ? " act-same" : ""}`;
+    el.querySelector(".act-pct").textContent = state === "running" ? `${Math.floor(pct)}%` : "";
+    el.querySelector(".act-bar div").style.width = `${state === "done" ? 100 : pct}%`;
+    const words = el.querySelector(".act-detail");
+    if (words.innerHTML !== detail) words.innerHTML = detail;
+  }
   for (const j of jobs) {  // tell the page when something it was showing has finished, so it can refresh
     if (j.state === "running") Activity.watching.add(j.id);
     else if (Activity.watching.delete(j.id)) window.dispatchEvent(new CustomEvent("editorshub:job-done", { detail: j }));
