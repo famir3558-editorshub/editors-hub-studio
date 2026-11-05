@@ -2917,6 +2917,14 @@ def learn_auto_tick():
         except StudioError:
             continue
         job = v.get("learn") or {}
+        if learn_free(job) and v["style"] not in style_dirs():  # its style has been deleted: nothing to teach, and no point trying again
+            with vlock(v["id"]):
+                v = load_video(v["id"])
+                v["learn"]["state"] = "no-style"
+                drop_quiet(learn_file(v["id"]))
+                save_video(v)
+            post_update(v["id"], f'The style this video was made in ({v["style"]}) is no longer in this studio, so it has nothing to teach. Change the video to another style and approve it again if you want it to.')
+            continue
         if not learn_free(job) or job.get("auto_tries", 0) >= LEARN_AUTO_TRIES or time.time() - job.get("asked_ts", 0) < LEARN_GRACE or claude_status(v["folder"]).get("listening"):
             continue
         if not claude_signed_in():
@@ -2928,13 +2936,15 @@ def learn_auto_tick():
                 continue
             job["auto_tries"] = job.get("auto_tries", 0) + 1
             save_video(v)
-        learn_auto_run(v)
-        with vlock(v["id"]):
-            v = load_video(v["id"])
-            job = v.get("learn") or {}
-            if job.get("state") == "working":  # it stopped before finishing: another try, or Home's notice
-                job["state"] = "waiting"
-                save_video(v)
+        try:
+            learn_auto_run(v)
+        finally:
+            with vlock(v["id"]):
+                v = load_video(v["id"])
+                job = v.get("learn") or {}
+                if job.get("state") == "working":  # it stopped before finishing: another try, or the Live tab's line
+                    job["state"] = "waiting"
+                    save_video(v)
         return v["id"]
     return None
 

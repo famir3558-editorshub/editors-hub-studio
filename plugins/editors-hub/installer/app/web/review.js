@@ -295,6 +295,7 @@ $("brollDlg").addEventListener("cancel", brollPutOff);  // Esc is the same as La
 function learnWords(v) {
   const job = v.learn;
   if (!job || job.state === "cancelled") return "";
+  if (job.state === "no-style") return "This video's style is no longer in this studio, so there was nothing to update.";
   const count = (n, one) => `${n} ${one}${n === 1 ? "" : "s"}`;
   const client = job.client_rules?.length ? ` The client's rules gained ${job.client_rules.length}.` : "";
   if (job.state === "done") return job.rules.length || job.effects.length
