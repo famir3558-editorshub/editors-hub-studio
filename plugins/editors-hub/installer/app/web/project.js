@@ -71,7 +71,7 @@ async function renderPane() {
       <div class="pane-head"><h2>Videos for this client</h2><div class="spacer"></div><button class="btn small" data-tab="videos">${p.videos.length} video${p.videos.length === 1 ? "" : "s"}</button></div>
       ${p.videos.length ? `<div class="strip">${p.videos.map(videoCard).join("")}</div>` : `<div class="empty-pane">No videos yet. Click <b>+ Video</b> and pick a style.</div>`}
       <div class="pane-head" style="margin-top:22px"><h2>Client rules</h2><div class="spacer"></div><button class="btn small" data-tab="rules">All ${p.rules.length}</button></div>
-      ${p.rules.length ? ruleList(p.rules.slice(0, 4)) : `<div class="empty-pane">No client rules yet. They're added when Claude saves a note about this client.</div>`}
+      ${p.rules.length ? ruleList(p.rules.slice(0, 4)) : `<div class="empty-pane">No client rules yet. They're added from your notes and from each approved video.</div>`}
       ${p.can_edit ? `<h2 style="margin-top:22px">Add brand files</h2><div class="drop-hint" data-pick>Drop the brandbook, logos, fonts or other client files anywhere on this page, or <b>click to choose</b>. Each one is sorted by its type.</div>` : ""}`;
     return;
   }
@@ -90,7 +90,7 @@ async function renderPane() {
     return;
   }
   if (tab === "rules") {
-    pane.innerHTML = `<div class="pane-head"><h2>Client rules</h2><span class="faint small-print">Claude follows these on every video for this client, whichever style it uses. They're kept in the guidelines' "Lessons from reviews".</span></div>
+    pane.innerHTML = `<div class="pane-head"><h2>Client rules</h2><span class="faint small-print">Claude follows these on this client's videos. One that starts with a style's name holds only in that style. They're kept in the guidelines' "Lessons from reviews".</span></div>
       ${p.rules.length ? ruleList(p.rules) : `<div class="empty-pane">No client rules yet.</div>`}`;
     return;
   }

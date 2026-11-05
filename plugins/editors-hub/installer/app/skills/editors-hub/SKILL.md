@@ -167,7 +167,7 @@ lives in the style and shows under Style videos, with no client brand. Save what
    under the note and marks it fixed (`--not-fixed` to answer without fixing). When a note states a rule worth
    keeping ("never…", "always…"), save it in the right place. About this client or their brand: `--client-lesson "<the
    rule>"` goes into their BRAND.md. About the editing, for every client in this style: `--lesson "<the rule>"` goes into
-   the style's STYLE.md. If it isn't clear which, ask. The note shows "Saved to <name>". Read "Lessons from reviews" in
+   the style's STYLE.md. If it isn't clear which, ask. In a client's BRAND.md, a section called "In <style>" holds only for videos in that style: follow it only when this video uses that style. The note shows "Saved to <name>". Read "Lessons from reviews" in
    both files before every edit.
 5. Post your progress to Live as you work, ask for the render settings, render, `finish-render`, and `wait` again. `studio.py notes <video>` lists open notes any time.
 6. The owner approves on the page. If you're part way through a draft when that happens, finish it. After that, no new draft can start and no notes can be added: the commands that edit are refused until the owner presses Undo approve on the page. Never try to get round this. When the final is exported to `exports/`, `studio.py set-status <video> delivered`.
@@ -181,7 +181,9 @@ An approved video is what the owner wants, so every approved video makes its sty
 - `--rule "Typography: ..."` goes into the guide's "What approved videos taught", and online into the Studio training rules every studio's Claude reads. So a rule is about editing, for any video: a new animation, effect, typography, transition, pacing or sound choice, said so a future edit can do it. Start it with its kind: Animation, Effect, Typography, Transition, Pacing or Sound. Nothing that only suits this one client. Never put a client's name, a person's name, a link or an address in a rule: the studio refuses the client's and the video's name, the service refuses links and addresses, and it skips a rule that nearly repeats one already there.
 - `--effect "Short name:<from>-<to>"` and `--transition "Short name:<from>-<to>"` cut that moment out of the approved video, up to 20 seconds. Give a name that says what the effect is. They can show people, so they go only to the studio owner's Effects panel, unless something online already looks the same.
 - `--effect-file <file>` adds a video or picture you made, like a rendered animation or typography treatment, with `--file-kind Animation` (or Effect, Typography, Transition). It goes the same way, up to 50 MB.
-- Brand rules stay in the client's BRAND.md, not the style.
+- `--client-rule "..."` goes into that client's rules, and goes nowhere else: their brand colours, logo, fonts, tone, wording and facts, which hold in every style. Client names are fine here. Brand rules never go in the style.
+- `--client-style-rule "..."` is an editing preference of this client that holds only in this style, like "slower hook, first cut after 3 seconds". It's kept under "In <style>" in their rules. Another style can do it differently.
+- Only what the video or its notes really show. Take likes and dislikes from the owner's notes; don't guess them from the video. If a new rule clashes with one already there, don't replace it: tell the owner with `--say "..."`. A style-training video has no client, so these don't apply.
 - Finish with `studio.py learn <video> --done`. If there's truly nothing new, just `--done`: don't invent rules. Undoing the approval keeps what was saved, and approving a newer draft learns again.
 
 ## Style rules

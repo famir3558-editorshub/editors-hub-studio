@@ -296,8 +296,9 @@ function learnWords(v) {
   const job = v.learn;
   if (!job || job.state === "cancelled") return "";
   const count = (n, one) => `${n} ${one}${n === 1 ? "" : "s"}`;
+  const client = job.client_rules?.length ? ` The client's rules gained ${job.client_rules.length}.` : "";
   if (job.state === "done") return job.rules.length || job.effects.length
-    ? `The style learned from this video: ${count(job.rules.length, "new rule")} and ${count(job.effects.length, "new effect")}.` : "The style already covered what this video does.";
+    ? `The style learned from this video: ${count(job.rules.length, "new rule")} and ${count(job.effects.length, "new effect")}.${client}` : `The style already covered what this video does.${client}`;
   return job.state === "working" ? "Claude is updating the style and the Effects panel from this video." : "The style and the Effects panel update from this video as soon as a Claude session picks it up.";
 }
 
