@@ -148,6 +148,10 @@ It trains the studio from everyone's work, and only the owner can see it.
 - **Who gets what:** the owner gets everything as **Studio training** in the Effects tab. Everyone else has no Effects tab and gets no files or clips. Their Claude sessions read the written rules, which can't name the client or the video.
 - **Where it's kept:** files are in an **Editors.Hub Effects** folder on the owner's Google Drive, up to 50 MB each. If a computer is offline, what it learned waits and goes next time. Only the owner can remove something, from the Effects tab.
 
+## Notifications
+
+The bell at the top of every page shows what needs you, what's running now, and what just happened: new drafts, approvals, notes from others, what the studio learned, and studio updates. Each person only sees what they can already see. It's worked out from the videos each time, so it can't go out of step with them, and opening it clears the count, apart from what still needs you.
+
 ## The Live tab
 
 Drag the left edge of the panel beside the video to make it wider or narrower. Your choice is remembered on that browser; double-click the edge to reset it.

@@ -225,3 +225,24 @@ select option { background: var(--panel-solid); color: var(--text); }
 .hover-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; background: #000; opacity: 0; transition: opacity 0.15s; }
 .hover-video.on { opacity: 1; }
 .wide > img, .wide > .hover-video { object-fit: contain !important; }
+
+/* the bell */
+.bell { display: flex; align-items: center; flex: none; margin-left: 8px; }
+.bell-btn { position: relative; display: grid; place-items: center; width: 34px; height: 34px; padding: 0; border: 1px solid var(--line-strong); border-radius: 50%; background: rgba(255, 255, 255, 0.03); color: var(--text); cursor: pointer; }
+.bell-btn:hover, .bell-btn[aria-expanded="true"] { border-color: rgba(229, 25, 43, 0.55); }
+.bell-count { position: absolute; top: -5px; right: -5px; min-width: 17px; padding: 0 4px; border-radius: 999px; background: var(--red); color: #fff; font-size: 10.5px; font-weight: 700; line-height: 17px; text-align: center; }
+.bell-count[hidden] { display: none; }
+.bell-panel { position: fixed; z-index: 200; width: min(350px, calc(100vw - 16px)); max-height: min(70vh, 560px); overflow-y: auto; padding: 6px; border: 1px solid var(--line-strong); border-radius: 14px; background: var(--panel-solid); box-shadow: 0 18px 50px rgba(0, 0, 0, 0.55); }
+.bell-panel[hidden] { display: none; }
+.bell-head { padding: 9px 10px 4px; color: var(--muted); font-size: 11.5px; font-weight: 600; }
+.bell-row { display: flex; gap: 9px; padding: 8px 10px; border-radius: 9px; color: var(--text); text-decoration: none; }
+a.bell-row:hover { background: rgba(255, 255, 255, 0.06); }
+.bell-row.new { background: rgba(229, 25, 43, 0.09); }
+.bell-dot { flex: none; width: 7px; height: 7px; margin-top: 6px; border-radius: 50%; background: var(--faint); }
+.bell-dot.warn { background: var(--warn); }
+.bell-dot.ok, .bell-dot.learn, .bell-dot.edit, .bell-dot.job { background: var(--ok); }
+.bell-dot.draft, .bell-dot.note { background: var(--blue); }
+.bell-words { min-width: 0; font-size: 13px; line-height: 1.35; overflow-wrap: anywhere; }
+.bell-words b { display: block; font-weight: 500; }
+.bell-words small { display: block; margin-top: 1px; color: var(--faint); font-size: 11.5px; }
+.bell-empty { margin: 0; padding: 20px 12px; color: var(--muted); font-size: 13px; text-align: center; }

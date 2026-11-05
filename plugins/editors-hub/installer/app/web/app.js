@@ -394,3 +394,72 @@ document.addEventListener("load", (e) => {
   const img = e.target;
   if (img.tagName === "IMG" && img.parentElement?.matches(".thumb, .th")) img.parentElement.classList.toggle("wide", img.naturalWidth > img.naturalHeight);
 }, true);
+
+/* ---- the bell: what needs you, what's running, what just happened ---- */
+const Bell = { data: null, open: false };
+const BELL_ICON = `<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>`;
+
+function bellRow(item) {
+  const inner = `<i class="bell-dot ${esc(item.icon || "")}"></i><span class="bell-words"><b>${esc(item.text)}</b>${item.sub ? `<small>${esc(item.sub)}</small>` : ""}${item.at ? `<small>${esc(ago(item.at))}</small>` : ""}</span>`;
+  return item.url ? `<a class="bell-row${item.new ? " new" : ""}" href="${esc(item.url)}">${inner}</a>` : `<div class="bell-row${item.new ? " new" : ""}">${inner}</div>`;
+}
+
+function bellDraw() {
+  const d = Bell.data, count = document.getElementById("bellCount"), panel = document.getElementById("bellPanel");
+  if (!d || !panel) return;
+  count.hidden = !d.unread;
+  count.textContent = d.unread > 9 ? "9+" : d.unread;
+  document.getElementById("bellBtn").setAttribute("aria-label", d.unread ? `Notifications, ${d.unread} new` : "Notifications");
+  const part = (title, items) => (items.length ? `<div class="bell-head">${title}</div>${items.map(bellRow).join("")}` : "");
+  const html = part("Needs you", d.needs) + part("Working now", d.working) + part("Recent", d.recent) || `<p class="bell-empty">Nothing yet. Updates show here.</p>`;
+  if (panel.dataset.html !== html) { panel.innerHTML = html; panel.dataset.html = html; }
+}
+
+async function bellLoad() {
+  if (document.visibilityState === "visible") {
+    try {
+      const res = await fetch("/api/notifications");
+      if (res.ok) { Bell.data = await res.json(); bellDraw(); }
+    } catch (e) { /* the next look is soon enough */ }
+  }
+  clearTimeout(Bell.timer);
+  Bell.timer = setTimeout(bellLoad, 10000);
+}
+
+function bellToggle(open) {
+  const panel = document.getElementById("bellPanel"), btn = document.getElementById("bellBtn");
+  Bell.open = open;
+  panel.hidden = !open;
+  btn.setAttribute("aria-expanded", open);
+  if (!open) return;
+  if (!Bell.data) panel.innerHTML = `<p class="bell-empty">Loading…</p>`;
+  bellLoad();
+  const r = btn.getBoundingClientRect();
+  panel.style.top = `${r.bottom + 8}px`;
+  panel.style.right = `${Math.max(8, innerWidth - r.right)}px`;
+  fetch("/api/notifications/seen", { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" }).then(() => {
+    if (Bell.data) { Bell.data.unread = Bell.data.needs.length; const c = document.getElementById("bellCount"); c.hidden = !Bell.data.unread; c.textContent = Bell.data.unread; }
+  }).catch(() => {});
+}
+
+function setupBell() {
+  const top = document.querySelector("header.top");
+  if (!top || document.getElementById("bellBtn")) return;
+  const wrap = document.createElement("div");
+  wrap.className = "bell";
+  wrap.innerHTML = `<button class="bell-btn" id="bellBtn" type="button" aria-label="Notifications" aria-expanded="false">${BELL_ICON}<span class="bell-count" id="bellCount" hidden></span></button>`;
+  const me = top.querySelector("#me");
+  if (me) top.insertBefore(wrap, me); else top.appendChild(wrap);
+  const panel = document.createElement("div");
+  panel.className = "bell-panel";
+  panel.id = "bellPanel";
+  panel.hidden = true;
+  document.body.appendChild(panel);
+  document.getElementById("bellBtn").addEventListener("click", (e) => { e.stopPropagation(); bellToggle(!Bell.open); });
+  panel.addEventListener("click", (e) => e.stopPropagation());
+  document.addEventListener("click", () => { if (Bell.open) bellToggle(false); });
+  document.addEventListener("keydown", (e) => { if (e.key === "Escape" && Bell.open) bellToggle(false); });
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") bellLoad(); });  // a page opened in the background hasn't looked yet
+  bellLoad();
+}
+if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", setupBell); else setupBell();

@@ -2865,6 +2865,87 @@ def claude_signed_in():
     return yes
 
 
+# ---------------------------------------------------------------- the bell: what needs you, what's running, what just happened
+# Worked out fresh from the videos and jobs each time, so it can't drift from what's true, and each person only gets what they can see.
+
+NOTIFY_RECENT = 25
+
+
+def notify_seen_file():
+    return DATA / "notifications-seen.json"
+
+
+def notify_mark_seen(user, at=None):
+    file, email = notify_seen_file(), (user or {}).get("email", "")
+    with LOCK:
+        seen = read_quiet(file)
+        seen[email] = at or now()
+        write_json(file, seen)
+
+
+def notifications(user=None):
+    maker = user is None or user["role"] != "reviewer"
+    needs, working, recent = [], [], []
+    me = (user or {}).get("email", "")
+    dirs = video_dirs(user)
+    for vid in dirs:
+        try:
+            v = load_video(vid, dirs)
+        except StudioError:
+            continue
+        url, name = f"/review/{vid}", v["name"]
+        for d in v["drafts"][-3:]:
+            recent.append({"id": f"draft:{vid}:{d['version']}", "icon": "draft", "text": f"Draft {d['version']} of {name} is ready", "at": d["added"], "url": f"{url}#v{d['version']}"})
+        approved = v.get("approved") or {}
+        if approved.get("at"):
+            recent.append({"id": f"approved:{vid}:{approved['version']}", "icon": "ok", "text": f"{name}: draft {approved['version']} approved", "at": approved["at"], "url": url})
+        for n in v["notes"][-20:]:
+            if n.get("author_email") and n["author_email"] != me and not n.get("done"):
+                recent.append({"id": f"note:{vid}:{n['id']}", "icon": "note", "text": f"{n.get('author') or 'Someone'} left a note on {name}", "at": n["created"], "url": url})
+        if not maker:
+            continue
+        job = v.get("learn") or {}
+        if job.get("state") == "done" and job.get("done_at"):
+            count = lambda n, what: f"{n} {what}{'' if n == 1 else 's'}"
+            sums = [count(len(job.get("rules", [])), "rule"), count(len(job.get("effects", [])), "effect")] + ([count(len(job["client_rules"]), "client rule")] if job.get("client_rules") else [])
+            recent.append({"id": f"learned:{vid}:{job.get('version')}", "icon": "learn", "text": f"The studio learned from {name}", "sub": ", ".join(sums), "at": job["done_at"], "url": url})
+        elif job.get("state") == "no-style":
+            recent.append({"id": f"nostyle:{vid}", "icon": "warn", "text": f"{name}'s style is gone, so it taught nothing", "at": approved.get("at") or v.get("updated"), "url": url})
+        elif job.get("state") in ("waiting", "working") and job.get("auto_tries", 0) >= LEARN_AUTO_TRIES and learn_free(job):
+            needs.append({"id": f"learn:{vid}", "icon": "warn", "text": f"The studio couldn't learn from {name}", "sub": "Open its Live tab for a line to paste into Claude", "url": url})
+        elif job.get("state") == "working":
+            working.append({"id": f"learning:{vid}", "icon": "learn", "text": f"Learning from {name}", "url": url})
+        if (v.get("render_request") or {}).get("status") == "waiting":
+            needs.append({"id": f"render:{vid}", "icon": "warn", "text": f"Choose the render settings for {name}", "url": url})
+        if (v.get("broll") or {}).get("stage") in BROLL_ASKING:
+            needs.append({"id": f"broll:{vid}", "icon": "warn", "text": f"Choose the b-roll for {name}", "url": url})
+        start = start_state(v)
+        if start and start.get("state") == "waiting" and not start.get("listening"):
+            needs.append({"id": f"start:{vid}", "icon": "warn", "text": f"{name} is waiting for {start['parent']}'s Claude session", "sub": "Open it for what to do", "url": url})
+        p = v.get("progress") or {}
+        if p.get("since") and not p.get("finished") and time.time() - p.get("last", 0) < PROGRESS_IDLE:
+            working.append({"id": f"edit:{vid}", "icon": "edit", "text": f"Editing {name}", "sub": p.get("step") or "", "url": url})
+    if user is not None:
+        for j in recent_jobs(user):
+            if j.get("state") == "running":
+                working.append({"id": f"job:{j['id']}", "icon": "job", "text": j.get("title") or "Working", "sub": j.get("stage") or ""})
+            elif j.get("state") == "failed":
+                needs.append({"id": f"job:{j['id']}", "icon": "warn", "text": j.get("title") or "Something didn't finish", "sub": str(j.get("message") or "")[:120]})
+    try:
+        version_file = Path(__file__).resolve().parent / "VERSION"
+        recent.append({"id": "studio", "icon": "studio", "text": f"The studio updated to {version_file.read_text(encoding='utf-8').strip()}", "at": time.strftime("%Y-%m-%dT%H:%M:%S", time.localtime(version_file.stat().st_mtime))})
+    except OSError:
+        pass
+    recent = sorted((r for r in recent if r.get("at")), key=lambda r: r["at"], reverse=True)[:NOTIFY_RECENT]
+    seen = read_quiet(notify_seen_file()).get(me)
+    if seen is None:  # the first look: what's already happened isn't news
+        notify_mark_seen(user)
+        seen = now()
+    for r in recent:
+        r["new"] = r["at"] > seen
+    return {"needs": needs, "working": working, "recent": recent, "unread": len(needs) + sum(r["new"] for r in recent)}
+
+
 def learn_auto_command():
     return f'"{Path(sys.executable).as_posix()}" "{Path(__file__).resolve().as_posix()}" learn'
 
@@ -4913,6 +4994,12 @@ class Handler(BaseHTTPRequestHandler):
             can_see_video(parts[1], self.user)
         if parts == ["api", "report"]:
             return self.report_route(method)
+        if parts == ["api", "notifications"] and method in ("GET", "HEAD"):
+            return self.send_json(notifications(self.user))
+        if parts == ["api", "notifications", "seen"] and method == "POST":
+            self.read_json_body()
+            notify_mark_seen(self.user)
+            return self.send_json({"ok": True})
         if parts == ["api", "update-seen"] and method == "POST":
             self.read_json_body()  # or what's left of it is taken for the start of the next request on this connection
             with LOCK:
