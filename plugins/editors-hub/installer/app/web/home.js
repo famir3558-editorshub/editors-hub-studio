@@ -57,7 +57,9 @@ function render() {
   const shown = listed.filter((v) =>
     (S.status === "all" || v.status === S.status) && (!S.style || v.style === S.style) && (S.kind !== "client" || !S.project || v.project === S.project) &&
     (!q || (v.name + " " + v.style_name + " " + v.project_name).toLowerCase().includes(q)));
-  $("videoGrid").innerHTML = shown.length ? shown.map(videoCard).join("") : emptyVideos(listed);
+  // left alone when nothing changed: this runs every few seconds and would cut off a hover preview
+  const videoHtml = shown.length ? shown.map(videoCard).join("") : emptyVideos(listed);
+  if (videoHtml !== S.videoHtml) $("videoGrid").innerHTML = S.videoHtml = videoHtml;
 
   $("projectGrid").innerHTML = projects.length ? projects.map(projectCard).join("") :
     `<div class="empty"><h3>No clients yet</h3><p>A project holds one client: their details, brandbook, brand guidelines and videos.</p><button class="btn primary" data-act="new-project">Add your first client</button></div>`;
@@ -89,7 +91,7 @@ function videoCard(v) {
   const initials = v.name.split(/\s+/).slice(0, 2).map((w) => w[0] || "").join("").toUpperCase();
   const thumb = v.thumb ? `<img src="/media/${enc(v.id)}/thumb.jpg?${enc(v.updated)}" alt="" loading="lazy">` : `<div class="ph">${esc(initials)}</div>`;
   const notes = v.open_notes ? ` · <b>${v.open_notes} open note${v.open_notes > 1 ? "s" : ""}</b>` : "";
-  return `<a class="card" href="/review/${enc(v.id)}">
+  return `<a class="card" href="/review/${enc(v.id)}"${previewAttr(v)}>
     <div class="thumb">${thumb}<span class="pill ${statusClass(v.status)}">${esc(v.status)}</span>${v.latest ? `<span class="ver">v${v.latest}</span>` : ""}</div>
     <div class="body"><div class="title">${esc(v.name)}</div>
       <div class="meta">${v.project_name ? esc(v.project_name) + " · " : ""}${esc(v.style_name)}${v.latest ? "" : " · no draft yet"}${notes}</div>

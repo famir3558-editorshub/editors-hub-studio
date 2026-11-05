@@ -36,6 +36,7 @@ function toSignIn() {
 
 const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
 const enc = encodeURIComponent;
+const previewAttr = (v) => v.preview ? ` data-preview="/media/${enc(v.id)}/${v.preview.split("/").map(enc).join("/")}"` : "";
 const statusClass = (s) => "s-" + String(s).replace(/\s+/g, "-");
 
 function fmtTime(t) {
@@ -351,3 +352,45 @@ function progressBar(j) {
     <div class="job-text"><span>${esc(l.text)}</span>${stopping ? "" : `<button class="job-stop" data-stop-job="${esc(j.id)}">Stop</button>`}</div>
     <div class="job-text"><span class="faint">${esc(l.stage)}</span></div></div>`;
 }
+
+/* ---- video cards: hover one to play it silently; a sideways video fits inside its tall card ---- */
+const Hover = { card: null, timer: null, video: null };
+
+function hoverStop() {
+  clearTimeout(Hover.timer);
+  if (Hover.video) {
+    Hover.video.pause();
+    Hover.video.removeAttribute("src");
+    Hover.video.load();  // lets go of the connection to the file
+    Hover.video.remove();
+  }
+  Hover.card = Hover.video = null;
+}
+
+function hoverStart(card) {
+  const box = card.querySelector(".thumb, .th");
+  if (!box) return;
+  const video = document.createElement("video");
+  Object.assign(video, { muted: true, loop: true, playsInline: true, preload: "auto", className: "hover-video" });
+  video.addEventListener("loadedmetadata", () => box.classList.toggle("wide", video.videoWidth > video.videoHeight));
+  video.addEventListener("playing", () => video.classList.add("on"));
+  video.addEventListener("error", () => { if (Hover.video === video) hoverStop(); });  // the still stays
+  video.src = card.dataset.preview;
+  (box.querySelector("img, .ph") || box.firstChild)?.after(video);
+  Hover.video = video;
+  video.play().catch(() => {});
+}
+
+document.addEventListener("pointerover", (e) => {
+  if (e.pointerType === "touch") return;
+  const card = e.target.closest?.("[data-preview]") || null;
+  if (card === Hover.card) return;
+  hoverStop();
+  if (!card) return;
+  Hover.card = card;
+  Hover.timer = setTimeout(() => hoverStart(card), 180);  // not for a mouse just passing over
+});
+document.addEventListener("load", (e) => {
+  const img = e.target;
+  if (img.tagName === "IMG" && img.parentElement?.matches(".thumb, .th")) img.parentElement.classList.toggle("wide", img.naturalWidth > img.naturalHeight);
+}, true);

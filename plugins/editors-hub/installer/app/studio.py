@@ -948,6 +948,15 @@ def latest_version(v):
     return v["drafts"][-1]["version"] if v["drafts"] else None
 
 
+def video_preview(v):
+    """What a card plays when you hover it: the latest draft, or the raw clip until there is one."""
+    if v["drafts"]:
+        return v["drafts"][-1]["file"]
+    raw = Path(v["folder"]) / "raw"
+    clips = sorted(p.name for p in raw.iterdir() if p.is_file() and kind_of(p.name) == "video") if raw.is_dir() else []
+    return f"raw/{clips[0]}" if clips else ""
+
+
 def video_summary(v, styles=None, projects=None):
     latest = latest_version(v)
     sdir = (style_dirs() if styles is None else styles).get(v["style"])
@@ -960,7 +969,7 @@ def video_summary(v, styles=None, projects=None):
             "status": v["status"], "created": v["created"], "updated": v.get("updated", v["created"]),
             "draft_count": len(v["drafts"]), "latest": latest,
             "open_notes": sum(1 for n in v["notes"] if not n["done"] and n["version"] == latest),
-            "thumb": (Path(v["folder"]) / "thumb.jpg").exists(), "style_shared": style_meta(sdir)["shared"] if sdir else False,
+            "thumb": (Path(v["folder"]) / "thumb.jpg").exists(), "preview": video_preview(v), "style_shared": style_meta(sdir)["shared"] if sdir else False,
             "render_waiting": (v.get("render_request") or {}).get("status") == "waiting",
             "broll_waiting": (v.get("broll") or {}).get("stage") in BROLL_ASKING}
 

@@ -46,7 +46,7 @@
 .strip { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(160px, 190px); gap: 12px; overflow-x: auto; padding-bottom: 8px; }
 .vcard { display: block; border-radius: 12px; overflow: hidden; background: var(--panel); border: 1px solid var(--line); }
 .vcard:hover { border-color: rgba(229, 25, 43, 0.45); }
-.vcard .th { aspect-ratio: 9 / 12; background: #0b0809; position: relative; }
+.vcard .th { aspect-ratio: 9 / 16; background: #0b0809; position: relative; }
 .vcard .th img { width: 100%; height: 100%; object-fit: cover; display: block; }
 .vcard .th .pill { position: absolute; left: 8px; top: 8px; background: rgba(8, 5, 6, 0.8); }
 .vcard .t { padding: 8px 10px; font-size: 13px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

@@ -220,3 +220,8 @@ select option { background: var(--panel-solid); color: var(--text); }
   select option:checked { color: var(--red-2); font-weight: 700; }
   select option:disabled { color: var(--muted); cursor: default; background: transparent; }
 }
+
+/* video cards: hover preview, and sideways videos fitted inside a tall card */
+.hover-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; background: #000; opacity: 0; transition: opacity 0.15s; }
+.hover-video.on { opacity: 1; }
+.wide > img, .wide > .hover-video { object-fit: contain !important; }

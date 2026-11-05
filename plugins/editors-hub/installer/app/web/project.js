@@ -52,7 +52,7 @@ function setTab(tab) {
 }
 
 function videoCard(v) {
-  return `<a class="vcard" href="/review/${enc(v.id)}"><div class="th">${v.thumb ? `<img src="/media/${enc(v.id)}/thumb.jpg?${enc(v.updated)}" alt="" loading="lazy">` : ""}<span class="pill ${statusClass(v.status)}">${esc(v.status)}</span></div><div class="t" title="${esc(v.name)}">${esc(v.name)}</div><div class="faint small-print">${esc(v.style_name)}</div></a>`;
+  return `<a class="vcard" href="/review/${enc(v.id)}"${previewAttr(v)}><div class="th">${v.thumb ? `<img src="/media/${enc(v.id)}/thumb.jpg?${enc(v.updated)}" alt="" loading="lazy">` : ""}<span class="pill ${statusClass(v.status)}">${esc(v.status)}</span></div><div class="t" title="${esc(v.name)}">${esc(v.name)}</div><div class="faint small-print">${esc(v.style_name)}</div></a>`;
 }
 
 function ruleList(rules) {
