@@ -903,7 +903,7 @@ async function fetchOnline(force) {
 }
 
 function onlineLine(x) {
-  return `${gb(x.size)} · ${x.videos ?? 0} video${x.videos === 1 ? "" : "s"} · by ${esc(x.uploaded_by || x.maker_name || "?")} · ${x.uploaded ? ago(x.uploaded) : ""}${x.complete ? "" : " · upload not finished"}`;
+  return `${gb(x.size)}${x.videos ? ` · ${x.videos} video${x.videos === 1 ? "" : "s"}` : ""} · by ${esc(x.uploaded_by || x.maker_name || "?")} · ${x.uploaded ? ago(x.uploaded) : ""}${x.complete ? "" : " · upload not finished"}`;
 }
 
 async function loadOnlineList(pick) {
@@ -1066,11 +1066,13 @@ async function loadOnlineGrid() {
     $("onlineNote").textContent = o.drive ? "Download one and it's added to your styles. To share your own: on any of your styles, ⋯ → Share online."
       : `Styles uploaded online (${o.repo}) can be downloaded into Editors.Hub on any of your computers.`;
     $("onlineGrid").innerHTML = o.styles.map((x) => `<div class="online-card">
+        ${x.has_preview ? `<img class="oc-preview" src="/api/online/${enc(x.tag)}/preview?v=${enc(x.uploaded || "")}" alt="" loading="lazy" onerror="this.replaceWith(Object.assign(document.createElement('div'),{className:'oc-preview none',textContent:${esc(JSON.stringify(x.name.slice(0, 2).toUpperCase()))}}))">`
+          : `<div class="oc-preview none">${esc(x.name.split(/\s+/).slice(0, 2).map((w) => w[0] || "").join("").toUpperCase())}</div>`}
         <div class="row"><b>${esc(x.name)}</b><div class="spacer"></div>${(x.palette || []).length ? `<span class="swatches">${x.palette.slice(0, 5).map((c) => `<i style="background:${esc(c)}"></i>`).join("")}</span>` : ""}</div>
-        <small>${onlineLine(x)}</small>
-        ${x.client ? `<small>Client: ${esc(x.client)}</small>` : ""}
-        ${x.notes ? `<small>${esc(x.notes)}</small>` : ""}
-        <div class="row" style="flex-wrap:wrap"><div class="spacer"></div>
+        <small class="oc-meta">${onlineLine(x)}</small>
+        ${x.client && x.client !== x.name ? `<small class="oc-client">Client: ${esc(x.client)}</small>` : ""}
+        <p class="oc-notes${x.notes ? "" : " none"}" title="${esc(x.notes || "")}">${esc(x.notes || "No description yet.")}</p>
+        <div class="row oc-actions"><div class="spacer"></div>
           ${(x.mine || x.is_owner) && o.drive ? `<button class="btn small" data-online-remove="${esc(x.tag)}" data-name="${esc(x.name)}">Remove</button>` : ""}
           ${x.complete ? `<button class="btn small primary" data-online-get="${esc(x.tag)}">Download</button>` : ""}</div>
       </div>`).join("") || `<p class="faint" style="margin:0">Nothing shared yet. On any of your styles: ⋯ → Share online.</p>`;

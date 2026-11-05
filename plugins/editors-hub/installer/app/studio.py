@@ -61,6 +61,7 @@ Everything is plain Python (3.9+, no packages to install). ffmpeg is optional (u
 On Mac run it as `python3 studio.py ...`, on Windows as `py studio.py ...`.
 """
 import argparse
+import base64
 import contextlib
 import hashlib
 import json
@@ -116,6 +117,18 @@ HUB_DIR_TOKEN = "@@EDITORS_HUB_DIR@@"
 MEDIA_TYPES = {".mp4": "video/mp4", ".mov": "video/mp4", ".m4v": "video/mp4", ".webm": "video/webm",
                ".mkv": "video/x-matroska", ".jpg": "image/jpeg", ".png": "image/png",
                ".wav": "audio/wav", ".mp3": "audio/mpeg", ".m4a": "audio/mp4"}
+
+
+if os.name == "nt":
+    class _QuietPopen(subprocess.Popen):
+        """Home runs with no window of its own, so Windows gave every ffmpeg, ffprobe or git it started a terminal window,
+        one after another while a style was shared. Everything started from here runs without one, unless it asks for something else."""
+        def __init__(self, *args, **kwargs):
+            if not kwargs.get("creationflags"):
+                kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW
+            super().__init__(*args, **kwargs)
+
+    subprocess.Popen = _QuietPopen
 
 
 class StudioError(Exception):
@@ -4107,6 +4120,91 @@ def online_repo():
     return f"{login}/{ONLINE_REPO_NAME}"
 
 
+PREVIEW_MAX = 150_000
+_preview_backfill = set()
+
+
+def style_preview(sdir):
+    """The picture on a style's Shared card: its own preview strip if it has one, otherwise frames from its references."""
+    ffmpeg = shutil.which("ffmpeg")
+    if not ffmpeg:
+        return None
+    sdir = Path(sdir)
+    out = sdir / ".shared-preview.jpg"
+    strip = next((p for p in (sdir / "library" / "preview-strip.jpg", sdir / "preview-strip.jpg") if p.is_file()), None)
+    clips = [] if strip else [sdir / i["file"] for sec in ("references", "effects", "transitions", "graphics") for i in section_items(sdir, sec) if i["kind"] == "video"][:4]
+    if strip:
+        cmd = [ffmpeg, "-y", "-v", "error", "-i", str(strip), "-vf", "scale='min(1440,iw)':-2", "-frames:v", "1", "-q:v", "5", str(out)]
+    elif clips:
+        inputs, cells = [], []
+        for n, clip in enumerate(clips):
+            inputs += ["-ss", "1", "-i", str(clip)]
+            cells.append(f"[{n}:v]scale=360:320:force_original_aspect_ratio=increase,crop=360:320,setsar=1[c{n}]")
+        joined = "".join(f"[c{n}]" for n in range(len(clips)))
+        graph = ";".join(cells) + (f";{joined}hstack=inputs={len(clips)}[out]" if len(clips) > 1 else ";[c0]null[out]")
+        cmd = [ffmpeg, "-y", "-v", "error", *inputs, "-filter_complex", graph, "-map", "[out]", "-frames:v", "1", "-q:v", "5", str(out)]
+    else:
+        return None
+    for quality in ("5", "9", "14"):
+        cmd[cmd.index("-q:v") + 1] = quality
+        try:
+            subprocess.run(cmd, capture_output=True, timeout=120)
+        except (OSError, subprocess.TimeoutExpired):
+            return None
+        if out.is_file() and out.stat().st_size <= PREVIEW_MAX:
+            break
+    try:
+        data = out.read_bytes()
+    except OSError:
+        return None
+    finally:
+        out.unlink(missing_ok=True)
+    if not data or len(data) > PREVIEW_MAX:
+        return None
+    return "data:image/jpeg;base64," + base64.b64encode(data).decode()
+
+
+def online_preview_backfill(items):
+    """Styles shared from this studio before cards had pictures get one, once, in the background."""
+    here = {(read_quiet(d / "style.json").get("online") or {}).get("tag"): d for d in style_dirs().values()}
+    for item in items:
+        key = item.get("tag")
+        if item.get("has_preview") or not item.get("mine") or key not in here or key in _preview_backfill:
+            continue
+        _preview_backfill.add(key)
+
+        def work(key=key, sdir=here[key]):
+            picture = style_preview(sdir)
+            if picture:
+                try:
+                    approval.shared_call(DATA, "/styles/preview-set", key=key, preview=picture)
+                except approval.ApprovalError:
+                    _preview_backfill.discard(key)
+
+        threading.Thread(target=work, daemon=True).start()
+
+
+def online_preview(key, uploaded=""):
+    """A Shared card's picture, asked for once and kept on this computer."""
+    folder = DATA / "online-previews"
+    stamp = re.sub(r"[^0-9A-Za-z]", "", str(uploaded))[:20]
+    cached = folder / f"{re.sub(r'[^0-9A-Za-z]', '', key)[:60]}-{stamp}.jpg"
+    if cached.is_file():
+        return cached.read_bytes()
+    try:
+        image = approval.shared_call(DATA, "/styles/preview", key=key)["image"]
+    except (approval.ApprovalError, KeyError):
+        raise NotFound("no picture")
+    if not image.startswith("data:image/jpeg;base64,"):
+        raise NotFound("no picture")
+    data = base64.b64decode(image.split(",", 1)[1])
+    folder.mkdir(parents=True, exist_ok=True)
+    for old in folder.glob(f"{cached.name.rsplit('-', 1)[0]}-*.jpg"):
+        old.unlink(missing_ok=True)
+    cached.write_bytes(data)
+    return data
+
+
 def drive_styles():
     """What this person can see in the Shared section, on the owner's Google Drive by way of the approval service."""
     try:
@@ -4289,6 +4387,8 @@ def drive_share_style(style_id, user=None):
             job["done_bytes"], job["total_bytes"] = 0, whole.stat().st_size
             check_stop(job)
             job["stage"] = "Connecting to the online Shared folder"
+            job["stage"] = "Making its picture"
+            picture = style_preview(sdir)
             described = {"id": style_id, "name": meta["name"], "notes": (meta.get("notes") or "")[:400], "format": meta.get("format") or "",
                          "palette": meta.get("palette", [])[:8], **named}
             try:
@@ -4298,7 +4398,7 @@ def drive_share_style(style_id, user=None):
                 if not file_id:
                     raise StudioError("Google Drive didn't say where it saved the style. Try sharing it again.")
                 job["stage"] = "Finishing"
-                entry = approval.shared_call(DATA, "/styles/finish", file_id=file_id, **described)["style"]
+                entry = approval.shared_call(DATA, "/styles/finish", file_id=file_id, **described, **({"preview": picture} if picture else {}))["style"]
             except approval.ApprovalError as e:
                 raise StudioError(str(e))
             with LOCK:
@@ -5089,10 +5189,15 @@ class Handler(BaseHTTPRequestHandler):
                     return self.send_json({"items": project_files(project_dir(parts[2]), parts[4])})
                 if parts[3:] == ["download"]:
                     return self.send_project_zip(parts[2])
+            if parts[:2] == ["api", "online"] and len(parts) == 4 and parts[3] == "preview":
+                self.need("owner", "editor")
+                return self.send_body(online_preview(parts[2], query.get("v", [""])[0] if isinstance(query, dict) else ""), "image/jpeg", extra=[("Cache-Control", "max-age=86400")])
             if parts == ["api", "online"]:
                 self.need("owner", "editor")
                 try:
                     repo, items = online_for(self.user)
+                    if approval.config():
+                        online_preview_backfill(items)
                     return self.send_json({"ready": True, "repo": repo, "styles": items, "drive": bool(approval.config())})
                 except StudioError as e:
                     return self.send_json({"ready": False, "message": str(e), "styles": []})
