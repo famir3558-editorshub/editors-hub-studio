@@ -133,6 +133,12 @@ Videos show as tall 9:16 cards on Home, client pages and style pages; a sideways
 
 Each client and each style has one parent Claude session, and each video gets its own subsession of it. When you make a client or style, the page gives you one line to paste into a new Claude session (the page can't create sessions itself; it's also under **Copy a prompt for Claude**). That session then only listens. **Make video** puts the video in a queue on this computer, and the client's parent session starts a subsession that edits it. A client's video goes only to that client's parent, and a style's training video only to that style's. If the parent session isn't open, the video waits, and the Live page says which session it needs. Only the parent has to stay open for new videos to start. Depending on the Claude app, it may show a card for you to click to start the subsession.
 
+## Approving a video
+
+**Approve the edit** locks the video: no new notes, and no new draft can start. If Claude is part way through a draft when you approve, it finishes that one, and your approval stays on the draft you approved. **Undo approve**, under the notes, reopens it so you can add notes and edit the next draft.
+
+Approving also teaches the studio. A Claude session looks at the approved video and adds what's new to the style's guide and to the Effects panel: written rules, and short clips cut from the video. The clips can show client footage, so they stay on this studio and are left out when the style is shared online. The rules go with the style, and can't name the client or the video. A style already shared online gets the new rules next time you share it. This needs a Claude session: the video's own if it's listening, or its client's parent session after a minute. If neither is open, the Live tab gives you a line to paste into a new one.
+
 ## The Live tab
 
 Drag the left edge of the panel beside the video to make it wider or narrower. Your choice is remembered on that browser; double-click the edge to reset it.

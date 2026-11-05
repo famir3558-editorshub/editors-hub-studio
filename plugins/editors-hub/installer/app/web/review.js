@@ -5,6 +5,8 @@ const SPEEDS = [1, 1.5, 2, 0.5];
 const R = { v: null, raw: "", version: null, frozen: null, hl: null, mode: "render", view: "watch", side: "notes",
             pending: [], role: "editor", cmpA: null, cmpB: null };
 const maker = () => R.role !== "reviewer";
+const isLocked = () => ["approved", "delivered"].includes(R.v?.status);
+const editingOn = (v) => v.progress && !v.progress.finished && v.progress.draft === (v.latest || 0) + 1;  // edit_in_progress in studio.py
 const firstEdit = () => maker() && !R.v.drafts.length;  // nothing to watch or note yet: the page is only the Live tab
 
 // the video the controls drive: the single player, or the left one when comparing
@@ -69,6 +71,8 @@ function render() {
   $("approveBtn").textContent = approvedThis ? `✓ v${d.version} approved` : "Approve the edit";
   $("approveBtn").disabled = !d || approvedThis;
   $("changesBtn").disabled = !d || v.status === "changes";
+  document.body.classList.toggle("locked", isLocked());
+  if (isLocked()) $("changesBtn").disabled = true;
   $("approvedBar").hidden = !v.approved;
   if (v.approved) $("approvedBar").textContent = `✓ v${v.approved.version} approved ${ago(v.approved.at)}`;
   if (d && location.hash !== `#v${d.version}`) history.replaceState(null, "", `#v${d.version}`);
@@ -287,6 +291,16 @@ $("brollDlg").addEventListener("cancel", brollPutOff);  // Esc is the same as La
 
 // ---------------------------------------------------------------- the Live tab and the render popup
 
+// what the style is doing with an approved video
+function learnWords(v) {
+  const job = v.learn;
+  if (!job || job.state === "cancelled") return "";
+  const count = (n, one) => `${n} ${one}${n === 1 ? "" : "s"}`;
+  if (job.state === "done") return job.rules.length || job.effects.length
+    ? `The style learned from this video: ${count(job.rules.length, "new rule")} and ${count(job.effects.length, "new effect")}.` : "The style already covered what this video does.";
+  return job.state === "working" ? "Claude is updating the style and the Effects panel from this video." : "The style and the Effects panel update from this video as soon as a Claude session picks it up.";
+}
+
 const LIVE_IDLE = 30 * 60;  // the same as PROGRESS_IDLE in studio.py
 const setHtml = (el, html) => { if (el.dataset.html !== html) { el.innerHTML = html; el.dataset.html = html; } };  // or the spinner and pictures restart every few seconds
 
@@ -316,7 +330,7 @@ function liveStarted(iso) {
 // the box on top: which video, which draft, how long it has taken
 function renderLiveTop(v) {
   const p = v.progress, state = liveState(p);
-  const say = { working: "Editing", waiting: "Waiting for you", quiet: "No update for a while", done: `Draft ${p?.draft} is ready`, none: v.drafts.length ? "Not being edited" : "Not started" }[state];
+  const say = v.approved && !editingOn(v) ? `Draft ${v.approved.version} approved` : { working: "Editing", waiting: "Waiting for you", quiet: "No update for a while", done: `Draft ${p?.draft} is ready`, none: v.drafts.length ? "Not being edited" : "Not started" }[state];
   const facts = [["Draft", p ? `v${p.draft}` : v.latest ? `v${v.latest}` : "None yet"], ["Client", v.project_name], ["Style", v.style_name],
     ["Started", p && liveStarted(p.started)], ["Raw clip", p?.raw_seconds && liveClock(p.raw_seconds)]].filter((f) => f[1]);
   setHtml($("liveTop"), `<div class="lv-box lv-top">
@@ -508,7 +522,9 @@ function renderLive() {
   const startCard = start?.state === "starting" ? `<div class="render-card"><b>The parent session is starting this edit.</b> Its first update shows here in a moment.</div>`
     : start?.state === "waiting" && start.listening ? `<div class="render-card"><b>Starting the edit…</b> ${esc(start.parent)}'s session is picking this up.</div>`
     : start?.state === "waiting" ? `<div class="render-card"><b>Waiting for ${esc(start.parent)}'s Claude session.</b> The edit starts by itself as soon as that session is listening. If it isn't open, open it. If it doesn't exist yet, paste this into a new session:<div class="start-prompt">${esc(start.prompt)}</div><button class="btn small" id="copyListen" type="button">Copy</button></div>` : "";
-  $("renderCard").innerHTML = startCard + brollCard + (req?.status === "waiting"
+  const copyLearn = `Use the editors-hub skill. Video ${v.id} was approved. Run studio.py learn ${v.id} and do what it says.`;
+  const learnCard = learnWords(v) ? `<div class="render-card"><b>${esc(learnWords(v))}</b>${v.learn.state === "waiting" && !v.claude?.listening ? `<div class="start-prompt">${esc(copyLearn)}</div>` : ""}</div>` : "";
+  $("renderCard").innerHTML = learnCard + startCard + brollCard + (req?.status === "waiting"
     ? `<div class="render-card"><b>Claude is waiting for your render settings.</b><br><button class="btn small primary" id="renderOpen" type="button">Choose the render settings</button></div>`
     : req?.status === "chosen" ? `<div class="render-card"><b>Render settings chosen.</b> ${v.claude?.listening ? "Claude is starting the render." : "The render starts when Claude picks them up."}</div>` : "");
   if ($("renderOpen")) $("renderOpen").onclick = () => openRenderDlg();
@@ -681,7 +697,10 @@ function renderSide() {
   $("draftsPane").hidden = R.side !== "drafts";
   $("livePane").hidden = R.side !== "live";
   $("brollPane").hidden = R.side !== "broll";
-  $("composer").style.display = R.side === "live" || R.side === "broll" ? "none" : "";
+  const lockedHere = isLocked() && R.side !== "live" && R.side !== "broll";
+  $("composer").style.display = R.side === "live" || R.side === "broll" || isLocked() ? "none" : "";
+  $("lockedBox").hidden = !lockedHere;
+  if (lockedHere) setHtml($("lockedBox"), `<b>${v.approved ? `✓ Draft ${v.approved.version} approved` : "✓ Delivered"}</b><p>${editingOn(v) ? `Notes are locked. Claude is finishing draft ${v.progress.draft}, then no new draft can start.` : "Notes are locked and no new draft can start."} To add notes or edit the next draft, undo the approval.</p>${learnWords(v) ? `<p class="faint">${esc(learnWords(v))}</p>` : ""}<button class="btn small" id="undoApprove" type="button">Undo approve</button>`);
   renderLive();
   renderBrollSide();
   const doneCount = v.notes.filter((n) => n.done && n.version === R.version).length;
@@ -1048,7 +1067,10 @@ async function post(body, msg) {
   }
 }
 $("statusSel").onchange = (e) => post({ status: e.target.value }, `Status: ${e.target.value}`);
-$("approveBtn").onclick = () => post({ approve: R.version }, `v${R.version} approved`);
+$("approveBtn").onclick = () => post({ approve: R.version }, `v${R.version} approved. Notes are locked.`);
+$("lockedBox").addEventListener("click", (e) => {
+  if (e.target.id === "undoApprove") post({ unapprove: true }, "Approval undone: you can add notes again");
+});
 $("changesBtn").onclick = () => post({ status: "changes" }, "Changes asked for");
 $("folderBtn").onclick = () => api("POST", "/api/reveal", { video: vidId }).catch((e) => toast(e.message, true));
 

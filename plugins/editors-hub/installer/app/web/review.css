@@ -299,3 +299,11 @@ a.lv-frame { position: relative; }
 .first-edit .side-grip, .player-full .side-grip { display: none; }
 body.side-dragging { cursor: col-resize; user-select: none; }
 body.side-dragging iframe, body.side-dragging video { pointer-events: none; }
+
+/* an approved video: notes locked, and the way to reopen it */
+.locked-box { display: grid; gap: 6px; justify-items: start; margin: 8px 12px 12px; padding: 12px 13px; border: 1px solid rgba(52, 211, 153, 0.35); border-radius: 12px; background: rgba(52, 211, 153, 0.08); font-size: 13.5px; }
+.locked-box[hidden] { display: none; }
+.locked-box b { color: var(--ok); }
+.locked-box p { margin: 0; line-height: 1.45; }
+.locked-box .btn { margin-top: 4px; }
+body.locked #noteList .tools, body.locked .upload-draft { display: none; }

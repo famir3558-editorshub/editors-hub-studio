@@ -47,6 +47,7 @@ This is the owner's rule, so follow it strictly. Each client and each style has 
   3. Run `wait-new` again, the same way, in the background.
 - **Subsession:** it edits this one video, starting at `studio.py context <video>` because the video and its files are already there (skip steps 1 to 3 of A new video). It never runs `wait-new`. After a draft it runs `wait <video>` as usual, for the notes.
 - **Any other session, such as one for changing the studio itself:** never run `wait-new`, and never edit a video. "Open the studio" there means open the page only. If the owner asks there to edit a video, point them to the client's parent session.
+- If `wait-new` says LEARN FROM AN APPROVED VIDEO, the video's own session isn't listening: start a subsession to do it, the same way, and listen again.
 - If the owner asks in chat for a new video, make it the same way: from the client's parent session, in a new subsession.
 
 ## While you edit: the Live tab
@@ -169,7 +170,18 @@ lives in the style and shows under Style videos, with no client brand. Save what
    the style's STYLE.md. If it isn't clear which, ask. The note shows "Saved to <name>". Read "Lessons from reviews" in
    both files before every edit.
 5. Post your progress to Live as you work, ask for the render settings, render, `finish-render`, and `wait` again. `studio.py notes <video>` lists open notes any time.
-6. The owner approves on the page. When the final is exported to `exports/`, `studio.py set-status <video> delivered`.
+6. The owner approves on the page. If you're part way through a draft when that happens, finish it. After that, no new draft can start and no notes can be added: the commands that edit are refused until the owner presses Undo approve on the page. Never try to get round this. When the final is exported to `exports/`, `studio.py set-status <video> delivered`.
+7. Then do "After approval" below. `wait` tells you with LEARN FROM THE APPROVED VIDEO, or run `studio.py learn <video>`.
+
+## After approval: teach the style and the Effects panel
+
+An approved video is what the owner wants, so every approved video makes its style better. `studio.py learn <video>` shows where everything is. Look at the approved video properly and compare it with the style's guide.
+
+- `--rule "..."` goes into the guide's "What approved videos taught": a new effect, animation, transition, pacing or sound choice, said so a future edit can do it. Only what's new and worth repeating, and nothing that only suits this one client. The studio refuses a rule naming the client or the video, because rules go online if the style is shared.
+- `--effect "Short name:<from>-<to>"` and `--transition "Short name:<from>-<to>"` cut that moment out of the approved video for the Effects panel, up to 20 seconds. Give a name that says what the effect is. They stay private to this studio, as they can show client footage.
+- `--effect-file <file>` adds a file you made, like a rendered animation. It can go online with the style, so only use it for something with no client footage, name or logo.
+- Brand rules stay in the client's BRAND.md, not the style.
+- Finish with `studio.py learn <video> --done`. If there's truly nothing new, just `--done`: don't invent rules. Undoing the approval keeps what was saved, and approving a newer draft learns again.
 
 ## Style rules
 

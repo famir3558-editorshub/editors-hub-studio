@@ -1387,6 +1387,7 @@ def add_draft(vid, src, note="", move=False, original=None, render=None):
         raise StudioError(f"no file at {src}")
     with vlock(vid):
         v = load_video(vid)
+        check_edit(v)
         version = (latest_version(v) or 0) + 1
         rel = f"drafts/v{version}{src.suffix.lower() or '.mp4'}"
         dest = Path(v["folder"]) / rel
@@ -1403,7 +1404,8 @@ def add_draft(vid, src, note="", move=False, original=None, render=None):
                 b["answered_in"] = version
                 draft["worked_for"] = int(time.time() - b["picked_up_ts"])
         v["drafts"].append(draft)
-        v["status"], v["approved"] = "in review", None
+        if v.get("status") not in LOCKED_STATUSES:  # a draft finished after approval leaves the approval as it was
+            v["status"], v["approved"] = "in review", None
         progress_finish(v)
         save_video(v)
     make_thumb(dest, Path(v["folder"]) / "thumb.jpg")
@@ -1435,12 +1437,35 @@ def clean_attachments(folder, items):
     return out
 
 
+LOCKED_STATUSES = ("approved", "delivered")
+
+
+def check_open(v):
+    """No new notes on an approved video until someone undoes the approval on the page."""
+    if v.get("status") in LOCKED_STATUSES:
+        raise StudioError(f"{v['name']} is {v['status']}, so its notes are locked. Press Undo approve to add more.")
+
+
+def edit_in_progress(v):
+    """A draft Claude had already started when the video was approved. That one gets finished."""
+    p = v.get("progress")
+    return bool(p and not p.get("finished") and p.get("draft") == (latest_version(v) or 0) + 1)
+
+
+def check_edit(v):
+    """An approved video can't start a new draft until the approval is undone; a draft already being made carries on."""
+    if v.get("status") in LOCKED_STATUSES and not edit_in_progress(v):
+        raise StudioError(f"{v['name']} is {v['status']}, so a new draft can't start. Don't edit it. "
+                          f"The owner can press Undo approve on the page to reopen it. If the style still has to learn from it, run: studio.py learn {v['id']}")
+
+
 def add_note(vid, version, t, text, author="", author_email="", attachments=None):
     text = str(text).strip()
     if not text and not attachments:
         raise StudioError("the note is empty")
     with vlock(vid):
         v = load_video(vid)
+        check_open(v)
         if not any(d["version"] == int(version) for d in v["drafts"]):
             raise StudioError(f"there is no v{version}")
         nid = v.get("next_note", 1)
@@ -1456,6 +1481,7 @@ def add_note(vid, version, t, text, author="", author_email="", attachments=None
 def update_note(vid, nid, changes):
     with vlock(vid):
         v = load_video(vid)
+        check_open(v)
         note = find_note(v, nid)
         if "done" in changes:
             note["done"] = bool(changes["done"])
@@ -1468,6 +1494,7 @@ def update_note(vid, nid, changes):
 def delete_note(vid, nid):
     with vlock(vid):
         v = load_video(vid)
+        check_open(v)
         v["notes"].remove(find_note(v, nid))
         save_video(v)
 
@@ -1488,6 +1515,7 @@ def submit_feedback(vid, by=""):
     """Send every note not yet sent to Claude as one batch; a waiting `studio.py wait` picks it up."""
     with vlock(vid):
         v = load_video(vid)
+        check_open(v)
         fresh = [n for n in v["notes"] if not n.get("batch") and not n.get("done")]
         if not fresh:
             raise StudioError("There are no new notes to send.")
@@ -1647,6 +1675,23 @@ def wait_for_new_video(project="", style="", timeout=0):
                     continue
                 if listener_fit(me, v) and take_start(v, me):
                     return v, item
+            for f in (DATA / LEARN_QUEUE).glob("*.json"):  # the video's own session comes first; if it's gone, a subsession of this parent does it
+                try:
+                    v = load_video(f.stem)
+                except StudioError:
+                    drop_quiet(f)
+                    continue
+                job = v.get("learn") or {}
+                if job.get("state") not in ("waiting", "working"):
+                    drop_quiet(f)
+                    continue
+                if not listener_fit(me, v) or claude_status(v["folder"]).get("listening") or time.time() - job.get("asked_ts", 0) < LEARN_GRACE:
+                    continue
+                with vlock(v["id"]):
+                    v = load_video(v["id"])
+                    if learn_claim(v):
+                        save_video(v)
+                        return v, {"learn": True}
             if timeout and time.time() - start > timeout:
                 return None
             time.sleep(2)
@@ -1669,6 +1714,9 @@ def wait_for_feedback(vid, timeout=0):
                     batch["picked_up"], batch["picked_up_ts"] = now(), time.time()
                     save_video(v)
                     return batch, v, [n for n in v["notes"] if n["id"] in batch["notes"]]
+                if learn_claim(v):
+                    save_video(v)
+                    return {"learn": True}, v, []
             if timeout and time.time() - start > timeout:
                 return None
             time.sleep(2)
@@ -1691,6 +1739,7 @@ def reply_note(vid, nid, text, fixed=True, lesson="", client_lesson=""):
     """lesson is an editing rule (it goes to the style); client_lesson is about this client (it goes to their project)."""
     with vlock(vid):
         v = load_video(vid)
+        check_edit(v)
         note = find_note(v, nid)
         saved = []
         if client_lesson.strip():
@@ -1881,6 +1930,7 @@ def post_update(vid, text, snapshot=None, at=None, draft=None, total=None, step=
         round_no = draft or (latest_version(v) or 0) + 1
         p = None
         if active or moves:
+            check_edit(v)
             p = progress_of(v, round_no)
             if steps:
                 p["steps"] = list(dict.fromkeys(steps))
@@ -1966,6 +2016,7 @@ def describe_choice(choice):
 
 def ask_render(vid, note="", size="", fps=None, duration=None):
     """Opens the render popup on the review page. Asking again before it's answered or used keeps the same request."""
+    check_edit(load_video(vid))
     source = {}
     if size:
         m = re.fullmatch(r"(\d+)[xX](\d+)", size.strip())
@@ -1999,6 +2050,7 @@ def wait_for_render_choice(vid, timeout=0):
     try:
         while True:
             write_json(hb, {"pid": os.getpid(), "since": since, "beat": time.time()})
+            check_edit(load_video(vid))
             req = load_video(vid).get("render_request") or {}
             if req.get("status") == "chosen":
                 return req
@@ -2033,6 +2085,7 @@ def set_render_choice(vid, choice, by=""):
 
 def finish_render(vid, master, note=""):
     """Encodes the edit with the settings chosen in the popup, and adds it as the next draft."""
+    check_edit(load_video(vid))
     master = Path(master)
     if not master.is_file():
         raise StudioError(f"no file at {master}")
@@ -2134,6 +2187,7 @@ def broll_wait(vid, timeout=0):
     try:
         while True:
             write_json(hb, {"pid": os.getpid(), "since": since, "beat": time.time()})
+            check_edit(load_video(vid))
             b = broll_of(load_video(vid))
             if b["stage"] not in BROLL_ASKING and b["decision"]:
                 return b["decision"]
@@ -2450,23 +2504,197 @@ def stop_live(vid):
 def set_status(vid, status):
     if status not in STATUSES:
         raise StudioError(f"status must be one of: {', '.join(STATUSES)}")
+    current = load_video(vid)
+    if status == "approved" and current["drafts"] and current.get("status") != "approved":
+        return approve(vid, latest_version(current))
     with vlock(vid):
         v = load_video(vid)
         v["status"] = status
-        if status not in ("approved", "delivered"):
+        if status not in LOCKED_STATUSES:
             v["approved"] = None
+            learn_cancel(v)
         save_video(v)
     return v
 
 
 def approve(vid, version):
+    """Notes lock, no new draft can start, and the style has to learn from it. A draft being made carries on."""
+    clear_start(vid)
     with vlock(vid):
         v = load_video(vid)
         if not any(d["version"] == int(version) for d in v["drafts"]):
             raise StudioError(f"there is no v{version}")
         v["status"], v["approved"] = "approved", {"version": int(version), "at": now()}
+        if not edit_in_progress(v):  # questions left over with no draft being made: nobody would use the answers
+            if (v.get("render_request") or {}).get("status") in ("waiting", "chosen"):
+                v["render_request"]["status"] = "cancelled"
+            if (v.get("broll") or {}).get("stage") in BROLL_ASKING:
+                v["broll"]["stage"] = "idle"
+        if int(version) not in v.get("learned_versions", []):
+            v["learn"] = {"version": int(version), "state": "waiting", "asked": now(), "asked_ts": time.time(), "rules": [], "effects": []}
+            learn_file(vid).parent.mkdir(parents=True, exist_ok=True)
+            write_json(learn_file(vid), {"video": vid, "at": time.time()})
         save_video(v)
     return v
+
+
+def unapprove(vid):
+    """Undo approve: notes open again and the next draft can start. What the style already learned stays."""
+    with vlock(vid):
+        v = load_video(vid)
+        if v.get("status") not in LOCKED_STATUSES:
+            raise StudioError("This video isn't approved.")
+        v["status"], v["approved"] = "in review", None
+        learn_cancel(v)
+        save_video(v)
+    post_update(vid, "You undid the approval, so the notes are open again.")
+    return load_video(vid)
+
+
+# ---------------------------------------------------------------- after approval: the style and the Effects panel learn from the video
+
+LEARN_QUEUE = "learn-queue"
+LEARN_CLAIM_TIMEOUT = 15 * 60  # a session that took this and went quiet: another one can have it
+LEARN_GRACE = 60  # the video's own session knows the edit best, so a parent session leaves it this long
+LEARN_HEADING = "## What approved videos taught"
+LEARN_PRIVATE = "from-approved"  # clips of client footage: in the Effects panel on this studio, left out when a style is shared
+LEARN_CLIP_MAX = 20
+
+
+def learn_file(vid):
+    return DATA / LEARN_QUEUE / f"{vid}.json"
+
+
+def learn_cancel(v):
+    """A job the style hasn't finished goes with the approval. What it already saved stays."""
+    if (v.get("learn") or {}).get("state") in ("waiting", "working"):
+        v["learn"]["state"] = "cancelled"
+    drop_quiet(learn_file(v["id"]))
+
+
+def learn_claim(v):
+    """Only one session does this. Call it holding the video's lock."""
+    job = v.get("learn") or {}
+    if job.get("state") == "waiting" or (job.get("state") == "working" and time.time() - job.get("claimed_ts", 0) > LEARN_CLAIM_TIMEOUT):
+        job.update(state="working", claimed_ts=time.time())
+        return True
+    return False
+
+
+def learn_steps(v):
+    job = v.get("learn") or {}
+    sdir = style_dir(v["style"])
+    d = next((x for x in v["drafts"] if x["version"] == job.get("version")), None)
+    vid = v["id"]
+    notes = [n for n in v["notes"] if n.get("text")]
+    return "\n".join([
+        f'LEARN FROM THE APPROVED VIDEO: "{v["name"]}" draft {job.get("version")} was approved. Don\'t start another draft. Teach its style what worked, following "After approval" in the editors-hub skill:',
+        f"The approved video: {Path(v['folder']) / d['file'] if d else '(its draft file is missing)'}",
+        f"The style's guide: {sdir / 'STYLE.md'}",
+        f"Its folder, with this edit's project files: {v['folder']}",
+        f"Notes it took to get there: {len(notes)} (studio.py notes {vid} --all shows open ones; video.json has them all)",
+        "1. Look at the approved video and compare it with the guide: what effects, animations, transitions, pacing or sound does it do well that the guide doesn't say yet?",
+        f'2. Save each new thing: studio.py learn {vid} --rule "a rule for future edits" --effect "Short name:<from>-<to>" --transition "Short name:<from>-<to>"',
+        f"   --effect and --transition cut that moment (up to {LEARN_CLIP_MAX} seconds) out of the approved video for the Effects panel. Those clips stay private to this studio. --effect-file <file> adds a file you made with no client footage, name or logo; that one can go online with the style.",
+        "   Rules go online if the style is shared, so never name the client or the video in a rule, and don't repeat what the guide already says.",
+        f"3. When that's all: studio.py learn {vid} --done",
+    ])
+
+
+def learn_clip(v, source, spec, section):
+    m = re.fullmatch(r"\s*(.+?)\s*:\s*(\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?)\s*", str(spec))
+    if not m or float(m[3]) <= float(m[2]):
+        raise StudioError(f'A clip looks like "Short name:12-15.5" (its name, then from and to in seconds), not "{spec}".')
+    name, start, end = m[1], float(m[2]), float(m[3])
+    if end - start > LEARN_CLIP_MAX:
+        raise StudioError(f"Keep a clip to {LEARN_CLIP_MAX} seconds or less: the Effects panel is for showing one effect.")
+    ffmpeg = shutil.which("ffmpeg")
+    if not ffmpeg:
+        raise StudioError("Cutting a clip needs ffmpeg.")
+    folder = style_dir(v["style"]) / section / LEARN_PRIVATE
+    folder.mkdir(parents=True, exist_ok=True)
+    target = unique_path(folder, safe_filename(name) + ".mp4")
+    r = subprocess.run([ffmpeg, "-y", "-loglevel", "error", "-ss", f"{start}", "-to", f"{end}", "-i", str(source), "-vf", "scale='min(720,iw)':-2", "-c:v", "libx264", "-preset", "veryfast",
+                        "-crf", "23", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", str(target)], capture_output=True, text=True, encoding="utf-8", errors="replace")
+    if r.returncode or not target.exists() or target.stat().st_size < 1000:
+        target.unlink(missing_ok=True)
+        raise StudioError(f'Couldn\'t cut "{name}" from {start:g} to {end:g} seconds. Is that inside the video?')
+    make_thumb(target, target.with_suffix(".poster.jpg"))
+    return target
+
+
+def learn_rule(md, rule):
+    """False if the guide says this already."""
+    text = md.read_text(encoding="utf-8") if md.exists() else "# Style\n"
+    if any(line[2:].strip().lower() == rule.lower() for line in text.splitlines() if line.startswith("- ")):
+        return False
+    lines = text.rstrip("\n").split("\n")
+    if LEARN_HEADING not in lines:
+        lines += ["", LEARN_HEADING]
+    at = lines.index(LEARN_HEADING) + 1
+    while at < len(lines) and not lines[at].startswith("## "):
+        at += 1
+    while lines[at - 1] == "":
+        at -= 1
+    lines.insert(at, f"- {rule}")
+    md.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    return True
+
+
+def learn_from_approved(vid, rules=(), effects=(), transitions=(), files=(), done=False):
+    """Saves what an approved video teaches: rules into the style's guide, clips and files into its Effects panel."""
+    v = load_video(vid)
+    job = v.get("learn") or {}
+    if v.get("status") not in LOCKED_STATUSES or not v.get("approved"):
+        raise StudioError(f"{v['name']} isn't approved any more, so there's nothing to learn from it. Stop here.")
+    if job.get("state") not in ("waiting", "working"):
+        raise StudioError(f"{v['name']} has nothing waiting to be learned: its style has already learned from draft {v['approved']['version']}.")
+    names = [n for n in (project_meta(project_dir(v["project"]))["name"] if v.get("project") else "", v["name"]) if len(n) >= 3]
+    rules = [str(r).strip()[:600] for r in rules if str(r).strip()]
+    for rule in rules:
+        for name in names:
+            if re.search(rf"\b{re.escape(name)}\b", rule, re.I):
+                raise StudioError(f'Keep "{name}" out of the rule: rules go online when the style is shared. Say it for every video: {rule[:120]}')
+    draft_row = next((x for x in v["drafts"] if x["version"] == job.get("version")), None)
+    source = Path(v["folder"]) / draft_row["file"] if draft_row else None
+    if (effects or transitions) and not (source and source.is_file()):
+        raise StudioError("The approved draft's file is missing, so clips can't be cut from it.")
+    sdir = style_dir(v["style"])
+    added_rules = [r for r in rules if learn_rule(sdir / "STYLE.md", r)]
+    added = [learn_clip(v, source, spec, "effects").stem for spec in effects]
+    added += [learn_clip(v, source, spec, "transitions").stem for spec in transitions]
+    for f in files:
+        f = Path(f)
+        if not f.is_file():
+            raise StudioError(f"no file at {f}")
+        if f.stat().st_size > 200_000_000:
+            raise StudioError(f"{f.name} is too big for the Effects panel (over 200 MB).")
+        folder = sdir / "effects"
+        folder.mkdir(parents=True, exist_ok=True)
+        target = unique_path(folder, safe_filename(f.name))
+        shutil.copy2(f, target)
+        if kind_of(target.name) == "video":
+            make_thumb(target, target.with_suffix(".poster.jpg"))
+        added.append(target.stem)
+    with vlock(vid):
+        v = load_video(vid)
+        job = v.get("learn") or {}
+        if job.get("state") in ("waiting", "working"):
+            learn_claim(v)
+            job["claimed_ts"] = time.time()
+            job["rules"] = [*job.get("rules", []), *added_rules]
+            job["effects"] = [*job.get("effects", []), *added]
+            if done:
+                job.update(state="done", done_at=now())
+                v["learned_versions"] = [*v.get("learned_versions", []), job["version"]]
+                drop_quiet(learn_file(vid))
+            save_video(v)
+    if done:
+        style = style_meta(sdir)["name"]
+        n, m = len(job["rules"]), len(job["effects"])
+        post_update(vid, f"{style} learned from this video: {n} new rule{'' if n == 1 else 's'} and {m} new effect{'' if m == 1 else 's'} in the Effects panel." if n or m
+                    else f"{style} had nothing new to learn from this video: its guide already covers it.")
+    return job
 
 
 _ACCOUNTS = None
@@ -3300,7 +3528,7 @@ ONLINE_REPO_NAME = "editors-hub-styles"
 DRIVE_PIECE = 32 * 256 * 1024  # Google takes pieces in multiples of 256 KB
 DRIVE_TRIES = 8
 SHARE_LIMIT = {"short": 3_000_000_000, "long": 7_000_000_000}  # the service holds to these too
-SHARE_LEAVE_OUT = ("videos/", "library/approved/", "library/previews/", "previews/", "brief/session/")  # raw footage and finished client edits
+SHARE_LEAVE_OUT = ("videos/", "library/approved/", "library/previews/", "previews/", "brief/session/", f"effects/{LEARN_PRIVATE}/", f"transitions/{LEARN_PRIVATE}/")  # raw footage and finished client edits
 SHARE_JUNK = {".us-bg-remover", ".transcode-cache", "__pycache__", "node_modules"}
 # references only have to show the look, so they can go smaller than clips an edit might really use
 LIGHT_STEPS = [
@@ -4435,6 +4663,8 @@ class Handler(BaseHTTPRequestHandler):
             vid = parts[2]
             if "approve" in body:
                 approve(vid, body["approve"])
+            elif body.get("unapprove"):
+                unapprove(vid)
             elif "status" in body:
                 if role == "reviewer" and body["status"] != "changes":
                     raise auth.Forbidden("Reviewers can approve or ask for changes.")
@@ -5134,6 +5364,13 @@ def main(argv=None):
     wt = sub.add_parser("wait")
     wt.add_argument("video")
     wt.add_argument("--timeout", type=int, default=0, help="seconds; 0 waits until feedback comes")
+    ln = sub.add_parser("learn", help="after approval: teach the style and the Effects panel from the video")
+    ln.add_argument("video")
+    ln.add_argument("--rule", action="append", default=[], help="a rule for future edits, with no client or video names")
+    ln.add_argument("--effect", action="append", default=[], help='cut a moment for the Effects panel: "Short name:12-15.5"')
+    ln.add_argument("--transition", action="append", default=[], help='cut a transition for the Effects panel: "Short name:12-13"')
+    ln.add_argument("--effect-file", action="append", default=[], help="a file you made, with no client footage, name or logo")
+    ln.add_argument("--done", action="store_true", help="that's everything from this video")
     rp = sub.add_parser("reply")
     rp.add_argument("video")
     rp.add_argument("id", type=int)
@@ -5285,6 +5522,8 @@ def main(argv=None):
                 update_note(a.video, nid, {"done": True})
             print(f"Marked fixed: {', '.join('#' + str(i) for i in a.ids)}")
         elif a.cmd == "set-status":
+            if load_video(a.video).get("status") in LOCKED_STATUSES and a.status not in LOCKED_STATUSES:
+                raise StudioError("Only the owner reopens an approved video, with Undo approve on the page.")
             set_status(a.video, a.status)
             print(f"{a.video}: {a.status}")
         elif a.cmd == "wait-new":
@@ -5294,6 +5533,12 @@ def main(argv=None):
                 print("No new video came in time.")
                 return
             v, item = got
+            if item.get("learn"):
+                print(f'LEARN FROM AN APPROVED VIDEO: "{v["name"]}" (id {v["id"]}) was approved and its own session isn\'t listening, so don\'t wait to be asked.')
+                print("Don't do it in this session. Do these two things now:")
+                print(f"1. Start a new subsession just for this, telling it to run `studio.py learn {v['id']}` and do what that says.")
+                print("2. Run `wait-new` again, the same way, in the background.")
+                return
             for_whom = f"client project {v['project']}" if v.get("project") else "no client, it trains its style"
             print(f"START THE EDIT NOW: {item.get('by') or 'The owner'} pressed Make video in the studio, so don't wait to be asked.")
             print(f'Video: "{v["name"]}" (id {v["id"]}), {for_whom}, style {v["style"]}.')
@@ -5309,11 +5554,29 @@ def main(argv=None):
                 print("No feedback came in time.")
                 return
             batch, v, notes = got
+            if batch.get("learn"):
+                print(learn_steps(v))
+                print(f"Afterwards run studio.py wait {a.video} again in the background: if the approval is undone, new notes come to you.")
+                return
             print(f"FEEDBACK on {v['name']} (draft v{batch.get('draft')}), sent by {batch.get('by') or 'the owner'}:")
             print("\n".join(describe_notes(v, notes)))
             print(f"\nWhen a note is done: studio.py reply {a.video} <id> \"what you changed\" "
                   f"[--lesson \"an editing rule for the style\"] [--client-lesson \"a rule about this client\"]. Then ask-render, render and "
                   f"studio.py finish-render {a.video} <file> --note \"what changed\", and wait again.")
+        elif a.cmd == "learn":
+            if not (a.rule or a.effect or a.transition or a.effect_file or a.done):
+                v = load_video(a.video)
+                if (v.get("learn") or {}).get("state") not in ("waiting", "working") or v.get("status") not in LOCKED_STATUSES:
+                    print(f"{v['name']} has nothing waiting to be learned.")
+                    return
+                with vlock(a.video):
+                    v = load_video(a.video)
+                    learn_claim(v)
+                    save_video(v)
+                print(learn_steps(v))
+                return
+            job = learn_from_approved(a.video, a.rule, a.effect, a.transition, a.effect_file, a.done)
+            print(f"Saved. So far: {len(job['rules'])} rules, {len(job['effects'])} effects." + (" Done." if a.done else f" Finish with: studio.py learn {a.video} --done"))
         elif a.cmd == "reply":
             n = reply_note(a.video, a.id, a.text, fixed=not a.not_fixed, lesson=a.lesson, client_lesson=a.client_lesson)
             print(f"#{a.id}: {'fixed' if n['done'] else 'answered'}" + (f", saved to {n['saved_to']}" if n.get("saved_to") else ""))

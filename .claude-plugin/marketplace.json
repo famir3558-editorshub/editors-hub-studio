@@ -11,7 +11,7 @@
       "name": "editors-hub",
       "source": "./plugins/editors-hub",
       "description": "Editors.Hub: your own studio for video edits. Home and review pages with sign-in, client projects, editing styles, drafts, timed notes, a Live progress tab and render settings, a setup that installs everything edits need, and the video skills, on Mac and Windows.",
-      "version": "1.21.0",
+      "version": "1.22.0",
       "category": "productivity"
     }
   ]
