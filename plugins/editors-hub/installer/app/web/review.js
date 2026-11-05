@@ -287,42 +287,113 @@ $("brollDlg").addEventListener("cancel", brollPutOff);  // Esc is the same as La
 
 // ---------------------------------------------------------------- the Live tab and the render popup
 
-// one layer: a clip for each snapshot of this draft, at its place in the edit, and the one being worked on marked
-function renderTimeline(items) {
-  const box = $("liveTimeline");
-  const round = items.length ? items[items.length - 1].draft : null;
-  const shots = items.filter((u) => u.image && u.draft === round);
-  if (!shots.length) return (box.innerHTML = "");
-  const now = shots[shots.length - 1];
-  const total = [...items].reverse().find((u) => u.draft === round && u.total)?.total;
-  const placed = shots.filter((u) => u.pos != null).sort((a, b) => a.pos - b.pos);
-  const order = [...placed, ...shots.filter((u) => u.pos == null)];
-  const len = (u, i) => {
-    const next = order[i + 1];
-    if (u.pos == null) return 1;
-    const end = next?.pos ?? total ?? u.pos + 1;
-    const whole = total || order[order.length - 1].pos + 1;
-    return Math.max(0.05, (end - u.pos) / whole) * order.length;
-  };
-  const shown = shots.find((u) => u.id === R.shot) || now;
-  const scroll = box.querySelector(".tl-track")?.scrollLeft;
-  box.innerHTML = `<div class="tl">
-    <div class="tl-head"><b>${shown === now ? "Working on now" : "Earlier"}</b>${shown.pos != null ? `<span class="faint">${fmtTime(shown.pos)}${total ? ` of ${fmtTime(total)}` : ""}</span>` : ""}</div>
-    <a class="tl-big" href="${esc(mediaUrl(shown.image))}" target="_blank" rel="noopener"><img src="${esc(mediaUrl(shown.image))}" alt="Snapshot of the edit"></a>
-    ${shown.text ? `<p class="tl-text">${esc(shown.text)}</p>` : ""}
-    <div class="tl-track">${order.map((u, i) => `<button type="button" class="tl-clip${u === now ? " now" : ""}${u === shown ? " on" : ""}" data-shot="${u.id}" style="flex:${len(u, i).toFixed(3)} 0 74px" title="${esc(u.text || "")}"><img src="${esc(mediaUrl(u.image))}" alt="">${u.pos != null ? `<span>${fmtTime(u.pos)}</span>` : ""}</button>`).join("")}</div>
-  </div>`;
-  const track = box.querySelector(".tl-track");
-  if (R.shot == null) box.querySelector(".tl-clip.now")?.scrollIntoView({ block: "nearest", inline: "center" });
-  else if (scroll != null) track.scrollLeft = scroll;
+const LIVE_IDLE = 30 * 60;  // the same as PROGRESS_IDLE in studio.py
+const setHtml = (el, html) => { if (el.dataset.html !== html) { el.innerHTML = html; el.dataset.html = html; } };  // or the spinner and pictures restart every few seconds
+
+function liveWorked(p) {
+  if (!p) return 0;
+  const left = p.since ? Math.min(Date.now() / 1000, p.last + LIVE_IDLE) - p.since : 0;
+  return (p.worked || 0) + Math.max(0, left);
 }
-$("liveTimeline").addEventListener("click", (e) => {
-  const clip = e.target.closest("[data-shot]");
-  if (!clip) return;
-  const id = +clip.dataset.shot, shots = (R.v.updates || []).filter((u) => u.image);
-  R.shot = shots[shots.length - 1]?.id === id ? null : id;  // the newest one goes back to following along
-  renderTimeline(R.v.updates || []);
-});
+
+function liveState(p) {
+  if (!p) return "none";
+  if (p.finished) return "done";
+  if (!p.since) return "waiting";
+  return Date.now() / 1000 - p.last > LIVE_IDLE ? "quiet" : "working";
+}
+
+function liveClock(seconds) {
+  const t = Math.floor(seconds), two = (n) => String(n).padStart(2, "0");
+  return `${t >= 3600 ? Math.floor(t / 3600) + ":" : ""}${two(Math.floor(t / 60) % 60)}:${two(t % 60)}`;
+}
+
+function liveStarted(iso) {
+  const d = new Date(iso), time = d.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" });
+  return d.toDateString() === new Date().toDateString() ? time : `${d.toLocaleDateString([], { month: "short", day: "numeric" })}, ${time}`;
+}
+
+// the box on top: which video, which draft, how long it has taken
+function renderLiveTop(v) {
+  const p = v.progress, state = liveState(p);
+  const say = { working: "Editing", waiting: "Waiting for you", quiet: "No update for a while", done: `Draft ${p?.draft} is ready`, none: v.drafts.length ? "Not being edited" : "Not started" }[state];
+  const facts = [["Draft", p ? `v${p.draft}` : v.latest ? `v${v.latest}` : "None yet"], ["Client", v.project_name], ["Style", v.style_name],
+    ["Started", p && liveStarted(p.started)], ["Raw clip", p?.raw_seconds && liveClock(p.raw_seconds)]].filter((f) => f[1]);
+  setHtml($("liveTop"), `<div class="lv-box lv-top">
+    <div class="lv-main">
+      <div class="lv-name"><div class="lv-state ${state}"><i></i>${esc(say)}</div><div class="lv-title">${esc(v.name)}</div></div>
+      ${p ? `<div class="lv-clock"><div id="liveClock">${liveClock(liveWorked(p))}</div><small>Time worked on this draft</small></div>` : ""}
+    </div>
+    <div class="lv-facts">${facts.map(([k, x]) => `<div><small>${esc(k)}</small><b title="${esc(x)}">${esc(x)}</b></div>`).join("")}</div>
+  </div>`);
+}
+
+// the tracks fill in as Claude reports each clip; a step the edit doesn't use has no track
+function renderLiveBoard(v) {
+  const p = v.progress, round = p ? p.draft : v.updates?.at(-1)?.draft;
+  const mine = (v.updates || []).filter((u) => u.draft === round);
+  const newest = mine.at(-1), shot = [...mine].reverse().find((u) => u.image);
+  if (!p && !shot) return setHtml($("liveBoard"), "");
+  const clips = p?.clips || [];
+  const total = p?.total || Math.max(0, ...clips.map((c) => c.end));
+  const tracks = ["Video", "B-roll", "Animation", "Captions", "Sound"].filter((t) => t === "Video" || p?.steps.includes(t) || clips.some((c) => c.track === t));
+  const pct = (x) => Math.min(100, (x / total) * 100).toFixed(2);
+  const marks = total ? [0, 1, 2, 3, 4].map((i) => `<span>${liveClock((total * i) / 4)}</span>`).join("") : "";
+  const cls = { Video: "v", "B-roll": "b", Animation: "a", Captions: "c", Sound: "s" };
+  setHtml($("liveBoard"), `<div class="lv-box">
+    <div class="lv-now${shot ? "" : " no-frame"}">
+      ${shot ? `<a class="lv-frame" href="${esc(mediaUrl(shot.image))}" target="_blank" rel="noopener"><img src="${esc(mediaUrl(shot.image))}" alt="Snapshot of the edit"></a>` : ""}
+      <div class="lv-doing"><b>${esc(p?.finished ? `Draft ${p.draft}` : p?.step || "Working on it")}</b>${newest?.text ? `<p>${esc(newest.text)}</p>` : ""}</div>
+    </div>
+    ${total ? `<div class="lv-tracks"><div class="lv-ruler">${marks}</div>
+      ${tracks.map((t) => `<div class="lv-track"><span>${esc(t)}</span><div>${clips.filter((c) => c.track === t && c.start < total).map((c) => `<i class="${cls[t]}" style="left:${pct(c.start)}%;width:${(pct(c.end) - pct(c.start)).toFixed(2)}%" title="${liveClock(c.start)} to ${liveClock(c.end)}"></i>`).join("")}</div></div>`).join("")}
+      ${p.pos != null && !p.finished ? `<div class="lv-head" style="left:calc(66px + (100% - 66px) * ${(Math.min(1, p.pos / total)).toFixed(4)})"></div>` : ""}
+    </div>` : ""}
+  </div>`);
+}
+
+// only the steps this edit uses
+function renderLiveSteps(v) {
+  const p = v.progress, steps = p?.steps || [];
+  if (!steps.length) return setHtml($("liveSteps"), "");
+  const state = liveState(p), done = state === "done", at = p.step ? steps.indexOf(p.step) : -1;
+  const share = done ? 1 : at < 0 ? 0 : (at + 0.5) / steps.length;
+  const left = state === "working" && at > 0 ? Math.max(1, Math.round((liveWorked(p) * (1 - share)) / share / 60)) : 0;
+  const newest = [...(v.updates || [])].reverse().find((u) => u.draft === p.draft && u.step === p.step);
+  setHtml($("liveSteps"), `<div class="lv-box">
+    <div class="lv-line"><b>${esc(done ? "Done" : p.step || "Getting ready")}</b> <span class="muted">· ${Math.round(share * 100)}%${left ? ` · About ${left} min left` : ""}</span></div>
+    <div class="lv-bar"><b style="width:${(share * 100).toFixed(1)}%"></b></div>
+    ${steps.map((s, i) => {
+      const kind = done || i < at ? "done" : i === at ? (state === "working" ? "now" : "paused") : "";
+      return `<div class="lv-step ${kind}"><span>${kind === "done" ? "✓" : ""}</span><div>${esc(s)}${i === at && !done && newest?.text ? `<small>${esc(newest.text)}</small>` : ""}</div></div>`;
+    }).join("")}
+  </div>`);
+}
+
+function renderLiveFeed(v) {
+  const items = (v.updates || []).slice().reverse();
+  if (!items.length) return setHtml($("liveFeed"), `<div class="live-empty">When Claude works on this video, what it's doing shows here in plain words, with snapshots.</div>`);
+  const [first, ...rest] = items, working = liveState(v.progress) === "working";
+  let round = first.draft;
+  setHtml($("liveFeed"), `<div class="lv-box">
+    <div class="lv-line"><b>Updates</b></div>
+    <div class="lv-latest"><b>${working ? "Now: " : ""}${esc(first.text || "New snapshot")}</b><small>${ago(first.at)}</small></div>
+    ${rest.map((u) => {
+      const head = u.draft !== round ? `<div class="live-round">Draft ${u.draft}</div>` : "";
+      round = u.draft;
+      return `${head}<div class="lv-item">${u.image ? `<a href="${esc(mediaUrl(u.image))}" target="_blank" rel="noopener"><img src="${esc(mediaUrl(u.image))}" alt="Snapshot of the edit" loading="lazy"></a>` : ""}<div><p>${esc(u.text || "New snapshot")}</p><small>${ago(u.at)}</small></div></div>`;
+    }).join("")}
+  </div>`);
+}
+
+// the time counter runs between refreshes; the words catch up when the state changes or "2 min ago" moves on
+setInterval(() => {
+  if (!R.v || R.side !== "live" || document.visibilityState !== "visible") return;
+  const clock = $("liveClock");
+  if (clock) clock.textContent = liveClock(liveWorked(R.v.progress));
+  const key = `${liveState(R.v.progress)}:${Math.floor(Date.now() / 30000)}`;
+  if (key !== R.liveKey) { R.liveKey = key; renderLive(); }
+}, 1000);
 
 function renderLive() {
   const v = R.v, items = v.updates || [];
@@ -344,13 +415,10 @@ function renderLive() {
     try { await navigator.clipboard.writeText(start.prompt); toast("Copied: paste it into a Claude session"); }
     catch (e) { await ehPrompt("Copy this and paste it into a Claude session:", start.prompt, { title: "Prompt for Claude", ok: "Done", cancel: "Close" }); }
   };
-  renderTimeline(items);
-  let round = null;
-  $("liveFeed").innerHTML = items.slice().reverse().map((u, i) => {
-    const head = u.draft !== round ? `<div class="live-round">Working on draft ${u.draft}</div>` : "";
-    round = u.draft;
-    return `${head}<div class="live-item${i === 0 ? " now" : ""}">${u.text ? `<p>${esc(u.text)}</p>` : ""}${u.image ? `<a href="${esc(mediaUrl(u.image))}" target="_blank" rel="noopener"><img src="${esc(mediaUrl(u.image))}" alt="Snapshot of the edit" loading="lazy"></a>` : ""}<small>${ago(u.at)}</small></div>`;
-  }).join("") || `<div class="live-empty">When Claude works on this video, what it's doing shows here in plain words, with snapshots.</div>`;
+  renderLiveTop(v);
+  renderLiveBoard(v);
+  renderLiveSteps(v);
+  renderLiveFeed(v);
 }
 
 // the same sums as render_size and render_mbps in studio.py

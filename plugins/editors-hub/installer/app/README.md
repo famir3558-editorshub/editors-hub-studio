@@ -133,9 +133,14 @@ Videos show as tall 9:16 cards on Home, client pages and style pages; a sideways
 
 Each client and each style has one parent Claude session, and each video gets its own subsession of it. When you make a client or style, the page gives you one line to paste into a new Claude session (the page can't create sessions itself; it's also under **Copy a prompt for Claude**). That session then only listens. **Make video** puts the video in a queue on this computer, and the client's parent session starts a subsession that edits it. A client's video goes only to that client's parent, and a style's training video only to that style's. If the parent session isn't open, the video waits, and the Live page says which session it needs. Only the parent has to stay open for new videos to start. Depending on the Claude app, it may show a card for you to click to start the subsession.
 
-## The Live timeline
+## The Live tab
 
-While Claude edits, the Live tab shows one layer of snapshots at their places in the edit, with the one being worked on marked in red. Click any snapshot to see it bigger with what Claude said about it.
+While Claude edits, the Live tab shows, from the top:
+
+- **The video:** its name, how long Claude has worked on this draft, the draft number, client, style, start time and raw clip length. The counter stops while Claude waits for your answer, and when the draft is ready. If there's no update for 30 minutes, it stops and says so, as the session may have stopped.
+- **The timeline:** the newest frame with what Claude is doing, and tracks for the video, b-roll, animation, captions and sound that fill in as the edit builds.
+- **The steps:** the progress bar and each step. The percentage and time left are estimates from the steps. Only the steps this edit uses show, so a video with no b-roll has no B-roll step or track.
+- **Updates:** the latest update, then the earlier ones with their frames.
 
 ## Seeing and stopping long jobs
 

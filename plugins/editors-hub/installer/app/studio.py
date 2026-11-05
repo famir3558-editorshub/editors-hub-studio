@@ -898,6 +898,7 @@ def load_video(vid, dirs=None):
 
 def save_video(v):
     v["updated"] = now()
+    progress_clock(v)
     write_json(Path(v["folder"]) / "video.json", {k: x for k, x in v.items() if k not in ("id", "folder")})
 
 
@@ -1343,6 +1344,7 @@ def add_draft(vid, src, note="", move=False, original=None, render=None):
                 draft["worked_for"] = int(time.time() - b["picked_up_ts"])
         v["drafts"].append(draft)
         v["status"], v["approved"] = "in review", None
+        progress_finish(v)
         save_video(v)
     make_thumb(dest, Path(v["folder"]) / "thumb.jpg")
     return version
@@ -1679,22 +1681,126 @@ def take_snapshot(folder, src, at=None):
     return dest.relative_to(folder).as_posix()
 
 
-def post_update(vid, text, snapshot=None, at=None, draft=None, total=None):
+# video.json "progress": this draft's edit, for the Live tab. Only Claude's work starts or moves it, not the studio's own
+# messages. The page counts the time up from worked + (now - since); since is empty while the clock is stopped.
+PROGRESS_IDLE = 30 * 60  # no update for this long: the clock stops counting, as the session may have stopped
+PROGRESS_STEPS = ["Transcript", "Tight cut", "B-roll", "Animation", "Captions", "Sound", "Render"]
+PROGRESS_TRACKS = ["Video", "B-roll", "Animation", "Captions", "Sound"]
+PROGRESS_NAMES = {"broll": "B-roll", "cut": "Tight cut", "transcribe": "Transcript", "animations": "Animation", "graphics": "Animation",
+                  "motiongraphics": "Animation", "visuals": "Animation", "screens": "Animation", "caption": "Captions", "audio": "Sound",
+                  "music": "Sound", "rendering": "Render"}
+
+
+def progress_name(name):
+    name = str(name or "").strip()[:40]
+    key = re.sub(r"[^a-z]", "", name.lower())
+    known = {re.sub(r"[^a-z]", "", n.lower()): n for n in [*PROGRESS_STEPS, *PROGRESS_TRACKS]}
+    return known.get(key) or PROGRESS_NAMES.get(key) or name
+
+
+def parse_clip(text):
+    """"B-roll:10-17" is the B-roll track from 10 to 17 seconds into the edit."""
+    m = re.fullmatch(r"\s*(.+?)\s*:\s*(\d+(?:\.\d+)?)\s*-\s*(\d+(?:\.\d+)?)\s*", str(text))
+    if not m or float(m[3]) <= float(m[2]):
+        raise StudioError(f'A clip looks like "B-roll:10-17" (track, then from and to in seconds), not "{text}".')
+    track = progress_name(m[1])
+    if track not in PROGRESS_TRACKS:
+        raise StudioError(f"There's no {track} track. The tracks are {', '.join(PROGRESS_TRACKS)}.")
+    return {"track": track, "start": round(float(m[2]), 2), "end": round(float(m[3]), 2)}
+
+
+def progress_add_step(p, name):
+    """A step this edit turned out to need goes in its usual place."""
+    if not name or name in p["steps"]:
+        return
+    if name in PROGRESS_STEPS:
+        later = PROGRESS_STEPS[PROGRESS_STEPS.index(name) + 1:]
+        at = next((i for i, s in enumerate(p["steps"]) if s in later), len(p["steps"]))
+    else:
+        at = p["steps"].index("Render") if "Render" in p["steps"] else len(p["steps"])
+    p["steps"].insert(at, name)
+
+
+def progress_of(v, draft):
+    """This draft's progress, new if Claude is starting on another draft. Counts Claude as active now."""
+    p, ts = v.get("progress"), time.time()
+    if not p or p.get("draft") != draft:
+        raw = Path(v["folder"]) / "raw"
+        clips = sorted(f for f in raw.iterdir() if f.is_file() and kind_of(f.name) == "video") if raw.is_dir() else []
+        p = v["progress"] = {"draft": draft, "steps": [], "step": None, "clips": [], "total": None, "pos": None, "started": now(), "worked": 0,
+                             "since": ts, "last": ts, "finished": None, "raw_seconds": probe_media(clips[0]).get("duration") if clips else None}
+    if p["since"] and ts - p["last"] > PROGRESS_IDLE:  # back after a long quiet spell: only the working time counts
+        p["worked"] += p["last"] + PROGRESS_IDLE - p["since"]
+        p["since"] = ts
+    p["last"] = ts
+    return p
+
+
+def progress_clock(v):
+    """Claude waiting for the owner's answer stops the clock; the answer starts it again."""
+    p = v.get("progress")
+    if not p or p.get("finished"):
+        return
+    waiting = (v.get("render_request") or {}).get("status") == "waiting" or (v.get("broll") or {}).get("stage") in BROLL_ASKING
+    ts = time.time()
+    if waiting and p["since"]:
+        p["worked"] += min(ts, p["last"] + PROGRESS_IDLE) - p["since"]
+        p["since"] = None
+    elif not waiting and not p["since"]:
+        p["since"] = p["last"] = ts
+
+
+def progress_finish(v):
+    """The draft is here: the clock stops for good and every step is done."""
+    p = v.get("progress")
+    if p and not p.get("finished"):
+        if p["since"]:
+            p["worked"] += min(time.time(), p["last"] + PROGRESS_IDLE) - p["since"]
+        p.update(since=None, finished=now(), step=None)
+
+
+def post_update(vid, text, snapshot=None, at=None, draft=None, total=None, step=None, steps=None, clips=(), clear_tracks=(), active=False, add_step=None):
     text = str(text or "").strip()
-    if not text and not snapshot:
+    steps = [progress_name(s) for s in (steps or []) if str(s).strip()]
+    step = progress_name(step) if step else None
+    clips = [parse_clip(c) for c in clips]
+    clear_tracks = [progress_name(t) for t in clear_tracks]
+    moves = bool(step or steps or clips or clear_tracks)
+    if not text and not snapshot and not moves and at is None and not total:
         raise StudioError("An update needs some words or a snapshot.")
     clear_start(vid)
     image = take_snapshot(load_video(vid)["folder"], snapshot, at) if snapshot else None
     with vlock(vid):
         v = load_video(vid)
-        items = v.setdefault("updates", [])
-        item = {"id": (items[-1]["id"] + 1) if items else 1, "at": now(), "text": text[:4000], "image": image,
-                "draft": draft or (latest_version(v) or 0) + 1}
-        if at is not None:
-            item["pos"] = max(0.0, round(float(at), 2))  # where in the edit this is, for the timeline
-        if total:
-            item["total"] = round(float(total), 2)
-        items.append(item)
+        round_no = draft or (latest_version(v) or 0) + 1
+        p = None
+        if active or moves:
+            p = progress_of(v, round_no)
+            if steps:
+                p["steps"] = list(dict.fromkeys(steps))
+            if step:
+                progress_add_step(p, step)
+                p["step"] = step
+            if clear_tracks:
+                p["clips"] = [c for c in p["clips"] if c["track"] not in clear_tracks]
+            p["clips"] = [*p["clips"], *clips][-500:]
+            if total:
+                p["total"] = round(float(total), 2)
+            if at is not None:
+                p["pos"] = max(0.0, round(float(at), 2))
+        elif add_step and v.get("progress") and not v["progress"].get("finished"):
+            progress_add_step(v["progress"], add_step)
+        item = None
+        if text or snapshot:
+            items = v.setdefault("updates", [])
+            item = {"id": (items[-1]["id"] + 1) if items else 1, "at": now(), "text": text[:4000], "image": image, "draft": round_no}
+            if p and p["step"]:
+                item["step"] = p["step"]
+            if at is not None:
+                item["pos"] = max(0.0, round(float(at), 2))
+            if total:
+                item["total"] = round(float(total), 2)
+            items.append(item)
         save_video(v)
     return item
 
@@ -1847,7 +1953,7 @@ def finish_render(vid, master, note=""):
                 "-c:a", "aac", "-b:a", f"{choice['audio']}k"]
         suffix = ".mp4"
     out = Path(v["folder"]) / f".render-{secrets.token_hex(3)}{suffix}"
-    post_update(vid, f"Rendering now: {width} × {height}, {fps:g} fps" + (f", about {mbps} Mbps." if mbps else ", ProRes."))
+    post_update(vid, f"Rendering now: {width} × {height}, {fps:g} fps" + (f", about {mbps} Mbps." if mbps else ", ProRes."), step="Render")
     try:
         r = subprocess.run([*cmd, str(out)], capture_output=True, text=True, encoding="utf-8", errors="replace")
         if r.returncode or not out.exists():
@@ -2073,7 +2179,7 @@ def set_broll_own(vid, links, mode):
     what = " and ".join(x for x in (f"{len(files)} file{'' if len(files) == 1 else 's'}" if files else "",
                                     f"{len(links)} link{'' if len(links) == 1 else 's'}" if links else "") if x)
     post_update(vid, f"You added your own b-roll: {what}. I'll use it first, and you'll pick from it." if mode == "manual"
-                else f"You added your own b-roll: {what}. I'll choose from it first.")
+                else f"You added your own b-roll: {what}. I'll choose from it first.", add_step="B-roll")
     return b
 
 
@@ -2088,7 +2194,7 @@ def set_broll_mode(vid, mode):
         b.update(mode=mode, stage="idle", decision={"type": "mode", "mode": mode, "at": now()})
         save_video(v)
     post_update(vid, "You'll pick the b-roll. I'm watching the video to find where it can go." if mode == "manual"
-                else "I'll choose the b-roll for this video myself.")
+                else "I'll choose the b-roll for this video myself.", add_step="B-roll")
     return b
 
 
@@ -2109,7 +2215,7 @@ def set_broll_picks(vid, picks):
             part.update(picked=picks[str(part["id"])], needs_pick=False)
         b.update(stage="idle", decision={"type": "picks", "at": now()}, round=(latest_version(v) or 0) + 1)
         save_video(v)
-    post_update(vid, f"You picked the b-roll for {len(pending)} part{'' if len(pending) == 1 else 's'}. I'm putting it into the edit now.")
+    post_update(vid, f"You picked the b-roll for {len(pending)} part{'' if len(pending) == 1 else 's'}. I'm putting it into the edit now.", add_step="B-roll")
     return b
 
 
@@ -4894,6 +5000,10 @@ def main(argv=None):
     up.add_argument("--snapshot", default=None)
     up.add_argument("--at", type=float, default=None, help="seconds into the edit: where this shows on the Live timeline")
     up.add_argument("--total", type=float, default=None, help="how long the edit is now, in seconds")
+    up.add_argument("--steps", default=None, help="the steps this edit will use, in order, with commas, e.g. \"Transcript,Tight cut,Captions,Sound,Render\"")
+    up.add_argument("--step", default=None, help="the step you're on now")
+    up.add_argument("--clip", action="append", default=[], help="a clip on a Live track, e.g. \"B-roll:10-17\" (seconds); use it as many times as you need")
+    up.add_argument("--clear-track", action="append", default=[], help="empty a Live track first, when you've redone it")
     ar = sub.add_parser("ask-render")
     ar.add_argument("video")
     ar.add_argument("--note", default="")
@@ -5035,7 +5145,8 @@ def main(argv=None):
         elif a.cmd == "broll-status":
             print(describe_broll(load_video(a.video)))
         elif a.cmd == "update":
-            post_update(a.video, a.text, a.snapshot, a.at, total=a.total)
+            post_update(a.video, a.text, a.snapshot, a.at, total=a.total, step=a.step, steps=(a.steps or "").split(","), clips=a.clip,
+                        clear_tracks=a.clear_track, active=True)
             print("Posted to the Live tab.")
         elif a.cmd == "ask-render":
             req = ask_render(a.video, a.note, a.size, a.fps, a.duration)

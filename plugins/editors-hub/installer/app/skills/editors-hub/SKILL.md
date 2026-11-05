@@ -60,7 +60,10 @@ browser (`studio.py open <video>`) when you start, then keep it up to date throu
   section, captions, B-roll, sound, each review note you're working on. Say what you found or decided, and what comes next.
 - Use easy words a non-editor understands: "I removed the long pauses, so it's now 48 seconds", never "ran a tight-cut pass
   on the transcript". No file names, commands or tool names.
-- The Live tab shows your snapshots on a one-layer timeline, so give each one its place: `--at <seconds into the edit>` and, once you know it, `--total <the edit's length in seconds>`. Post one for each section as you work on it, in the order you work; the newest is marked as what you're working on now.
+- As soon as you know what this edit needs, give its steps, in order, only the ones it will really use: `--steps "Transcript,Tight cut,B-roll,Animation,Captions,Sound,Render"`. No b-roll in this edit: leave out B-roll. No motion graphics, visuals or screens: leave out Animation. The Live tab shows only those steps and tracks, so never list a step you won't do. Each round of notes gets its own list, with only what that round needs. If a step turns out to be needed later, just use it: it joins the list.
+- Say which step you're on with every update: `--step "B-roll"`. Steps before it show as done, and the percentage comes from this.
+- Fill in the tracks as you go, so the owner sees the edit build. Give the length of the edit with `--total <seconds>` once you know it, then add each clip with `--clip "<track>:<from>-<to>"`, in seconds into the edit, as many times as you need: `--clip "Video:0-9.5" --clip "Video:10-17"` for each piece of the cut, then B-roll, Animation, Captions and Sound (`--clip "Sound:0-64"` for a bed that runs the whole way). Redid a track? `--clear-track "Video"` empties it first. `--at <seconds>` marks where you're working now.
+- Never make up clips or steps. A step with no clips yet just shows an empty track.
 - Add a snapshot whenever something visible changed: a frame of the cut, a layout, a graphic. For a HyperFrames project
   use `npx hyperframes snapshot` and pass the image; for a video file pass it with `--at`. Look at each snapshot first.
   Never post one that shows a problem without saying so.
