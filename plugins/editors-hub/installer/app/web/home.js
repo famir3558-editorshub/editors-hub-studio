@@ -18,6 +18,10 @@ function render() {
   if (effectsTab) effectsTab.style.display = S.state?.can_effects ? "" : "none";
   const { videos, styles, projects, statuses, settings, me } = S.state;
   renderMe(me);
+  const learning = S.state.learn_waiting || [];
+  $("learnBanner").hidden = !learning.length;
+  const learnHtml = learning.length ? `<div><b>${learning.length === 1 ? "An approved video is" : `${learning.length} approved videos are`} waiting to teach the style</b><span class="muted">${esc(learning.map((x) => x.name).join(", "))}. No Claude session is doing this yet, so paste this line into a new one.</span></div><button class="btn small primary" id="learnCopy" type="button">Copy the line</button>` : "";
+  if ($("learnBanner").dataset.html !== learnHtml) { $("learnBanner").innerHTML = learnHtml; $("learnBanner").dataset.html = learnHtml; }
   const waiting4Render = videos.filter((v) => v.render_waiting);
   $("renderBanner").hidden = !waiting4Render.length;
   $("renderBanner").innerHTML = waiting4Render.length ? `<div><b>Claude is waiting for your render settings</b><span class="muted">${waiting4Render.map((v) => `<a href="/review/${enc(v.id)}">${esc(v.name)}</a>`).join(", ")}</span></div>` : "";
@@ -1167,3 +1171,15 @@ load().then(() => {
   tellIfUpdated();
 });
 setInterval(() => document.visibilityState === "visible" && !document.querySelector("dialog[open]") && load(), 5000);
+
+$("learnBanner").addEventListener("click", async (e) => {
+  if (e.target.id !== "learnCopy") return;
+  const ids = (S.state.learn_waiting || []).map((x) => x.id);
+  const line = `Use the editors-hub skill. ${ids.length === 1 ? "This approved video is" : "These approved videos are"} waiting to teach their styles: ${ids.join(", ")}. For each one, run studio.py learn <id> and do what it says.`;
+  try {
+    await navigator.clipboard.writeText(line);
+    toast("Copied: paste it into a new Claude session");
+  } catch (err) {
+    await ehPrompt("Copy this and paste it into a new Claude session:", line, { title: "Prompt for Claude", ok: "Done", cancel: "Close" });
+  }
+});

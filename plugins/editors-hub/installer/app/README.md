@@ -137,7 +137,7 @@ Each client and each style has one parent Claude session, and each video gets it
 
 **Approve the edit** locks the video: no new notes, and no new draft can start. If Claude is part way through a draft when you approve, it finishes that one, and your approval stays on the draft you approved. **Undo approve**, under the notes, reopens it so you can add notes and edit the next draft.
 
-Approving also teaches the studio. A Claude session looks at the approved video and adds what's new to the style's guide and the online Effects panel: written rules, and short clips cut from the video. This needs a Claude session: the video's own if it's listening, or its client's parent session after a minute. If neither is open, the Live tab gives you a line to paste into a new one.
+Approving also teaches the studio. A Claude session looks at the approved video and adds what's new to the style's guide and the online Effects panel: written rules, and short clips cut from the video. It happens by itself: the video's own session if it's listening, its client's parent session if that is, and otherwise Home runs Claude itself a minute after you approve. That needs Claude signed in once on this computer, with `claude auth login`. Without that, or if it fails twice, Home says so and gives you a line to paste into a new session.
 
 ## The online Effects panel
 
