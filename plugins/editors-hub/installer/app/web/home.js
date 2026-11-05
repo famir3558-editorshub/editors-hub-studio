@@ -14,6 +14,8 @@ async function load() {
 }
 
 function render() {
+  const effectsTab = document.querySelector('[data-tab="effects"]');  // only the owner has the Effects panel
+  if (effectsTab) effectsTab.style.display = S.state?.can_effects ? "" : "none";
   const { videos, styles, projects, statuses, settings, me } = S.state;
   renderMe(me);
   const waiting4Render = videos.filter((v) => v.render_waiting);

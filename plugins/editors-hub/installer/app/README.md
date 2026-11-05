@@ -122,7 +122,7 @@ Overview each file is sorted by type. Only the style's maker, or the owner, can 
 
 ## The Effects tab
 
-Everyone who makes videos can see it. It's mainly for Claude: it reads the library before each edit, for ideas, so the studio knows more with every style added. The video's style and the client's brand still decide the look. It mixes the effects, transitions and techniques from your styles and the online Shared folder, with search and a filter by style. **Collect them** downloads the online styles not in it yet and keeps only their effects and guide. A style someone keeps private stays on their computer, so nobody else sees it until they share it online.
+Only the owner can see it. It's mainly for Claude: it reads the library before each edit, for ideas, so the studio knows more with every style added. The video's style and the client's brand still decide the look. It mixes the effects, transitions and techniques from your styles and the online Shared folder, with search and a filter by style. **Collect them** downloads the online styles not in it yet and keeps only their effects and guide. A style someone keeps private stays on their computer, so nobody else sees it until they share it online.
 Only the owner can remove something, and that removes it for everyone, for Claude too. **Bring them all back** undoes it. The style it came from keeps it.
 
 ## Video cards
@@ -137,9 +137,16 @@ Each client and each style has one parent Claude session, and each video gets it
 
 **Approve the edit** locks the video: no new notes, and no new draft can start. If Claude is part way through a draft when you approve, it finishes that one, and your approval stays on the draft you approved. **Undo approve**, under the notes, reopens it so you can add notes and edit the next draft.
 
-Approving also teaches the studio. A Claude session looks at the approved video and adds what's new to the style's guide and to the Effects panel: written rules, and short clips cut from the video. The clips can show client footage, so they stay on this studio and never go online. The rules can't name the client or the video.
+Approving also teaches the studio. A Claude session looks at the approved video and adds what's new to the style's guide and the online Effects panel: written rules, and short clips cut from the video. This needs a Claude session: the video's own if it's listening, or its client's parent session after a minute. If neither is open, the Live tab gives you a line to paste into a new one.
 
-The rules, and animations Claude made with no client footage, also go to the online Effects panel, so an approval by anyone trains every studio. They show as **Studio training** in the Effects tab, and Claude reads them before an edit. Files are kept in an **Editors.Hub Effects** folder on the owner's Google Drive, up to 50 MB each. Only the owner can remove something, for everyone, from the Effects tab. If this computer is offline, what it learned waits and goes next time. This needs a Claude session: the video's own if it's listening, or its client's parent session after a minute. If neither is open, the Live tab gives you a line to paste into a new one.
+## The online Effects panel
+
+It trains the studio from everyone's work, and only the owner can see it.
+
+- **What goes up by itself:** rules and clips from each approved video, and new effects added to anyone's styles. Effects already in a style when this started stay where they are.
+- **Nothing repeated:** a file that's the same, or whose frames look the same as something online, isn't uploaded. Neither is a rule that nearly repeats another. Before adding anything, Claude reads what's there and adds only what's really different. It can still miss two different-looking effects of the same type.
+- **Who gets what:** the owner gets everything as **Studio training** in the Effects tab. Everyone else has no Effects tab and gets no files or clips. Their Claude sessions read the written rules, which can't name the client or the video.
+- **Where it's kept:** files are in an **Editors.Hub Effects** folder on the owner's Google Drive, up to 50 MB each. If a computer is offline, what it learned waits and goes next time. Only the owner can remove something, from the Effects tab.
 
 ## The Live tab
 

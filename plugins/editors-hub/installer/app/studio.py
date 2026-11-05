@@ -1239,6 +1239,74 @@ def board_ready():
     return bool(approval.config() and approval.status(DATA).get("email"))
 
 
+def board_look(path):
+    """Frames from the start, middle and end as picture hashes, to tell if something online already looks like this. Empty if it can't be read."""
+    ffmpeg = shutil.which("ffmpeg")
+    if not ffmpeg:
+        return ""
+    path = Path(path)
+    still = kind_of(path.name) == "image"
+    duration = 0 if still else (probe_media(path).get("duration") or 0)
+    look = ""
+    for share in (0.1, 0.5, 0.9):
+        try:
+            r = subprocess.run([ffmpeg, "-v", "error", *([] if still else ["-ss", f"{duration * share:.2f}"]), "-i", str(path), "-frames:v", "1", "-vf", "scale=9:8,format=gray", "-f", "rawvideo", "-"],
+                               capture_output=True, timeout=60)
+        except (OSError, subprocess.TimeoutExpired):
+            return ""
+        if len(r.stdout) != 72:
+            return ""
+        bits = 0
+        for row in range(8):
+            for col in range(8):
+                bits = bits << 1 | (r.stdout[row * 9 + col] < r.stdout[row * 9 + col + 1])
+        look += f"{bits:016x}"
+    return look
+
+
+def board_facts(path):
+    sha = hashlib.sha256()
+    with open(path, "rb") as f:
+        while piece := f.read(1 << 20):
+            sha.update(piece)
+    return {"sha": sha.hexdigest(), "look": board_look(path)}
+
+
+def board_seen_key(sid, rel, size):
+    return f"{sid}/{rel}:{size}"
+
+
+def board_mark_seen(keys):
+    file = DATA / "effects-seen.json"
+    with LOCK:
+        write_json(file, {"files": sorted({*read_quiet(file).get("files", []), *keys})})
+
+
+def board_scan():
+    """New effects in this studio's own styles wait to go up. What was there the first time this ran stays where it is: nobody's old private work goes out."""
+    file = DATA / "effects-seen.json"
+    first = not file.exists()
+    seen = set(read_quiet(file).get("files", []))
+    keys, waiting = [], []
+    for sid, d in style_dirs().items():
+        meta = style_meta(d)
+        if meta.get("imported_from"):  # someone else's style brought in: not this person's to send
+            continue
+        for sec, category in (("effects", "Effect"), ("transitions", "Transition")):
+            for i in section_items(d, sec):
+                rel = i["file"]
+                if f"/{LEARN_PRIVATE}/" in f"/{rel}" or ".still." in i["name"] or Path(rel).suffix.lower() not in BOARD_FILE_TYPES or i["size"] > BOARD_FILE_MAX:
+                    continue
+                key = board_seen_key(sid, rel, i["size"])
+                if key not in seen:
+                    keys.append(key)
+                    waiting.append({"kind": "file", "category": category, "path": str(d / rel)})
+    if first or keys:
+        board_mark_seen(keys)
+    if not first:
+        board_queue(waiting)
+
+
 def board_kind(text):
     """"Typography: tight tracking on big words" is that kind of rule; with no kind it's an effect."""
     m = re.match(rf"\s*({'|'.join(BOARD_KINDS)})s?\s*:\s*(.+)", str(text), re.I | re.S)
@@ -1269,8 +1337,8 @@ def board_send():
     items, failed = read_quiet(sending).get("items", []), []
     rules = [i for i in items if i.get("kind") == "rule"]
     try:
-        for at in range(0, len(rules), 100):
-            batch = rules[at:at + 100]
+        for at in range(0, len(rules), 40):
+            batch = rules[at:at + 40]
             try:
                 approval.shared_call(DATA, "/effects/board/rules", rules=[{"text": r["text"], "category": r["category"]} for r in batch])
             except (approval.ApprovalError, OSError):
@@ -1280,9 +1348,11 @@ def board_send():
             if not path.is_file():
                 continue  # taken out of the style since
             try:
-                described = {"name": path.name, "category": item["category"]}
-                url = approval.shared_call(DATA, "/effects/board/file-start", bytes=path.stat().st_size, **described)["upload_url"]
-                file_id = drive_upload_file(url, path, {}).get("id")
+                described = {"name": path.name, "category": item["category"], **board_facts(path)}
+                started = approval.shared_call(DATA, "/effects/board/file-start", bytes=path.stat().st_size, **described)
+                if started.get("duplicate"):  # something online already looks like this
+                    continue
+                file_id = drive_upload_file(started["upload_url"], path, {}).get("id")
                 approval.shared_call(DATA, "/effects/board/file-finish", file_id=file_id, **described)
             except (approval.ApprovalError, StudioError, OSError, KeyError):
                 failed.append(item)
@@ -1356,6 +1426,7 @@ def effects_board_sync(files=True, force=False):
         return
     write_json(mark, {"at": time.time()})
     try:
+        board_scan()
         board_send()
         items = approval.shared_call(DATA, "/effects/board/list")["items"]
         board_write(items)
@@ -1363,6 +1434,12 @@ def effects_board_sync(files=True, force=False):
         return
     if files:
         threading.Thread(target=board_fetch_files, args=(items,), daemon=True).start()
+
+
+def effects_access(user):
+    """The panel is the owner's own: every effect from everyone is in it. Everyone else's Claude still gets the written rules in its guide."""
+    if not can_remove_effects(user):
+        raise auth.Forbidden("The Effects panel is only for the studio's owner.")
 
 
 def effects_library(user=None):
@@ -2730,15 +2807,18 @@ def learn_steps(v):
     d = next((x for x in v["drafts"] if x["version"] == job.get("version")), None)
     vid = v["id"]
     notes = [n for n in v["notes"] if n.get("text")]
+    effects_board_sync(files=False)
+    board_guide = effects_cache() / BOARD_TAG / "STYLE.md"
     return "\n".join([
         f'LEARN FROM THE APPROVED VIDEO: "{v["name"]}" draft {job.get("version")} was approved. Don\'t start another draft. Teach its style what worked, following "After approval" in the editors-hub skill:',
         f"The approved video: {Path(v['folder']) / d['file'] if d else '(its draft file is missing)'}",
         f"The style's guide: {sdir / 'STYLE.md'}",
         f"Its folder, with this edit's project files: {v['folder']}",
         f"Notes it took to get there: {len(notes)} (studio.py notes {vid} --all shows open ones; video.json has them all)",
+        *([f"Already in the online panel: {board_guide}. Read it first: add only what's really different from it. A new way of saying the same thing, or another of the same type of effect, doesn't belong."] if board_guide.exists() else []),
         "1. Look at the approved video and compare it with the guide: what effects, animations, transitions, pacing or sound does it do well that the guide doesn't say yet?",
         f'2. Save each new thing: studio.py learn {vid} --rule "a rule for future edits" --effect "Short name:<from>-<to>" --transition "Short name:<from>-<to>"',
-        f"   --effect and --transition cut that moment (up to {LEARN_CLIP_MAX} seconds) out of the approved video for the Effects panel. Those clips stay private to this studio. --effect-file <file> adds a video or picture you made with no client footage, name or logo: it goes online for every studio to learn from (--file-kind says if it's Animation, Effect, Typography or Transition).",
+        f"   --effect and --transition cut that moment (up to {LEARN_CLIP_MAX} seconds) out of the approved video for the Effects panel. They go to the studio owner's Effects panel, and to no one else. --effect-file <file> adds a video or picture you made, which goes the same way (--file-kind says if it's Animation, Effect, Typography or Transition).",
         "   Each rule goes online for every studio to learn from. Start it with its kind, like \"Typography: tight tracking on big words\" (Animation, Effect, Typography, Transition, Pacing or Sound). Never name the client or the video, and don't repeat what the guide already says.",
         f"3. When that's all: studio.py learn {vid} --done",
     ])
@@ -2806,9 +2886,11 @@ def learn_from_approved(vid, rules=(), effects=(), transitions=(), files=(), don
     sdir = style_dir(v["style"])
     added_rules = [r for r in rules if learn_rule(sdir / "STYLE.md", r)]
     online = [{"kind": "rule", "category": kind, "text": text[:600]} for kind, text in kinds if text[:600] in added_rules]
+    sid = sdir.name
     file_kind = next((k for k in BOARD_KINDS if k.lower() == str(file_kind).strip().lower()), "Animation")
-    added = [learn_clip(v, source, spec, "effects").stem for spec in effects]
-    added += [learn_clip(v, source, spec, "transitions").stem for spec in transitions]
+    clips = [(learn_clip(v, source, spec, "effects"), "Effect") for spec in effects] + [(learn_clip(v, source, spec, "transitions"), "Transition") for spec in transitions]
+    added = [clip.stem for clip, _ in clips]
+    online += [{"kind": "file", "category": category, "path": str(clip)} for clip, category in clips if clip.stat().st_size <= BOARD_FILE_MAX]
     for f in files:
         f = Path(f)
         if not f.is_file():
@@ -2824,6 +2906,7 @@ def learn_from_approved(vid, rules=(), effects=(), transitions=(), files=(), don
         added.append(target.stem)
         if target.suffix.lower() in BOARD_FILE_TYPES and target.stat().st_size <= BOARD_FILE_MAX:  # others stay on this studio's panel
             online.append({"kind": "file", "category": file_kind, "path": str(target)})
+            board_mark_seen([board_seen_key(sid, target.relative_to(sdir).as_posix(), target.stat().st_size)])  # this one goes when the job's done
     with vlock(vid):
         v = load_video(vid)
         job = v.get("learn") or {}
@@ -4662,7 +4745,7 @@ class Handler(BaseHTTPRequestHandler):
                 self.need("owner", "editor")
                 return self.send_file(WEB / "style.html")
             if parts[0] == "effects-media" and len(parts) >= 3:
-                self.need("owner", "editor")
+                effects_access(self.user)
                 sdir = effects_source_dir(parts[1], self.user)
                 target = sdir.joinpath(*parts[2:]).resolve()
                 if sdir not in target.parents or not target.is_file():
@@ -4701,7 +4784,7 @@ class Handler(BaseHTTPRequestHandler):
                 except StudioError as e:
                     return self.send_json({"ready": False, "message": str(e), "styles": []})
             if parts == ["api", "effects"]:
-                self.need("owner", "editor")
+                effects_access(self.user)
                 return self.send_json(effects_library(self.user))
             if parts == ["api", "trash"]:
                 self.need("owner", "editor")
@@ -4828,6 +4911,7 @@ class Handler(BaseHTTPRequestHandler):
         # editors and the owner: making things, and sending notes to Claude
         self.need("owner", "editor")
         if method == "POST" and parts == ["api", "effects", "collect"]:
+            effects_access(self.user)
             return self.send_json(collect_effects(self.user))
         if method == "POST" and parts == ["api", "effects", "remove"]:
             return self.send_json(remove_effects(body.get("ids", []), bool(body.get("restore")), self.user))
@@ -5030,7 +5114,7 @@ class Handler(BaseHTTPRequestHandler):
             for p in list_projects()]
         me = accounts().public(self.user)
         visible = ("studio_name", "your_name", "library") if me["role"] == "owner" else ("studio_name",)
-        return {"me": me, "version": APP_VERSION, "approval": approval.status(DATA), "alone": not approval.open_to_others(DATA), "report": self.report_mode(), "updated": update_to_tell(me["email"]), "settings": {k: s[k] for k in visible},
+        return {"can_effects": can_remove_effects(self.user), "me": me, "version": APP_VERSION, "approval": approval.status(DATA), "alone": not approval.open_to_others(DATA), "report": self.report_mode(), "updated": update_to_tell(me["email"]), "settings": {k: s[k] for k in visible},
                 "projects": projects, "styles": styles, "videos": videos, "statuses": STATUSES,
                 "platform": "windows" if WINDOWS else "mac" if sys.platform == "darwin" else "linux"}
 
