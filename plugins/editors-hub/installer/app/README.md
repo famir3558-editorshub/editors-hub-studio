@@ -148,6 +148,10 @@ It trains the studio from everyone's work, and only the owner can see it.
 - **Who gets what:** the owner gets everything as **Studio training** in the Effects tab. Everyone else has no Effects tab and gets no files or clips. Their Claude sessions read the written rules, which can't name the client or the video.
 - **Where it's kept:** files are in an **Editors.Hub Effects** folder on the owner's Google Drive, up to 50 MB each. If a computer is offline, what it learned waits and goes next time. Only the owner can remove something, from the Effects tab.
 
+## Managing a video
+
+On Home, each video card has a folder button that opens the video's folder on this computer, and a ⋯ menu: Open, Rename, Open folder, Download the latest draft and Delete. Deleting moves the video, with its drafts and notes, to Recently deleted, where you can restore it. Only the owner, or whoever made the video, can rename or delete it, and not while Claude is working on it.
+
 ## Notifications
 
 The bell at the top of every page shows what needs you, what's running now, and what just happened: new drafts, approvals, notes from others, what the studio learned, and studio updates. Everyone hears about studio updates. Otherwise each person hears about their own work, including the owner: an editor gets the videos they made, and a client the videos they're invited to. The owner also hears about every report sent with **Report to owner**, within about a minute, and clicking one opens the reports page. It's worked out from the videos each time, so it can't go out of step with them, and opening it clears the count, apart from what still needs you.

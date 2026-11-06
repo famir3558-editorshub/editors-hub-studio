@@ -482,6 +482,47 @@ def delete_style(style_id, user=None):
     return {"id": style_id, "name": meta["name"], "trash": dest.name}
 
 
+def can_manage_video(v, user):
+    """The owner, or whoever made the video. Videos from before makers were recorded are the owner's."""
+    return user is None or user["role"] == "owner" or (bool(v.get("maker")) and v.get("maker") == user["email"])
+
+
+def rename_video(vid, name, user=None):
+    name = str(name or "").strip()[:120]
+    if not name:
+        raise StudioError("Give it a name.")
+    with vlock(vid):
+        v = load_video(vid)
+        if not can_manage_video(v, user):
+            raise auth.Forbidden("Only the person who made this video, or the owner, can rename it.")
+        v["name"] = name
+        save_video(v)
+    return video_summary(load_video(vid))
+
+
+def delete_video(vid, user=None):
+    """Moves one video, with its drafts and notes, into Recently deleted. Nothing is erased; it can be restored."""
+    v = load_video(vid)
+    if not can_manage_video(v, user):
+        raise auth.Forbidden("Only the person who made this video, or the owner, can delete it.")
+    if claude_status(v["folder"])["listening"] or edit_in_progress(v):
+        raise StudioError("Claude is working on this video right now. Try again when it's done.")
+    if v.get("live"):
+        stop_live(vid)
+    clear_start(vid)
+    drop_quiet(learn_file(vid))
+    src = Path(v["folder"])
+    with LOCK:
+        trash = library() / TRASH
+        trash.mkdir(exist_ok=True)
+        dest = trash / f"{time.strftime('%Y%m%d-%H%M%S')}-video-{vid}"
+        shutil.move(str(src), str(dest / vid))
+        write_json(dest / ".deleted.json", {"kind": "video", "id": vid, "name": v["name"], "home": str(src.parent),
+                                            "project": v.get("project", ""), "style": v.get("style", ""), "maker": v.get("maker", ""),
+                                            "deleted_by": (user or {}).get("email") or settings()["owner_email"], "deleted": now()})
+    return {"id": vid, "name": v["name"], "trash": dest.name}
+
+
 def list_trash(user=None):
     out = []
     trash = library() / TRASH
@@ -491,7 +532,7 @@ def list_trash(user=None):
             continue
         if user is not None and user["role"] != "owner" and user["email"] not in (info.get("maker"), info.get("deleted_by")):
             continue
-        videos = len(list(d.glob("videos/*/video.json")))
+        videos = 1 if info.get("kind") == "video" else len(list(d.glob("videos/*/video.json")))
         out.append({**info, "trash": d.name, "videos": videos})
     return out
 
@@ -520,6 +561,8 @@ def restore_style(trash_name, user=None):
     info = read_json(d / ".deleted.json") if d.parent == library() / TRASH and d.is_dir() else None
     if not info or (user is not None and user["role"] != "owner" and user["email"] not in (info.get("maker"), info.get("deleted_by"))):
         raise NotFound("That isn't in Recently deleted.")
+    if info.get("kind") == "video":
+        return restore_video(d, info)
     is_project = info.get("kind") == "project"
     with LOCK:
         sid, n = info["id"], 2
@@ -536,6 +579,28 @@ def restore_style(trash_name, user=None):
         (d / ".deleted.json").unlink()
         shutil.move(str(d), str(dest))
     return {**project_meta(dest), "kind": "project"} if is_project else style_meta(dest)
+
+
+def restore_video(d, info):
+    """Back where it was: its client's or its style's videos. If that client or style is gone too, bring that back first."""
+    home = Path(info["home"])
+    if info.get("project"):
+        pdir = project_dirs().get(info["project"])
+        home = pdir / "videos" if pdir else None
+    elif not home.is_dir():
+        sdir = style_dirs().get(info.get("style", ""))
+        home = sdir / "videos" if sdir else None
+    if home is None:
+        raise StudioError(f"The {'client' if info.get('project') else 'style'} this video belongs to is gone. Restore that first, then this video.")
+    with LOCK:
+        vid = info["id"]
+        name, n = vid, 2
+        while name in video_dirs():  # a video made since with the same name keeps its own
+            name, n = f"{vid}-{n}", n + 1
+        home.mkdir(parents=True, exist_ok=True)
+        shutil.move(str(d / vid), str(home / name))
+        shutil.rmtree(d, ignore_errors=True)
+    return {"id": name, "name": info["name"], "kind": "video"}
 
 
 # ---------------------------------------------------------------- projects: one client each, kept apart from styles
@@ -986,7 +1051,7 @@ def video_summary(v, styles=None, projects=None):
             "style_name": style.get("name") or f"{v['style']} (style not in this studio)",
             "project": v.get("project", ""), "project_name": project.get("name", ""),
             "status": v["status"], "created": v["created"], "updated": v.get("updated", v["created"]),
-            "draft_count": len(v["drafts"]), "latest": latest,
+            "draft_count": len(v["drafts"]), "latest": latest, "latest_file": v["drafts"][-1]["file"] if v["drafts"] else "", "maker": v.get("maker", ""),
             "open_notes": sum(1 for n in v["notes"] if not n["done"] and n["version"] == latest),
             "thumb": (Path(v["folder"]) / "thumb.jpg").exists(), "preview": video_preview(v), "style_shared": style_meta(sdir)["shared"] if sdir else False,
             "render_waiting": (v.get("render_request") or {}).get("status") == "waiting",
@@ -5339,6 +5404,10 @@ class Handler(BaseHTTPRequestHandler):
         if method == "POST" and parts[:2] == ["api", "videos"] and parts[3:] == ["feedback"]:
             submit_feedback(parts[2], self.user["username"])
             return self.send_json(video_view(load_video(parts[2])))
+        if method == "POST" and parts[:2] == ["api", "videos"] and parts[3:] == ["rename"]:
+            return self.send_json(rename_video(parts[2], body.get("name"), self.user))
+        if method == "DELETE" and parts[:2] == ["api", "videos"] and len(parts) == 3:
+            return self.send_json(delete_video(parts[2], self.user))
         if method == "POST" and parts[:2] == ["api", "videos"] and parts[3:] == ["style"]:
             set_video_style(parts[2], body.get("style", ""), self.user)
             return self.send_json(video_view(load_video(parts[2])))

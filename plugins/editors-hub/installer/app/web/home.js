@@ -89,12 +89,71 @@ function render() {
   ].join("\n");
 }
 
+const FOLDER_ICON = `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>`;
+
+function openVideoMenu(btn, v) {
+  closeMenus();
+  const me = S.state.me;
+  const mine = me.role === "owner" || (v.maker && v.maker === me.email);
+  const act = async (fn) => { closeMenus(); try { await fn(); } catch (e) { toast(e.message, true); } };
+  const items = [
+    ["Open", () => (location.href = `/review/${enc(v.id)}`)],
+    mine && ["Rename", () => act(async () => {
+      const name = await ehPrompt("The video's new name:", v.name, { title: "Rename the video" });
+      if (!name || name.trim() === v.name) return;
+      await api("POST", `/api/videos/${enc(v.id)}/rename`, { name });
+      toast("Renamed");
+      load();
+    })],
+    ["Open folder", () => act(() => api("POST", "/api/reveal", { video: v.id }))],
+    v.latest_file && ["Download the latest draft", () => { closeMenus(); const a = document.createElement("a"); a.href = `/media/${enc(v.id)}/${v.latest_file.split("/").map(enc).join("/")}`; a.download = `${v.name} v${v.latest}${v.latest_file.slice(v.latest_file.lastIndexOf("."))}`; a.click(); }],
+    mine && "-",
+    mine && ["Delete", () => act(async () => {
+      if (!(await ehConfirm(`"${v.name}" moves to Recently deleted, with its drafts and notes. You can restore it from there.`, { title: "Delete this video?", ok: "Delete", danger: true }))) return;
+      await api("DELETE", `/api/videos/${enc(v.id)}`);
+      toast(`"${v.name}" moved to Recently deleted`);
+      load();
+      loadTrash();
+    }), "danger"],
+  ].filter(Boolean);
+  const menu = document.createElement("div");
+  menu.className = "menu";
+  menu.setAttribute("role", "menu");
+  items.forEach((it) => {
+    if (it === "-") return menu.appendChild(document.createElement("hr"));
+    const b = document.createElement("button");
+    b.type = "button";
+    b.textContent = it[0];
+    if (it[2]) b.className = it[2];
+    b.onclick = (e) => { e.stopPropagation(); it[1](); };
+    menu.appendChild(b);
+  });
+  document.body.appendChild(menu);
+  const r = btn.getBoundingClientRect();
+  menu.style.left = `${Math.max(8, Math.min(r.right - menu.offsetWidth, innerWidth - menu.offsetWidth - 8))}px`;
+  menu.style.top = `${Math.max(8, r.bottom + 6 + menu.offsetHeight > innerHeight ? r.top - menu.offsetHeight - 6 : r.bottom + 6)}px`;
+}
+
+// the card is a link: its buttons work without opening the video
+document.addEventListener("click", (e) => {
+  const folder = e.target.closest("[data-video-folder]"), more = e.target.closest("[data-video-menu]");
+  if (!folder && !more) return;
+  e.preventDefault();
+  e.stopPropagation();
+  if (folder) return api("POST", "/api/reveal", { video: folder.dataset.videoFolder }).catch((err) => toast(err.message, true));
+  const v = (S.state?.videos || []).find((x) => x.id === more.dataset.videoMenu);
+  if (v) openVideoMenu(more, v);
+}, true);
+
 function videoCard(v) {
   const initials = v.name.split(/\s+/).slice(0, 2).map((w) => w[0] || "").join("").toUpperCase();
   const thumb = v.thumb ? `<img src="/media/${enc(v.id)}/thumb.jpg?${enc(v.updated)}" alt="" loading="lazy">` : `<div class="ph">${esc(initials)}</div>`;
   const notes = v.open_notes ? ` · <b>${v.open_notes} open note${v.open_notes > 1 ? "s" : ""}</b>` : "";
+  const tools = S.state.me.role === "reviewer" ? "" : `<span class="card-tools">
+      <button type="button" class="card-tool" data-video-folder="${esc(v.id)}" title="Open its folder" aria-label="Open its folder">${FOLDER_ICON}</button>
+      <button type="button" class="card-tool" data-menu data-video-menu="${esc(v.id)}" title="More" aria-label="More">⋯</button></span>`;
   return `<a class="card" href="/review/${enc(v.id)}"${previewAttr(v)}>
-    <div class="thumb">${thumb}<span class="pill ${statusClass(v.status)}">${esc(v.status)}</span>${v.latest ? `<span class="ver">v${v.latest}</span>` : ""}</div>
+    <div class="thumb">${thumb}<span class="pill ${statusClass(v.status)}">${esc(v.status)}</span>${tools}${v.latest ? `<span class="ver">v${v.latest}</span>` : ""}</div>
     <div class="body"><div class="title">${esc(v.name)}</div>
       <div class="meta">${v.project_name ? esc(v.project_name) + " · " : ""}${esc(v.style_name)}${v.latest ? "" : " · no draft yet"}${notes}</div>
       <div class="meta faint">Updated ${ago(v.updated)}</div></div></a>`;
@@ -562,10 +621,10 @@ async function loadTrash() {
   try { items = (await api("GET", "/api/trash")).items; } catch (e) { return; }
   S.deleted = items;
   $("deletedCount").textContent = items.length || "";
-  const group = (title, list) => list.length ? `<section class="deleted-group"><h3>${title}</h3>${list.map((i) => `<div class="trash-row"><div><b>${esc(i.name)}</b><small>${i.videos} video${i.videos === 1 ? "" : "s"} · deleted ${ago(i.deleted)}${i.shared ? " · was shared" : ""}</small></div>
+  const group = (title, list) => list.length ? `<section class="deleted-group"><h3>${title}</h3>${list.map((i) => `<div class="trash-row"><div><b>${esc(i.name)}</b><small>${i.kind === "video" ? (i.project ? "Client video" : "Style video") : `${i.videos} video${i.videos === 1 ? "" : "s"}`} · deleted ${ago(i.deleted)}${i.shared ? " · was shared" : ""}</small></div>
     <div class="row"><button class="btn small" data-restore="${esc(i.trash)}">Restore</button><button class="btn small danger" data-erase="${esc(i.trash)}">Delete forever</button></div></div>`).join("")}</section>` : "";
-  $("deletedList").innerHTML = group("Clients", items.filter((i) => i.kind === "project")) + group("Styles", items.filter((i) => i.kind !== "project")) ||
-    `<div class="empty"><h3>Nothing here</h3><p>When you delete a client or a style, it waits here until you restore it.</p></div>`;
+  $("deletedList").innerHTML = group("Clients", items.filter((i) => i.kind === "project")) + group("Styles", items.filter((i) => !i.kind || i.kind === "style")) + group("Videos", items.filter((i) => i.kind === "video")) ||
+    `<div class="empty"><h3>Nothing here</h3><p>When you delete a client, a style or a video, it waits here until you restore it.</p></div>`;
 }
 const restoreFromTrash = async (e) => {
   const b = e.target.closest("[data-restore]");
@@ -575,7 +634,7 @@ const restoreFromTrash = async (e) => {
     toast(`"${r.name}" is back`);
     await load();
     loadTrash();
-    setTab(r.kind === "project" ? "projects" : "styles");
+    setTab(r.kind === "project" ? "projects" : r.kind === "video" ? "videos" : "styles");
   } catch (ex) { toast(ex.message, true); }
 };
 $("deletedList").addEventListener("click", restoreFromTrash);
