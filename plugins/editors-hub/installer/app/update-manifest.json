@@ -1,5 +1,5 @@
 {
-"version": "1.29.0",
+"version": "1.29.1",
 "files": {
 "approval-service.json": "5fbc80d9bce24d1de021f328df110e8957c35ad0bf10b8d143af9865820cda86",
 "approval.py": "c0a5f968f052cb7eecc80d5981b010b81458f520d24d90b0ffbb9f84ecab1cc7",
@@ -8,7 +8,7 @@
 "Editors.Hub.command": "a7a12b2401eada2a19b800aa31b888373efde3f52c1c746b6dbf7661ce83113e",
 "hubsetup.py": "422e2a8212bbc8313a4a135eb4b17662b10647d0a5cef047e6cc3ba7095b4e68",
 "keys.py": "e0716cefcec92782f4f660ee513e712131a8336f7f6c5826ed0c9eace449f46d",
-"README.md": "620cca967d0ea6f15a3d4ec01062535a9cb6e7470e05ea2a2b2f87673c8927c7",
+"README.md": "09051067e4e15c2916bac953b5d2d22f5e7483bf191bcc7033bd4bf988b7086b",
 "skills/broll-stacked-text-edit/assets/fonts/PlayfairDisplay-Italic.ttf": "66f68e2ec819f94126719ec65107dd3613338d28db2c4822a2902140afd1762c",
 "skills/broll-stacked-text-edit/references/text-reference.md": "c9d688b553901026695a61b080dc7db01e1f2027003c8a83ac2a3e792c854bb6",
 "skills/broll-stacked-text-edit/scripts/01_prep.py": "fdeae28cd67f3f583997424818848c782e2d931b795044917c21d38fc83802d0",
@@ -749,18 +749,18 @@
 "skills/youtube-clips/setup/SETUP.md": "c94401cce3da40a4c254de4c6443389df3a0fee8784e37489e6794fff5f1efe4",
 "skills/youtube-clips/setup/SHARED-SETUP.md": "8675064726241ddc8f19a715fff7cf16ea1b955dbd589d34df551a0f081159d2",
 "skills/youtube-clips/SKILL.md": "c6ef731482a70f87b951eb5312e2118fee0148fee78a5ee7c238e4dbe871e5e8",
-"studio.py": "b8a095a84165de6410dc7303236986cb4cea48a5962dad3ba33ba1980653fc98",
+"studio.py": "9b706c1f75c2f0ef4ff0a6c8256c7476916af2908dab3f407bced6df1e6e4a51",
 "updater.py": "899c734ab2f79b3f41402cb755d80c977f5de29419660df739a3fb81a0da475d",
-"VERSION": "14f3cbec9273cc3930799347014ca4604809060bd82d753e2a14d104dda8c985",
+"VERSION": "81996ae8037bb61131878676a822f5488b34fc06807589e4214fab0b459a3673",
 "web/app.css": "25ad1466d48bc9546f554fa330e01d45ae22827963540bdb8d5f7410dbcb3254",
-"web/app.js": "929d39a7a7c8e2f2a3d6709e81aa253b141c16f9427a8791a392d801eacaadfa",
+"web/app.js": "1e38abd7cca3c841c5306ac9a56c6e1ab757a24869beec1800a48f48a7bef455",
 "web/approve.html": "05632b78433c7f81e14e9be9c6236380db3f607d44113ba669c6f1091148ccb4",
 "web/approve.js": "937fad411cb85eeb681326c41e894d66c027d033f8d51b6c8612a9da43cad300",
 "web/home.css": "c9c7ffe26a430d2f850afb9b90d7e7af3fb581ff9cddd1efa01d4c9aef2d156a",
 "web/home.html": "547f384210957dd8b9e7445655bbc358fe24a5ffc9ad37f0d504162d1a7c0452",
-"web/home.js": "732efce3f427f12856c236d8efb05d738ef199f996adda236f518f3d20d6df14",
+"web/home.js": "d9cea93dcff89373a80ffbf53d1149fc0de54d140f7e57a28d077d90f3eaf073",
 "web/project.html": "47ad4d24e1be83b58b07800647fc421739ea20c4d2242165095834f17a3904d9",
-"web/project.js": "8ec5c97853a165d4e1f41f27ebde81c318f3999e5fac3c31f10a2f4afd579a56",
+"web/project.js": "5dd4464d62d626257152a83fe141c91c0f974a730a924f74125f9dbee574e365",
 "web/review.css": "d1c1ad066249f9abc273c7be53a3acf8a0402cdd6356ad48efe58e9081c38bfd",
 "web/review.html": "a3ec9c43763233f48684c271c64bc9215d5baad035e77defebd6b00f7becfc8b",
 "web/review.js": "d87a846fe5a38d76a45a7b801488e12d5f751a53a797e4fb45bb72dd839faba3",
@@ -769,6 +769,6 @@
 "web/signin.js": "8fa828ea23eaeba6a9f50030b180bb79c1b1c7e1e03a929924a5e0ed5b5d3aeb",
 "web/style.css": "2f9db8717b9fb9b28b6c4aef2c2220f0f86a213d3751b85d6cdf09eb9a86be58",
 "web/style.html": "01c6b8fb11e3c3434c65ebd207c0ef25d0db86425fb8cec1e3c392ae8224df13",
-"web/style.js": "2963d6c7546347ed444012c5c1800ef14c5a595c7286485c69dd64eeab45a632"
+"web/style.js": "151b40a0f721122539dbee39f2972cc3a9164d772842e8535573abeedc8ed2c5"
 }
 }

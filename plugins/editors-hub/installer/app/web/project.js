@@ -124,8 +124,10 @@ async function renderPane() {
 
 function tile(it) {
   const url = pmedia(it.file);
-  const box = it.kind === "image" ? `<img src="${url}" alt="" loading="lazy">` : `<span class="icon">📄</span>`;
-  return `<a class="tile" href="${url}" target="_blank" rel="noopener" title="${esc(it.file)}"><div class="box">${box}${it.kind !== "image" ? `<span class="badge-k">${esc(it.name.split(".").pop())}</span>` : ""}</div>
+  const box = it.kind === "image" ? `<img src="${url}" alt="" loading="lazy">`
+    : it.kind === "video" ? `<img src="${url}?peek=still" alt="" loading="lazy" onerror="this.remove()">`
+    : it.kind === "audio" ? `<audio controls preload="none" src="${url}"></audio>` : `<span class="icon">📄</span>`;
+  return `<a class="tile" href="${url}" target="_blank" rel="noopener" title="${esc(it.file)}"${it.kind === "video" ? ` data-preview="${url}?peek=clip"` : ""}><div class="box">${box}${it.kind !== "image" ? `<span class="badge-k">${esc(it.name.split(".").pop())}</span>` : ""}</div>
     <div class="cap"><b>${esc(it.name)}</b><span>${fmtSize(it.size)}</span></div></a>`;
 }
 

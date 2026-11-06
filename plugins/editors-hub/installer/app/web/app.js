@@ -392,7 +392,7 @@ function hoverStop() {
 }
 
 function hoverStart(card) {
-  const box = card.querySelector(".thumb, .th");
+  const box = card.querySelector(".thumb, .th, .box");
   if (!box) return;
   const video = document.createElement("video");
   Object.assign(video, { muted: true, loop: true, playsInline: true, preload: "auto", className: "hover-video" });
@@ -400,7 +400,8 @@ function hoverStart(card) {
   video.addEventListener("playing", () => video.classList.add("on"));
   video.addEventListener("error", () => { if (Hover.video === video) hoverStop(); });  // the still stays
   video.src = card.dataset.preview;
-  (box.querySelector("img, .ph") || box.firstChild)?.after(video);
+  const still = box.querySelector(":scope > img, .ph");
+  if (still) still.after(video); else box.prepend(video);
   Hover.video = video;
   video.play().catch(() => {});
 }

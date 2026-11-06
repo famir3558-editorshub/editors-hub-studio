@@ -2311,6 +2311,73 @@ def probe_media(path):
         return {}
 
 
+# ---------------------------------------------------------------- quick looks at clips
+# Clips in a style or project are often 4K or ProRes: too big or not playable in a browser, and many came
+# without a still. A small still and, when needed, a small H.264 copy are made the first time a card asks,
+# and kept in data/peek (never next to the clip, so they don't end up in shares or downloads).
+
+PEEK_TURNS = threading.Semaphore(3)
+PEEK_LOCKS = {}
+PEEK_KEEP = 2000  # files kept in data/peek before the oldest go
+BROWSER_CODECS = {"h264", "vp8", "vp9", "av1"}
+
+
+def plays_in_browser(path):
+    ffprobe = shutil.which("ffprobe")
+    if not ffprobe:
+        return True
+    try:
+        r = subprocess.run([ffprobe, "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=codec_name,pix_fmt,width,height",
+                            "-of", "json", str(path)], capture_output=True, text=True, timeout=30)
+        st = json.loads(r.stdout)["streams"][0]
+    except (OSError, ValueError, KeyError, IndexError, subprocess.TimeoutExpired):
+        return True
+    small = st.get("width", 0) * st.get("height", 0) <= 1920 * 1088 or path.stat().st_size <= 15_000_000
+    return st.get("codec_name") in BROWSER_CODECS and st.get("pix_fmt") in ("yuv420p", "yuvj420p") and small
+
+
+def peek(path, what):
+    """A small still ("still") or a browser-friendly clip ("clip") of the video at path."""
+    ffmpeg = shutil.which("ffmpeg")
+    if what == "clip" and (not ffmpeg or plays_in_browser(path)):
+        return path
+    if not ffmpeg:
+        raise NotFound("no still")
+    st = path.stat()
+    key = hashlib.sha1(f"{path.resolve()}|{st.st_size}|{int(st.st_mtime)}".encode("utf-8", "replace")).hexdigest()
+    out = DATA / "peek" / f"{key}.{'jpg' if what == 'still' else 'mp4'}"
+    if out.exists():
+        return out
+    with PEEK_LOCKS.setdefault(out.name, threading.Lock()), PEEK_TURNS:
+        if out.exists():
+            return out
+        out.parent.mkdir(parents=True, exist_ok=True)
+        part = out.with_name(f"{key}.part{out.suffix}")
+        if what == "still":
+            tries = [["-ss", seek, "-i", str(path), "-frames:v", "1", "-vf", "scale='min(640,iw)':-2", "-q:v", "4"] for seek in ("1", "0")]
+        else:
+            tries = [["-i", str(path), "-t", "8", "-an", "-vf", "scale='min(640,iw)':-2:flags=bilinear,fps=30",
+                      "-c:v", "libx264", "-preset", "veryfast", "-crf", "27", "-pix_fmt", "yuv420p", "-movflags", "+faststart"]]
+        for args in tries:
+            try:
+                subprocess.run([ffmpeg, "-y", "-loglevel", "error", *args, str(part)], capture_output=True, timeout=180)
+            except (OSError, subprocess.TimeoutExpired):
+                break
+            if part.exists() and part.stat().st_size:
+                part.replace(out)
+                break
+        part.unlink(missing_ok=True)
+        PEEK_LOCKS.pop(out.name, None)
+    if not out.exists():
+        if what == "clip":
+            return path
+        raise NotFound("no still")
+    olds = sorted((DATA / "peek").glob("*.*"), key=lambda f: f.stat().st_mtime)
+    for f in olds[:-PEEK_KEEP]:
+        f.unlink(missing_ok=True)
+    return out
+
+
 def render_size(width, height, resolution):
     if resolution == "same":
         return width - width % 2, height - height % 2
@@ -5000,6 +5067,12 @@ class Handler(BaseHTTPRequestHandler):
     def send_json(self, data, status=200):
         self.send_body(json.dumps(data).encode(), "application/json", status)
 
+    def send_media(self, target, query):
+        what = query.get("peek", [""])[0]
+        if what in ("still", "clip") and kind_of(target.name) == "video":
+            return self.send_file(peek(target, what))
+        return self.send_file(target)
+
     def send_file(self, path):
         size = path.stat().st_size
         ctype = MEDIA_TYPES.get(path.suffix.lower()) or mimetypes.guess_type(path.name)[0] or "application/octet-stream"
@@ -5228,14 +5301,14 @@ class Handler(BaseHTTPRequestHandler):
                 target = sdir.joinpath(*parts[2:]).resolve()
                 if sdir not in target.parents or not target.is_file():
                     raise NotFound("no such file")
-                return self.send_file(target)
+                return self.send_media(target, query)
             if parts[0] == "style-media" and len(parts) >= 3:
                 self.need("owner", "editor")
                 sdir = style_dir(parts[1], self.user).resolve()
                 target = sdir.joinpath(*parts[2:]).resolve()
                 if sdir not in target.parents or not target.is_file():
                     raise NotFound("no such file")
-                return self.send_file(target)
+                return self.send_media(target, query)
             if parts[0] == "project" and len(parts) == 2:
                 self.need("owner", "editor")
                 return self.send_file(WEB / "project.html")
@@ -5245,7 +5318,7 @@ class Handler(BaseHTTPRequestHandler):
                 target = pdir.joinpath(*parts[2:]).resolve()
                 if pdir not in target.parents or not target.is_file():
                     raise NotFound("no such file")
-                return self.send_file(target)
+                return self.send_media(target, query)
             if parts[:2] == ["api", "projects"] and len(parts) >= 3:
                 self.need("owner", "editor")
                 if len(parts) == 3:

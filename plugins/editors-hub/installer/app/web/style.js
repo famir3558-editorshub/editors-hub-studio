@@ -128,7 +128,6 @@ async function renderPane() {
     if (P.tab !== tab) return;
     $("secCount").textContent = `${items.length} item${items.length === 1 ? "" : "s"}`;
     $("media").innerHTML = items.length ? items.map(tile).join("") : `<div class="empty-pane" style="grid-column:1/-1">Nothing in ${esc(label)} yet.</div>`;
-    lazyVideos();
   } catch (e) {
     $("media").innerHTML = `<div class="empty-pane">${esc(e.message)}</div>`;
   }
@@ -143,29 +142,12 @@ function tile(it) {
   const url = smedia(it.file);
   let box;
   if (it.kind === "image") box = `<img src="${url}" alt="" loading="lazy">`;
-  else if (it.kind === "video") box = it.poster ? `<img src="${smedia(it.poster)}" alt="" loading="lazy" data-video="${url}">` : `<video muted playsinline preload="none" data-src="${url}#t=0.5"></video>`;
+  else if (it.kind === "video") box = `<img src="${it.poster ? smedia(it.poster) : `${url}?peek=still`}" alt="" loading="lazy" onerror="this.remove()">`;
   else if (it.kind === "audio") box = `<audio controls preload="none" src="${url}"></audio>`;
   else box = `<span class="icon">📄</span>`;
-  return `<a class="tile" href="${url}" target="_blank" rel="noopener" title="${esc(it.file)}"><div class="box">${box}${it.kind !== "image" ? `<span class="badge-k">${esc(it.name.split(".").pop())}</span>` : ""}</div>
+  return `<a class="tile" href="${url}" target="_blank" rel="noopener" title="${esc(it.file)}"${it.kind === "video" ? ` data-preview="${url}?peek=clip"` : ""}><div class="box">${box}${it.kind !== "image" ? `<span class="badge-k">${esc(it.name.split(".").pop())}</span>` : ""}</div>
     <div class="cap"><b>${esc(it.name)}</b><span>${fmtSize(it.size)}${it.folder.split("/").length > 2 ? " · " + esc(it.folder.split("/").slice(2).join("/")) : ""}</span></div></a>`;
 }
-
-// videos without a still only load when they scroll into view; clips with a still play on hover
-function lazyVideos() {
-  const io = new IntersectionObserver((entries) => entries.forEach((e) => {
-    if (e.isIntersecting && e.target.dataset.src) { e.target.src = e.target.dataset.src; delete e.target.dataset.src; io.unobserve(e.target); }
-  }), { rootMargin: "200px" });
-  document.querySelectorAll("video[data-src]").forEach((v) => io.observe(v));
-}
-document.addEventListener("mouseover", (e) => {
-  const img = e.target.closest("img[data-video]");
-  if (!img) return;
-  const v = document.createElement("video");
-  Object.assign(v, { src: img.dataset.video, muted: true, autoplay: true, loop: true, playsInline: true });
-  v.poster = img.src;
-  img.replaceWith(v);
-  v.closest(".tile").addEventListener("mouseleave", () => v.pause(), { once: true });
-});
 
 // ---------------------------------------------------------------- actions
 

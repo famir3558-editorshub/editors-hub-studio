@@ -1089,7 +1089,7 @@ function drawEffects() {
   $("techCount").textContent = `Techniques · ${tech.length}`;
   $("effectsGrid").innerHTML = items.slice(0, 300).map((i) => {
     const url = effectUrl(i.source, i.file);
-    const view = i.kind === "video" ? `<video src="${esc(url)}#t=0.1" muted loop playsinline preload="metadata"${i.poster ? ` poster="${esc(effectUrl(i.source, i.poster))}"` : ""}></video>`
+    const view = i.kind === "video" ? `<video src="${esc(url)}?peek=clip" muted loop playsinline preload="none" poster="${esc(i.poster ? effectUrl(i.source, i.poster) : `${url}?peek=still`)}"></video>`
       : i.kind === "image" ? `<img src="${esc(url)}" alt="" loading="lazy">`
       : i.kind === "audio" ? `<audio src="${esc(url)}" controls preload="none"></audio>` : `<div class="effect-file">${esc((i.name.split(".").pop() || "").toUpperCase())}</div>`;
     return `<a class="effect" href="${esc(url)}" target="_blank" rel="noopener"><div class="effect-view">${view}</div><b title="${esc(i.name)}">${esc(i.name)}</b><small>${esc(i.style)} · ${i.section === "transitions" ? "Transition" : "Effect"}</small>${effects.can_remove ? `<button type="button" class="btn small effect-remove" data-effect-remove="${esc(i.rid)}">Remove</button>` : ""}</a>`;

@@ -148,6 +148,10 @@ It trains the studio from everyone's work, and only the owner can see it.
 - **Who gets what:** the owner gets everything as **Studio training** in the Effects tab. Everyone else has no Effects tab and gets no files or clips. Their Claude sessions read the written rules, which can't name the client or the video.
 - **Where it's kept:** files are in an **Editors.Hub Effects** folder on the owner's Google Drive, up to 50 MB each. If a computer is offline, what it learned waits and goes next time. Only the owner can remove something, from the Effects tab.
 
+## Clips in a style or project
+
+Every clip in a style's or project's sections shows a still and plays silently when you hover over it, even 4K or ProRes clips a browser can't play: the studio makes a small copy for the preview the first time, and keeps it in its own data folder, so the style itself is left as it is.
+
 ## Managing a video
 
 On Home, each video card has a folder button that opens the video's folder on this computer, and a ⋯ menu: Open, Rename, Open folder, Download the latest draft and Delete. Deleting moves the video, with its drafts and notes, to Recently deleted, where you can restore it. Only the owner, or whoever made the video, can rename or delete it, and not while Claude is working on it.
