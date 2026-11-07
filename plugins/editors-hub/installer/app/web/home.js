@@ -1337,6 +1337,7 @@ function openClientShareDialog(pid) {
     prog.hidden = false;
     try {
       let job = await api("POST", `/api/projects/${enc(pid)}/link`, { videos: chosen, download: dlg.querySelector("#shDl").checked, comments: dlg.querySelector("#shCm").checked });
+      shareStopButton(dlg, job);
       while (job.state === "running") {
         const pct = job.total_bytes ? Math.round((100 * job.done_bytes) / job.total_bytes) : 0;
         prog.querySelector(".act-bar div").style.width = `${Math.max(4, pct)}%`;

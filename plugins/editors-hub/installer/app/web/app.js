@@ -491,6 +491,24 @@ if (document.readyState === "loading") document.addEventListener("DOMContentLoad
 
 // ---- Share: a private link to one draft for a client with no account (Home's ⋯ menu and the review page share it)
 
+// while a Share window uploads, everything else in it is locked: this Stop (or Esc) ends the upload and cleans up
+function shareStopButton(dlg, job) {
+  const b = document.createElement("button");
+  b.type = "button";
+  b.className = "btn danger";
+  b.textContent = "Stop";
+  const stop = async () => {
+    if (b.disabled) return;
+    b.disabled = true;
+    b.textContent = "Stopping…";
+    try { await api("POST", `/api/jobs/${job.id}/stop`, {}); } catch (e) { b.disabled = false; b.textContent = "Stop"; toast(e.message, true); }
+  };
+  b.onclick = stop;
+  dlg.addEventListener("cancel", (e) => { e.preventDefault(); stop(); }, { once: true });
+  dlg.querySelector(".actions").prepend(b);
+  return b;
+}
+
 function openShareDialog(v, onChange = () => {}) {
   const drafts = v.drafts ? v.drafts.map((d) => d.version) : v.latest ? Array.from({ length: v.latest }, (_, i) => i + 1) : [];
   const latest = drafts.length ? Math.max(...drafts) : 0;
@@ -549,6 +567,7 @@ function openShareDialog(v, onChange = () => {}) {
     prog.hidden = false;
     try {
       let job = await api("POST", `/api/videos/${enc(v.id)}/link`, body);
+      shareStopButton(dlg, job);
       while (job.state === "running") {
         const pct = job.total_bytes ? Math.round((100 * job.done_bytes) / job.total_bytes) : 0;
         prog.querySelector(".act-bar div").style.width = `${job.stage === "Uploading" ? pct : 4}%`;
