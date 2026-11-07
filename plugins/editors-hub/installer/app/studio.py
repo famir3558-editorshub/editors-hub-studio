@@ -635,15 +635,58 @@ class JobPart(dict):
         return self.job.get(k, default) if k == "stop" else super().get(k, default)
 
 
+LINK_QUALITIES = (1080, 720, 480)  # smaller copies made for a link's quality menu, by the short side
+
+
+def ffmpeg_until_stopped(args, job):
+    """ffmpeg that the job's Stop can end. True when it made what it was asked to."""
+    p = subprocess.Popen([shutil.which("ffmpeg") or "ffmpeg", "-y", "-loglevel", "error", *args], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    while p.poll() is None:
+        if job.get("stop"):
+            p.kill()
+            p.wait()
+            raise JobStopped()
+        time.sleep(0.4)
+    return p.returncode == 0
+
+
+def link_copies(send, folder, job):
+    """720p, 480p and (for anything bigger) 1080p copies of what goes on a link: [(short side, file)]. Fewer for small drafts."""
+    m = probe_media(send)
+    w, h = m.get("width") or 0, m.get("height") or 0
+    short = min(w, h)
+    out = []
+    if not short or not shutil.which("ffmpeg"):
+        return short, out
+    for target in LINK_QUALITIES:
+        if short < target * 1.15:  # not worth a copy so close to the original
+            continue
+        job["stage"] = f"Making a {target}p copy"
+        dest = folder / f"{send.stem}-{target}p.mp4"
+        scale = f"scale={target}:-2" if w < h else f"scale=-2:{target}"
+        if ffmpeg_until_stopped(["-i", str(send), "-map", "0:v:0", "-map", "0:a:0?", "-vf", scale, "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
+                                 "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", str(dest)], job) and dest.exists():
+            out.append((target, dest))
+    return short, out
+
+
 def put_draft_on_link(vid, draft, user, job, download=None, comments=None, via_client=None):
     """Sends one draft up and puts it on the video's link (made the first time, the same one after). Runs inside a job."""
     v = load_video(vid)
     old = v.get("link") or {}
     src = Path(v["folder"]) / draft["file"]
     send, temp = link_video_file(src, job)
+    if not temp:
+        DATA.mkdir(parents=True, exist_ok=True)
+        temp = DATA / f"link-{secrets.token_hex(6)}"
+        temp.mkdir()
     try:
         check_stop(job)
+        height, copies = link_copies(send, temp, job)
         size = send.stat().st_size
+        extra = sum(f.stat().st_size for _, f in copies)
+        if job.get("several"):
+            job["total_bytes"] = job.get("total_bytes", 0) + extra
         job["stage"] = f"Uploading {v['name']}"
         name = f"{vid}-v{draft['version']}{send.suffix.lower()}"
         key = old.get("key")
@@ -657,12 +700,22 @@ def put_draft_on_link(vid, draft, user, job, download=None, comments=None, via_c
         if job.get("several"):  # one of a client's videos: the bar runs over all of them
             sent = drive_upload_file(started["upload_url"], send, JobPart(job, job.get("done_bytes", 0)))
         else:
-            job["total_bytes"] = size
+            job["total_bytes"] = size + extra
             sent = drive_upload_file(started["upload_url"], send, job)
+        sent_copies = []
+        for target, f in copies:
+            check_stop(job)
+            job["stage"] = f"Uploading {v['name']} ({target}p)"
+            cname = f"{vid}-v{draft['version']}-{target}p.mp4"
+            started_copy = approval.shared_call(DATA, "/links/start", name=cname, bytes=f.stat().st_size, **({"key": key} if key else {}))
+            part = JobPart(job, job.get("done_bytes", 0))
+            got = drive_upload_file(started_copy["upload_url"], f, part)
+            sent_copies.append({"file_id": got.get("id"), "name": cname, "height": target})
         job["stage"] = "Making the link"
         sets = {k: bool(val) for k, val in (("download", download), ("comments", comments)) if val is not None}
         poster = link_poster(send)
         link = approval.shared_call(DATA, "/links/finish", file_id=sent.get("id"), name=name, video_name=v["name"], draft=f"v{draft['version']}",
+                                    height=height or None, copies=sent_copies,
                                     **({"key": key} if key else {}), **({"poster": poster} if poster else {}), **sets)["link"]
     except approval.ApprovalError as e:
         raise StudioError(str(e))
