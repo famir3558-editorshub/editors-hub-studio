@@ -1290,7 +1290,7 @@ function openClientShareDialog(pid) {
     const want = shownNow || v.latest;
     return `<div class="share-video"><input type="checkbox" data-pick="${esc(v.id)}"${onLink.has(v.id) ? " checked" : ""} aria-label="${esc(v.name)}">
       <span class="sv-thumb">${v.thumb ? `<img src="/media/${enc(v.id)}/thumb.jpg?${enc(v.updated)}" alt="">` : ""}</span>
-      <span class="sv-name"><b>${esc(v.name)}</b><small>${shownNow ? `On the link: v${shownNow}${shownNow < v.latest ? ` · v${v.latest} is newer` : ""}` : "Not on the link"}</small></span>
+      <span class="sv-name"><b>${esc(v.name)}</b><small>${shownNow ? `On the link: v${shownNow}${shownNow < v.latest ? ` · v${v.latest} is newer` : v.link && !v.link.qualities ? " · Update the link to add quality choices" : ""}` : "Not on the link"}</small></span>
       <select data-ver="${esc(v.id)}">${Array.from({ length: v.latest }, (_, i) => v.latest - i).map((n) => `<option value="${n}"${n === want ? " selected" : ""}>v${n}</option>`).join("")}</select></div>`;
   }).join("");
   function picks() {

@@ -728,7 +728,8 @@ def put_draft_on_link(vid, draft, user, job, download=None, comments=None, via_c
         fresh["link"] = {"key": link["key"], "url": link["url"], "version": draft["version"], "download": link["download"],
                          "comments": link["comments"], "shared": now(), "by": (user or {}).get("email", ""),
                          "taken": old.get("taken", []) if same else [],
-                         "via_client": old.get("via_client") if same else via_client}
+                         "via_client": old.get("via_client") if same else via_client,
+                         "qualities": sorted({height, *(t for t, _ in copies)} - {0}, reverse=True)}
         save_video(fresh)
     return fresh["link"]
 
@@ -772,6 +773,11 @@ def client_link_call(pid, meta, key, keys, download=None, comments=None):
         raise StudioError(str(e))
 
 
+def link_needs_sending(link, draft):
+    """A video goes up again for a picked draft that isn't on its link yet, or one sent before links had quality copies."""
+    return not link or link.get("version") != draft["version"] or "qualities" not in link
+
+
 def share_client(pid, picks, user=None, download=None, comments=None):
     """picks: [{"video": id, "version": n}] in the order the client sees them. Drafts not already on their video's link go up."""
     d = project_dir(pid)
@@ -793,13 +799,13 @@ def share_client(pid, picks, user=None, download=None, comments=None):
 
     def work(job):
         job["several"] = True
-        sending = [(v, dr) for v, dr in chosen if (v.get("link") or {}).get("version") != dr["version"]]
+        sending = [(v, dr) for v, dr in chosen if link_needs_sending(v.get("link"), dr)]
         job["total_bytes"] = sum((Path(v["folder"]) / dr["file"]).stat().st_size for v, dr in sending)
         keys = {}
         for v, dr in chosen:
             check_stop(job)
             link = v.get("link")
-            if (link or {}).get("version") != dr["version"]:
+            if link_needs_sending(link, dr):
                 link = put_draft_on_link(v["id"], dr, user, job, via_client=pid)
             keys[v["id"]] = link["key"]
         job["stage"] = "Making the client's link"
@@ -1496,7 +1502,7 @@ def video_summary(v, styles=None, projects=None):
             "project": v.get("project", ""), "project_name": project.get("name", ""),
             "status": v["status"], "created": v["created"], "updated": v.get("updated", v["created"]),
             "draft_count": len(v["drafts"]), "latest": latest, "latest_file": v["drafts"][-1]["file"] if v["drafts"] else "", "maker": v.get("maker", ""),
-            "link": {k: v["link"][k] for k in ("url", "version", "download", "comments")} if v.get("link") else None,
+            "link": {**{k: v["link"][k] for k in ("url", "version", "download", "comments")}, "qualities": v["link"].get("qualities")} if v.get("link") else None,
             "open_notes": sum(1 for n in v["notes"] if not n["done"] and n["version"] == latest),
             "thumb": (Path(v["folder"]) / "thumb.jpg").exists(), "preview": video_preview(v), "style_shared": style_meta(sdir)["shared"] if sdir else False,
             "render_waiting": (v.get("render_request") or {}).get("status") == "waiting",

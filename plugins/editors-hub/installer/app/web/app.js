@@ -533,8 +533,8 @@ function openShareDialog(v, onChange = () => {}) {
     } else {
       dlg.innerHTML = `<form method="dialog"><h2>Share “${esc(v.name)}”</h2>
         <div class="share-link"><input id="shUrl" readonly value="${esc(link.url)}"><button type="button" class="btn primary" id="shCopy">Copy</button></div>
-        <p class="ask-text muted small-print">The link shows v${link.version}.${link.version < latest ? ` v${latest} is newer: pick it below and press Update the link: the same link then plays it.` : " A new draft goes on it only when you pick it here."} Anyone who has the link can watch it, so send it only to your client.</p>
-        ${pick(link.version < latest ? latest : link.version) ? `<div class="share-row">${pick(link.version < latest ? latest : link.version)}<button type="button" class="btn" id="shSwap">Update the link</button></div>` : ""}
+        <p class="ask-text muted small-print">The link shows v${link.version}.${link.version < latest ? ` v${latest} is newer: pick it below and press Update the link: the same link then plays it.` : !link.qualities ? " It was shared before quality choices: press Update the link to add them." : " A new draft goes on it only when you pick it here."} Anyone who has the link can watch it, so send it only to your client.</p>
+        ${pick(link.version < latest ? latest : link.version) || !link.qualities ? `<div class="share-row">${pick(link.version < latest ? latest : link.version)}<button type="button" class="btn" id="shSwap">Update the link</button></div>` : ""}
         ${opts(link)}<div class="share-progress" id="shProg" hidden><div class="act-bar"><div></div></div><small></small></div><p class="share-err">${esc(message)}</p>
         <div class="actions"><button type="button" class="btn danger" id="shOff">Turn off the link</button><span style="flex:1"></span><a class="btn ghost" href="${esc(link.url)}" target="_blank" rel="noopener">Open</a><button type="button" class="btn" data-close>Done</button></div></form>`;
       dlg.querySelector("#shCopy").onclick = async () => {
@@ -542,7 +542,7 @@ function openShareDialog(v, onChange = () => {}) {
       };
       dlg.querySelector("#shUrl").onfocus = (e) => e.target.select();
       const swap = dlg.querySelector("#shSwap");
-      if (swap) swap.onclick = () => send({ version: +dlg.querySelector("#shVer").value });
+      if (swap) swap.onclick = () => send({ version: +(dlg.querySelector("#shVer")?.value || link.version) });
       for (const [id, field] of [["shDl", "download"], ["shCm", "comments"]]) {
         dlg.querySelector("#" + id).onchange = async (e) => {
           try {
