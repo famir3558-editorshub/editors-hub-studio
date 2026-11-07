@@ -190,7 +190,9 @@ def _signed_call(data_dir, path, body):
         raise ApprovalError("This computer needs the owner's approval first.")
     status_code, data = _call(path, {**body, "token": token})
     if status_code != 200:
-        raise ApprovalError(data.get("error") or "The owner's service couldn't take that. Try again in a while.")
+        err = ApprovalError(data.get("error") or "The owner's service couldn't take that. Try again in a while.")
+        err.status = status_code
+        raise err
     return data
 
 

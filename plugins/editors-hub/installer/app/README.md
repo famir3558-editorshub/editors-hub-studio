@@ -148,6 +148,23 @@ It trains the studio from everyone's work, and only the owner can see it.
 - **Who gets what:** the owner gets everything as **Studio training** in the Effects tab. Everyone else has no Effects tab and gets no files or clips. Their Claude sessions read the written rules, which can't name the client or the video.
 - **Where it's kept:** files are in an **Editors.Hub Effects** folder on the owner's Google Drive, up to 50 MB each. If a computer is offline, what it learned waits and goes next time. Only the owner can remove something, from the Effects tab.
 
+## Sharing a video with a client (a link, no sign-in)
+
+**Share** on a video's review page, or in its ⋯ menu on Home, makes a private link to one draft. Whoever has the link can watch that draft, with no account and no sign-in code, and nothing else in your studio: no other drafts, no approve button, no notes from your side. Two switches, which you can change at any time without a new link:
+
+- **Downloading:** on, they get a Download button; off, there's none (a determined person can still record their screen).
+- **Commenting:** on, they type their name and leave comments at a moment in the video; off, they can only watch.
+
+Their comments come into the studio within a minute, as notes on that draft at that moment, marked "(link)". From there you send them to Claude like any other notes. On an approved video they wait until you press Undo approve.
+
+The link stays on the draft you shared. When a newer draft is ready and you've checked it, open Share, pick it and press **Update the link**: the client's same link plays it after a refresh. **Turn off the link** stops it for everyone and deletes its copy from Drive; comments already in stay. Only the owner, or whoever made the video, can share it. The video goes to the "Editors.Hub Review links" folder on the owner's Google Drive (a draft a browser can't play, such as ProRes, goes as an MP4 copy), so the computer needs the owner's approval, like sharing a style.
+
+### A client's page: all their videos on one link
+
+On Home, **Videos → By client** shows a card for each client with their finished videos (ones with a draft). Open a client to see just theirs, and press **Share with <client>** (or the link button on their card). Tick the videos to put on the page and pick a draft for each, then **Make the link**. The client gets one page listing those videos with pictures. They open one to watch it and, if it's on, comment at a moment in it. The page's own Downloading and Commenting switches hold for every video on it, and each comment lands as a note on its own video.
+
+Nothing changes on the page by itself. To add a video, take one off or show a newer draft, open Share again, tick, untick or pick, and press **Update the link**: the same link shows it. A video taken off loses the link made for it. **Turn off the link** stops the page and the video links made for it; comments already in stay.
+
 ## Clips in a style or project
 
 Every clip in a style's or project's sections shows a still and plays silently when you hover over it, even 4K or ProRes clips a browser can't play: the studio makes a small copy for the preview the first time, and keeps it in its own data folder, so the style itself is left as it is.

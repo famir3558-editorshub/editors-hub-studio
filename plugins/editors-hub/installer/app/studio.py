@@ -523,6 +523,397 @@ def delete_video(vid, user=None):
     return {"id": vid, "name": v["name"], "trash": dest.name}
 
 
+# ---------------------------------------------------------------- review links
+# A private link to one draft, for a client with no account: they watch it, download it if that's on, and leave timed
+# comments if those are on, and nothing else. The draft goes through the approval service to the owner's Google Drive, and
+# the comments come back here as the video's notes, marked "(link)". Only the owner or the video's maker can share it.
+# The link stays on the draft it was given until someone picks a newer one in the Share window: same address, new draft.
+
+LINK_PULL_EVERY = 45  # seconds between looks for new comments
+LINK_PLAYS = {"h264"}
+_link_pulled = {}
+
+
+def link_gone(e):
+    return getattr(e, "status", 0) == 404
+
+
+def media_codecs(path):
+    ffprobe = shutil.which("ffprobe")
+    if not ffprobe:
+        return {}
+    try:
+        r = subprocess.run([ffprobe, "-v", "error", "-show_entries", "stream=codec_type,codec_name,pix_fmt", "-of", "json", str(path)],
+                           capture_output=True, text=True, timeout=60)
+        streams = json.loads(r.stdout).get("streams", [])
+    except (OSError, ValueError, subprocess.TimeoutExpired):
+        return {}
+    video = next((s for s in streams if s.get("codec_type") == "video"), {})
+    audio = next((s for s in streams if s.get("codec_type") == "audio"), {})
+    return {"video": video.get("codec_name"), "pix_fmt": video.get("pix_fmt"), "audio": audio.get("codec_name")}
+
+
+def link_video_file(src, job):
+    """The draft as it is when every browser plays it (H.264 in an MP4 or MOV), else an H.264 copy made for the link."""
+    c = media_codecs(src)
+    if src.suffix.lower() in (".mp4", ".m4v", ".mov") and c.get("video") in LINK_PLAYS and c.get("pix_fmt") in ("yuv420p", "yuvj420p") and c.get("audio") in (None, "aac", "mp3"):
+        return src, None
+    ffmpeg = shutil.which("ffmpeg")
+    if not ffmpeg:
+        raise StudioError("This draft's format doesn't play in a browser, and ffmpeg isn't here to make a copy that does. Run setup first.")
+    DATA.mkdir(parents=True, exist_ok=True)
+    folder = DATA / f"link-{secrets.token_hex(6)}"
+    folder.mkdir()
+    out = folder / f"{src.stem}.mp4"
+    job["stage"] = "Making a copy every browser can play"
+    p = subprocess.Popen([ffmpeg, "-y", "-loglevel", "error", "-i", str(src), "-map", "0:v:0", "-map", "0:a:0?", "-c:v", "libx264", "-preset", "veryfast",
+                          "-crf", "20", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", str(out)],
+                         stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
+    while p.poll() is None:
+        if job.get("stop"):
+            p.kill()
+            p.wait()
+            shutil.rmtree(folder, ignore_errors=True)
+            raise JobStopped()
+        time.sleep(0.5)
+    if p.returncode != 0 or not out.exists():
+        shutil.rmtree(folder, ignore_errors=True)
+        raise StudioError("The copy for the link couldn't be made from this draft.")
+    return out, folder
+
+
+def manage_video_or_refuse(vid, user):
+    v = load_video(vid)
+    if not can_manage_video(v, user):
+        raise auth.Forbidden("Only the owner, or whoever made this video, can share it.")
+    return v
+
+
+def pick_draft(v, version=None):
+    if not v["drafts"]:
+        raise StudioError(f"{v['name']} has no draft to share yet.")
+    draft = next((d for d in v["drafts"] if d["version"] == int(version)), None) if version else v["drafts"][-1]
+    if not draft:
+        raise StudioError(f"{v['name']} has no v{version}")
+    if not (Path(v["folder"]) / draft["file"]).is_file():
+        raise StudioError(f"{v['name']} v{draft['version']}'s file isn't in the video's folder any more.")
+    return draft
+
+
+def link_poster(src):
+    """A small picture of the draft for the client's page, as the service keeps it (a JPEG data URL under 200 KB)."""
+    ffmpeg = shutil.which("ffmpeg")
+    if not ffmpeg:
+        return None
+    for seek, q in (("1", "4"), ("1", "9"), ("0", "9")):
+        try:
+            r = subprocess.run([ffmpeg, "-loglevel", "error", "-ss", seek, "-i", str(src), "-frames:v", "1", "-vf", "scale='min(540,iw)':-2",
+                                "-q:v", q, "-f", "image2", "-c:v", "mjpeg", "-"], capture_output=True, timeout=60)
+        except (OSError, subprocess.TimeoutExpired):
+            return None
+        data = "data:image/jpeg;base64," + base64.b64encode(r.stdout).decode() if r.stdout else ""
+        if data and len(data) <= 200_000:
+            return data
+    return None
+
+
+class JobPart(dict):
+    """One upload inside a bigger job: its progress adds to the job's, and the job's Stop reaches it."""
+    def __init__(self, job, offset):
+        super().__init__()
+        self.job, self.offset = job, offset
+
+    def __setitem__(self, k, val):
+        if k == "done_bytes":
+            self.job["done_bytes"] = self.offset + val
+        elif k == "stage":
+            self.job["stage"] = val
+        else:
+            super().__setitem__(k, val)
+
+    def get(self, k, default=None):
+        return self.job.get(k, default) if k == "stop" else super().get(k, default)
+
+
+def put_draft_on_link(vid, draft, user, job, download=None, comments=None, via_client=None):
+    """Sends one draft up and puts it on the video's link (made the first time, the same one after). Runs inside a job."""
+    v = load_video(vid)
+    old = v.get("link") or {}
+    src = Path(v["folder"]) / draft["file"]
+    send, temp = link_video_file(src, job)
+    try:
+        check_stop(job)
+        size = send.stat().st_size
+        job["stage"] = f"Uploading {v['name']}"
+        name = f"{vid}-v{draft['version']}{send.suffix.lower()}"
+        key = old.get("key")
+        try:
+            started = approval.shared_call(DATA, "/links/start", name=name, bytes=size, **({"key": key} if key else {}))
+        except approval.ApprovalError as e:
+            if not (key and link_gone(e)):
+                raise
+            key = None  # turned off somewhere else: a new link
+            started = approval.shared_call(DATA, "/links/start", name=name, bytes=size)
+        if job.get("several"):  # one of a client's videos: the bar runs over all of them
+            sent = drive_upload_file(started["upload_url"], send, JobPart(job, job.get("done_bytes", 0)))
+        else:
+            job["total_bytes"] = size
+            sent = drive_upload_file(started["upload_url"], send, job)
+        job["stage"] = "Making the link"
+        sets = {k: bool(val) for k, val in (("download", download), ("comments", comments)) if val is not None}
+        poster = link_poster(send)
+        link = approval.shared_call(DATA, "/links/finish", file_id=sent.get("id"), name=name, video_name=v["name"], draft=f"v{draft['version']}",
+                                    **({"key": key} if key else {}), **({"poster": poster} if poster else {}), **sets)["link"]
+    except approval.ApprovalError as e:
+        raise StudioError(str(e))
+    finally:
+        if temp:
+            shutil.rmtree(temp, ignore_errors=True)
+    same = link["key"] == old.get("key")
+    with vlock(vid):
+        fresh = load_video(vid)
+        fresh["link"] = {"key": link["key"], "url": link["url"], "version": draft["version"], "download": link["download"],
+                         "comments": link["comments"], "shared": now(), "by": (user or {}).get("email", ""),
+                         "taken": old.get("taken", []) if same else [],
+                         "via_client": old.get("via_client") if same else via_client}
+        save_video(fresh)
+    return fresh["link"]
+
+
+def share_video(vid, user=None, version=None, download=None, comments=None):
+    """Puts a draft (the latest unless one is picked) on the video's link, making the link the first time. Same link after.
+    A new draft doesn't go on it by itself: the owner checks it first, then picks it in the Share window."""
+    v = manage_video_or_refuse(vid, user)
+    draft = pick_draft(v, version)
+    src = Path(v["folder"]) / draft["file"]
+
+    def work(job):
+        job["total_bytes"] = src.stat().st_size
+        return put_draft_on_link(vid, draft, user, job, download, comments)
+    job = start_job("link", f"Sharing {v['name']} v{draft['version']}", user, work)
+    job["video"] = vid
+    return job
+
+
+# ---- a client's link: one page with the videos picked from their project, each on its own video link
+
+def client_videos(pid):
+    d = project_dir(pid)
+    out = []
+    for vid, vdir in video_dirs().items():
+        if vdir.parent.parent == d:
+            try:
+                out.append(load_video(vid))
+            except StudioError:
+                pass
+    return out
+
+
+def client_link_call(pid, meta, key, keys, download=None, comments=None):
+    sets = {k: bool(val) for k, val in (("download", download), ("comments", comments)) if val is not None}
+    try:
+        return approval.shared_call(DATA, "/links/client", name=meta.get("name") or pid, videos=keys, **({"key": key} if key else {}), **sets)["link"]
+    except approval.ApprovalError as e:
+        if key and link_gone(e):
+            return client_link_call(pid, meta, None, keys, download, comments)
+        raise StudioError(str(e))
+
+
+def share_client(pid, picks, user=None, download=None, comments=None):
+    """picks: [{"video": id, "version": n}] in the order the client sees them. Drafts not already on their video's link go up."""
+    d = project_dir(pid)
+    meta = project_meta(d)
+    if not can_edit_project(meta, user):
+        raise auth.Forbidden("Only the person who made this client's project, or the owner, can share it.")
+    mine = {v["id"]: v for v in client_videos(pid)}
+    chosen = []
+    for p in picks or []:
+        v = mine.get(str((p or {}).get("video", "")))
+        if not v:
+            raise StudioError("One of those videos isn't this client's.")
+        if not can_manage_video(v, user):
+            raise auth.Forbidden(f"Only the owner, or whoever made {v['name']}, can share it.")
+        chosen.append((v, pick_draft(v, p.get("version"))))
+    if not chosen:
+        raise StudioError("Pick at least one video for the link.")
+    old = meta.get("link") or {}
+
+    def work(job):
+        job["several"] = True
+        sending = [(v, dr) for v, dr in chosen if (v.get("link") or {}).get("version") != dr["version"]]
+        job["total_bytes"] = sum((Path(v["folder"]) / dr["file"]).stat().st_size for v, dr in sending)
+        keys = {}
+        for v, dr in chosen:
+            check_stop(job)
+            link = v.get("link")
+            if (link or {}).get("version") != dr["version"]:
+                link = put_draft_on_link(v["id"], dr, user, job, via_client=pid)
+            keys[v["id"]] = link["key"]
+        job["stage"] = "Making the client's link"
+        got = client_link_call(pid, meta, old.get("key"), [keys[v["id"]] for v, _ in chosen], download, comments)
+        record = {"key": got["key"], "url": got["url"], "videos": [v["id"] for v, _ in chosen], "download": got["download"],
+                  "comments": got["comments"], "shared": now(), "by": (user or {}).get("email", "")}
+        with LOCK:
+            data = read_json(d / "project.json", {}) or {}
+            data["link"] = record
+            write_json(d / "project.json", data)
+        for v in mine.values():  # videos taken off the page lose the links made only for it
+            if v["id"] not in keys:
+                drop_client_video_link(v["id"], pid, user)
+        return record
+    job = start_job("link", f"Sharing {meta.get('name') or pid}'s videos", user, work)
+    job["project"] = pid
+    return job
+
+
+def drop_client_video_link(vid, pid, user):
+    try:
+        if (load_video(vid).get("link") or {}).get("via_client") == pid:
+            video_link_off(vid, user)
+    except (StudioError, auth.AuthError):
+        pass
+
+
+def set_client_link(pid, user=None, download=None, comments=None):
+    d = project_dir(pid)
+    meta = project_meta(d)
+    if not can_edit_project(meta, user):
+        raise auth.Forbidden("Only the person who made this client's project, or the owner, can change its link.")
+    link = meta.get("link")
+    if not link:
+        raise StudioError("This client has no link yet.")
+    keys = [(load_video(vid).get("link") or {}).get("key") for vid in link["videos"] if vid in {v["id"] for v in client_videos(pid)}]
+    got = client_link_call(pid, meta, link["key"], [k for k in keys if k], download, comments)
+    with LOCK:
+        data = read_json(d / "project.json", {}) or {}
+        data["link"] = {**link, "key": got["key"], "url": got["url"], "download": got["download"], "comments": got["comments"]}
+        write_json(d / "project.json", data)
+    return data["link"]
+
+
+def client_link_off(pid, user=None):
+    """The client's page stops working, and the video links made only for it go too. Comments already in stay."""
+    d = project_dir(pid)
+    meta = project_meta(d)
+    if not can_edit_project(meta, user):
+        raise auth.Forbidden("Only the person who made this client's project, or the owner, can turn off its link.")
+    link = meta.get("link")
+    if not link:
+        return None
+    try:
+        approval.shared_call(DATA, "/links/client-off", key=link["key"])
+    except approval.ApprovalError as e:
+        if not link_gone(e):
+            raise StudioError(str(e))
+    for v in client_videos(pid):
+        drop_client_video_link(v["id"], pid, user)
+    with LOCK:
+        data = read_json(d / "project.json", {}) or {}
+        data.pop("link", None)
+        write_json(d / "project.json", data)
+    return None
+
+
+def set_video_link(vid, user=None, download=None, comments=None):
+    v = manage_video_or_refuse(vid, user)
+    link = v.get("link")
+    if not link:
+        raise StudioError("This video has no link yet.")
+    sets = {k: bool(val) for k, val in (("download", download), ("comments", comments)) if val is not None}
+    try:
+        got = approval.shared_call(DATA, "/links/set", key=link["key"], video_name=v["name"], **sets)["link"]
+    except approval.ApprovalError as e:
+        if link_gone(e):
+            drop_video_link(vid)
+            raise StudioError("That link had already been turned off. Share the video again for a new one.")
+        raise StudioError(str(e))
+    with vlock(vid):
+        fresh = load_video(vid)
+        if fresh.get("link", {}).get("key") == link["key"]:
+            fresh["link"].update(download=got["download"], comments=got["comments"])
+            save_video(fresh)
+    return fresh.get("link")
+
+
+def drop_video_link(vid):
+    with vlock(vid):
+        v = load_video(vid)
+        if v.pop("link", None) is not None:
+            save_video(v)
+
+
+def video_link_off(vid, user=None):
+    """The link stops working for everyone, and its copy of the video goes from the owner's Drive. Comments already in stay."""
+    v = manage_video_or_refuse(vid, user)
+    link = v.get("link")
+    if not link:
+        return None
+    pull_link_notes(vid)  # what came in last stays
+    try:
+        approval.shared_call(DATA, "/links/off", key=link["key"])
+    except approval.ApprovalError as e:
+        if not link_gone(e):
+            raise StudioError(str(e))
+    drop_video_link(vid)
+    return None
+
+
+def pull_link_notes(vid):
+    """New comments from the video's link become notes on the draft they were left on. On an approved video they wait."""
+    v = load_video(vid)
+    link = v.get("link")
+    if not link:
+        return 0
+    _link_pulled[vid] = time.time()
+    try:
+        notes = approval.shared_call(DATA, "/links/notes", key=link["key"])["notes"]
+    except approval.ApprovalError as e:
+        if link_gone(e):
+            drop_video_link(vid)
+        return 0
+    taken = set(link.get("taken", []))
+    fresh = [n for n in notes if n.get("id") not in taken]
+    if not fresh or v.get("status") in LOCKED_STATUSES:
+        return 0
+    versions = {d["version"] for d in v["drafts"]}
+    added = []
+    for n in fresh:
+        m = re.fullmatch(r"v(\d+)", str(n.get("draft") or ""))
+        version = int(m.group(1)) if m and int(m.group(1)) in versions else link.get("version")
+        if version not in versions:
+            version = latest_version(v)
+        try:
+            add_note(vid, version, n.get("t") or 0, n.get("text") or "", author=f"{str(n.get('name') or 'Client')[:60]} (link)")
+        except StudioError:
+            continue
+        added.append(n["id"])
+    if added:
+        with vlock(vid):
+            v = load_video(vid)
+            if v.get("link", {}).get("key") == link["key"]:
+                v["link"]["taken"] = [*v["link"].get("taken", []), *added][-2000:]
+                save_video(v)
+    return len(added)
+
+
+def pull_link_notes_soon(vid):
+    """When someone opens the video's page: a quick look, at most every 10 seconds, without making the page wait."""
+    if time.time() - _link_pulled.get(vid, 0) > 10:
+        _link_pulled[vid] = time.time()
+        threading.Thread(target=lambda: pull_link_notes(vid), daemon=True).start()
+
+
+def link_watch():
+    while True:
+        time.sleep(LINK_PULL_EVERY)
+        for vid, d in list(video_dirs().items()):
+            try:
+                if (read_json(d / "video.json", {}) or {}).get("link"):
+                    pull_link_notes(vid)
+            except (StudioError, OSError, ValueError, KeyError):
+                pass
+
+
 def list_trash(user=None):
     out = []
     trash = library() / TRASH
@@ -1052,6 +1443,7 @@ def video_summary(v, styles=None, projects=None):
             "project": v.get("project", ""), "project_name": project.get("name", ""),
             "status": v["status"], "created": v["created"], "updated": v.get("updated", v["created"]),
             "draft_count": len(v["drafts"]), "latest": latest, "latest_file": v["drafts"][-1]["file"] if v["drafts"] else "", "maker": v.get("maker", ""),
+            "link": {k: v["link"][k] for k in ("url", "version", "download", "comments")} if v.get("link") else None,
             "open_notes": sum(1 for n in v["notes"] if not n["done"] and n["version"] == latest),
             "thumb": (Path(v["folder"]) / "thumb.jpg").exists(), "preview": video_preview(v), "style_shared": style_meta(sdir)["shared"] if sdir else False,
             "render_waiting": (v.get("render_request") or {}).get("status") == "waiting",
@@ -5381,9 +5773,11 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send_json(hubsetup.snapshot())
             if parts[:2] == ["api", "videos"] and len(parts) == 3:
                 view = video_view(load_video(parts[2]))
+                if view.get("link"):
+                    pull_link_notes_soon(parts[2])
                 if role == "reviewer":
                     view.pop("preview_frames", None)
-                    for private in ("reviewers", "updates", "render_request", "last_render_choice", "render_options", "broll"):
+                    for private in ("reviewers", "updates", "render_request", "last_render_choice", "render_options", "broll", "link"):
                         view.pop(private, None)
                 return self.send_json(view)
             self.need("owner")
@@ -5479,6 +5873,15 @@ class Handler(BaseHTTPRequestHandler):
             return self.send_json(video_view(load_video(parts[2])))
         if method == "POST" and parts[:2] == ["api", "videos"] and parts[3:] == ["rename"]:
             return self.send_json(rename_video(parts[2], body.get("name"), self.user))
+        if method == "POST" and parts[:2] == ["api", "videos"] and parts[3:] == ["link"]:
+            return self.send_json(share_video(parts[2], self.user, body.get("version"), body.get("download"), body.get("comments")))
+        if method == "POST" and parts[:2] == ["api", "videos"] and parts[3:] == ["link", "settings"]:
+            return self.send_json({"link": set_video_link(parts[2], self.user, body.get("download"), body.get("comments"))})
+        if method == "POST" and parts[:2] == ["api", "videos"] and parts[3:] == ["link", "pull"]:
+            added = pull_link_notes(parts[2]) if can_manage_video(load_video(parts[2]), self.user) else 0
+            return self.send_json({"added": added})
+        if method == "DELETE" and parts[:2] == ["api", "videos"] and parts[3:] == ["link"]:
+            return self.send_json({"link": video_link_off(parts[2], self.user)})
         if method == "DELETE" and parts[:2] == ["api", "videos"] and len(parts) == 3:
             return self.send_json(delete_video(parts[2], self.user))
         if method == "POST" and parts[:2] == ["api", "videos"] and parts[3:] == ["style"]:
@@ -5547,6 +5950,12 @@ class Handler(BaseHTTPRequestHandler):
             return self.send_json(export_project_to(parts[2], body.get("dest"), self.user))
         if method == "POST" and parts[:2] == ["api", "projects"] and len(parts) == 3:
             return self.send_json(save_project(parts[2], body, self.user))
+        if method == "POST" and parts[:2] == ["api", "projects"] and parts[3:] == ["link"]:
+            return self.send_json(share_client(parts[2], body.get("videos"), self.user, body.get("download"), body.get("comments")))
+        if method == "POST" and parts[:2] == ["api", "projects"] and parts[3:] == ["link", "settings"]:
+            return self.send_json({"link": set_client_link(parts[2], self.user, body.get("download"), body.get("comments"))})
+        if method == "DELETE" and parts[:2] == ["api", "projects"] and parts[3:] == ["link"]:
+            return self.send_json({"link": client_link_off(parts[2], self.user)})
         if method == "DELETE" and parts[:2] == ["api", "projects"] and len(parts) == 3:
             return self.send_json(delete_project(parts[2], self.user))
         if method == "POST" and parts == ["api", "videos"]:
@@ -5926,6 +6335,7 @@ def serve(port):
             time.sleep(86400)
     threading.Thread(target=keep_approval, daemon=True).start()
     threading.Thread(target=learn_watch, daemon=True).start()
+    threading.Thread(target=link_watch, daemon=True).start()
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:

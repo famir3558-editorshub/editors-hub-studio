@@ -1,4 +1,4 @@
-const S = { state: null, tab: "videos", kind: "client", status: "all", style: "", project: "", q: "" };
+const S = { state: null, tab: "videos", kind: "client", status: "all", style: "", project: "", q: "", client: "" };
 const $ = (id) => document.getElementById(id);
 
 async function load() {
@@ -30,7 +30,8 @@ function render() {
   const clientVideos = videos.filter((v) => v.project), styleVideos = videos.filter((v) => !v.project);
   // a reviewer only sees the videos they're invited to, with no tabs to hide any behind
   const listed = me.role === "reviewer" ? videos : S.kind === "client" ? clientVideos : styleVideos;
-  $("videoKinds").innerHTML = [["client", "Client videos", clientVideos.length], ["style", "Style videos", styleVideos.length]]
+  const withFinished = projects.filter((p) => videos.some((v) => v.project === p.id && v.latest)).length;
+  $("videoKinds").innerHTML = [["client", "Client videos", clientVideos.length], ["style", "Style videos", styleVideos.length], ["clients", "By client", withFinished]]
     .map(([k, label, n]) => `<button type="button" data-kind="${k}" class="${S.kind === k ? "on" : ""}">${label}<em>${n}</em></button>`).join("");
   $("hello").innerHTML = `Welcome back, <span class="name">${esc(me.username)}</span>`;
   const waiting = videos.filter((v) => v.status === "in review").length;
@@ -60,7 +61,9 @@ function render() {
     (S.status === "all" || v.status === S.status) && (!S.style || v.style === S.style) && (S.kind !== "client" || !S.project || v.project === S.project) &&
     (!q || (v.name + " " + v.style_name + " " + v.project_name).toLowerCase().includes(q)));
   // left alone when nothing changed: this runs every few seconds and would cut off a hover preview
-  const videoHtml = shown.length ? shown.map(videoCard).join("") : emptyVideos(listed);
+  const byClient = me.role !== "reviewer" && S.kind === "clients";
+  document.querySelector("#tab-videos .toolbar").hidden = byClient;
+  const videoHtml = byClient ? clientsHtml() : shown.length ? shown.map(videoCard).join("") : emptyVideos(listed);
   if (videoHtml !== S.videoHtml) $("videoGrid").innerHTML = S.videoHtml = videoHtml;
 
   $("projectGrid").innerHTML = projects.length ? projects.map(projectCard).join("") :
@@ -89,6 +92,7 @@ function render() {
   ].join("\n");
 }
 
+const LINK_ICON = `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 13a5 5 0 0 0 7.07 0l3-3a5 5 0 0 0-7.07-7.07l-1.5 1.5"/><path d="M14 11a5 5 0 0 0-7.07 0l-3 3a5 5 0 0 0 7.07 7.07l1.5-1.5"/></svg>`;
 const FOLDER_ICON = `<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>`;
 
 function openVideoMenu(btn, v) {
@@ -105,6 +109,7 @@ function openVideoMenu(btn, v) {
       toast("Renamed");
       load();
     })],
+    mine && [v.link ? `Share · link on v${v.link.version}` : "Share…", () => { closeMenus(); openShareDialog(v, () => load()); }],
     ["Open folder", () => act(() => api("POST", "/api/reveal", { video: v.id }))],
     v.latest_file && ["Download the latest draft", () => { closeMenus(); const a = document.createElement("a"); a.href = `/media/${enc(v.id)}/${v.latest_file.split("/").map(enc).join("/")}`; a.download = `${v.name} v${v.latest}${v.latest_file.slice(v.latest_file.lastIndexOf("."))}`; a.click(); }],
     mine && "-",
@@ -849,12 +854,24 @@ $("settingsForm").addEventListener("submit", async (e) => {
   }
 });
 
+document.addEventListener("click", (e) => {
+  const share = e.target.closest("[data-client-share]"), open = e.target.closest("[data-client-open]"), back = e.target.closest("[data-client-back]");
+  if (!share && !open && !back) return;
+  e.preventDefault();
+  e.stopPropagation();
+  if (share) return openClientShareDialog(share.dataset.clientShare);
+  S.client = open ? open.dataset.clientOpen : "";
+  S.videoHtml = null;
+  render();
+  scrollTo({ top: document.getElementById("videoKinds").offsetTop - 90 });
+}, true);
+
 document.addEventListener("click", async (e) => {
   const t = e.target.closest("[data-tab],[data-status],[data-kind],[data-act],[data-style],[data-project]");
   if (!t) return;
   if (t.dataset.tab) return setTab(t.dataset.tab);
   if (t.dataset.status) { S.status = t.dataset.status; return render(); }
-  if (t.dataset.kind) { S.kind = t.dataset.kind; S.status = "all"; return render(); }
+  if (t.dataset.kind) { S.kind = t.dataset.kind; S.status = "all"; S.client = ""; return render(); }
   const act = t.dataset.act;
   if (act === "new-style") return openStyleDlg();
   if (act === "new-project") return openProjectDlg();
@@ -1229,3 +1246,116 @@ load().then(() => {
 });
 setInterval(() => document.visibilityState === "visible" && !document.querySelector("dialog[open]") && load(), 5000);
 
+
+// ---- By client: each client's finished videos together, and one link for the client to see them all
+
+const finishedOf = (pid) => S.state.videos.filter((v) => v.project === pid && v.latest);
+
+function clientCard(p) {
+  const vids = finishedOf(p.id);
+  const pics = vids.filter((v) => v.thumb).slice(0, 4);
+  const initials = p.name.replace(/[^\p{L}\p{N}\s]/gu, "").split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join("").toUpperCase();
+  const mosaic = pics.length ? `<div class="mosaic n${pics.length}">${pics.map((v) => `<img src="/media/${enc(v.id)}/thumb.jpg?${enc(v.updated)}" alt="" loading="lazy">`).join("")}</div>` : `<div class="ph">${esc(initials)}</div>`;
+  const tools = `<span class="card-tools"><button type="button" class="card-tool share-tool${p.link ? " on" : ""}" data-client-share="${esc(p.id)}" title="${p.link ? "Shared: manage the link" : "Share with the client"}" aria-label="Share">${LINK_ICON}</button></span>`;
+  return `<a class="card client-card" href="#" data-client-open="${esc(p.id)}"><div class="thumb">${mosaic}${p.link ? `<span class="pill s-approved">Shared</span>` : ""}${tools}</div>
+    <div class="body"><div class="title">${esc(p.name)}</div><div class="meta">${vids.length} video${vids.length === 1 ? "" : "s"}${p.link ? ` · ${p.link.videos.length} on the link` : ""}</div></div></a>`;
+}
+
+function clientsHtml() {
+  const { projects } = S.state;
+  const open = projects.find((p) => p.id === S.client);
+  if (!open) {
+    S.client = "";
+    return projects.length ? projects.map(clientCard).join("") : `<div class="empty" style="grid-column:1/-1"><h3>No clients yet</h3><p>Make a project for a client, and their finished videos gather here.</p></div>`;
+  }
+  const vids = finishedOf(open.id);
+  return `<div class="client-head"><button type="button" class="btn ghost small" data-client-back>‹ All clients</button><h3>${esc(open.name)}</h3><span class="muted">${vids.length} finished video${vids.length === 1 ? "" : "s"}</span><span class="spacer"></span>
+      ${vids.length ? `<button type="button" class="btn ${open.link ? "" : "primary "}small" data-client-share="${esc(open.id)}">${open.link ? "Shared · manage the link" : `Share with ${esc(open.name)}`}</button>` : ""}</div>`
+    + (vids.length ? vids.map(videoCard).join("") : `<div class="empty" style="grid-column:1/-1"><h3>No finished videos yet</h3><p>A video shows here once it has a draft.</p></div>`);
+}
+
+function openClientShareDialog(pid) {
+  const p = S.state.projects.find((x) => x.id === pid);
+  const vids = finishedOf(pid);
+  let link = p.link || null, busy = false;
+  const onLink = new Set(link ? link.videos : vids.map((v) => v.id));
+  const dlg = document.createElement("dialog");
+  dlg.className = "ask share";
+  document.body.appendChild(dlg);
+  const close = () => { if (busy) return; dlg.close(); dlg.remove(); };
+  dlg.addEventListener("cancel", (e) => { e.preventDefault(); close(); });
+  const toggle = (id, label, hint, on) => `<label class="share-opt"><span><b>${label}</b><small>${hint}</small></span><span class="switch"><input type="checkbox" id="${id}"${on ? " checked" : ""}><span></span></span></label>`;
+  const rows = () => vids.map((v) => {
+    const shownNow = link && link.videos.includes(v.id) && v.link ? v.link.version : 0;
+    const want = shownNow || v.latest;
+    return `<div class="share-video"><input type="checkbox" data-pick="${esc(v.id)}"${onLink.has(v.id) ? " checked" : ""} aria-label="${esc(v.name)}">
+      <span class="sv-thumb">${v.thumb ? `<img src="/media/${enc(v.id)}/thumb.jpg?${enc(v.updated)}" alt="">` : ""}</span>
+      <span class="sv-name"><b>${esc(v.name)}</b><small>${shownNow ? `On the link: v${shownNow}${shownNow < v.latest ? ` · v${v.latest} is newer` : ""}` : "Not on the link"}</small></span>
+      <select data-ver="${esc(v.id)}">${Array.from({ length: v.latest }, (_, i) => v.latest - i).map((n) => `<option value="${n}"${n === want ? " selected" : ""}>v${n}</option>`).join("")}</select></div>`;
+  }).join("");
+  function picks() {
+    return vids.filter((v) => dlg.querySelector(`[data-pick="${CSS.escape(v.id)}"]`).checked).map((v) => ({ video: v.id, version: +dlg.querySelector(`[data-ver="${CSS.escape(v.id)}"]`).value }));
+  }
+  function draw(message = "") {
+    dlg.innerHTML = `<form method="dialog"><h2>Share with ${esc(p.name)}</h2>
+      ${link ? `<div class="share-link"><input id="shUrl" readonly value="${esc(link.url)}"><button type="button" class="btn primary" id="shCopy">Copy</button></div>` : ""}
+      <p class="ask-text muted small-print">${link ? "One page with the ticked videos. To change what's on it, tick or untick videos, pick drafts, then press Update the link: the same link shows it." : "One private page with all the videos you tick, each at the draft you pick. No sign-in, and nothing else from your studio. New drafts only go on it when you update the link."}</p>
+      <div class="share-videos">${rows()}</div>
+      ${toggle("shDl", "Downloading", "They can save the videos.", link ? link.download : true)}
+      ${toggle("shCm", "Commenting", "They can comment at a moment in a video. Comments come in as notes on that video.", link ? link.comments : true)}
+      <div class="share-progress" id="shProg" hidden><div class="act-bar"><div></div></div><small></small></div><p class="share-err">${esc(message)}</p>
+      <div class="actions">${link ? `<button type="button" class="btn danger" id="shOff">Turn off the link</button><span style="flex:1"></span><a class="btn ghost" href="${esc(link.url)}" target="_blank" rel="noopener">Open</a><button type="button" class="btn" data-close>Done</button><button type="button" class="btn primary" id="shSend">Update the link</button>`
+        : `<button type="button" class="btn ghost" data-close>Cancel</button><button type="button" class="btn primary" id="shSend">Make the link</button>`}</div></form>`;
+    dlg.querySelectorAll("[data-close]").forEach((b) => (b.onclick = close));
+    dlg.querySelector("form").addEventListener("submit", (e) => { e.preventDefault(); close(); });
+    dlg.querySelectorAll("[data-pick]").forEach((c) => (c.onchange = () => (c.checked ? onLink.add(c.dataset.pick) : onLink.delete(c.dataset.pick))));
+    dlg.querySelector("#shSend").onclick = () => {
+      const chosen = picks();
+      if (!chosen.length) return draw("Tick at least one video.");
+      send(chosen);
+    };
+    if (link) {
+      dlg.querySelector("#shCopy").onclick = async () => { try { await navigator.clipboard.writeText(link.url); toast("Link copied"); } catch (e) { dlg.querySelector("#shUrl").select(); } };
+      for (const [id, field] of [["shDl", "download"], ["shCm", "comments"]]) {
+        dlg.querySelector("#" + id).onchange = async (e) => {
+          try {
+            ({ link } = await api("POST", `/api/projects/${enc(pid)}/link/settings`, { [field]: e.target.checked }));
+            toast(`${field === "download" ? "Downloading" : "Commenting"} ${e.target.checked ? "on" : "off"}`);
+          } catch (ex) { e.target.checked = !e.target.checked; toast(ex.message, true); }
+        };
+      }
+      dlg.querySelector("#shOff").onclick = async () => {
+        if (!(await ehConfirm(`${p.name}'s page stops working, and the video links made for it go too. Comments already in stay as notes.`, { title: "Turn off the link?", ok: "Turn it off", danger: true }))) return;
+        try { await api("DELETE", `/api/projects/${enc(pid)}/link`); toast("Link turned off"); busy = false; close(); load(); } catch (e) { toast(e.message, true); }
+      };
+    }
+  }
+  async function send(chosen) {
+    busy = true;
+    dlg.querySelectorAll("button, input, select").forEach((el) => (el.disabled = true));
+    const prog = dlg.querySelector("#shProg");
+    prog.hidden = false;
+    try {
+      let job = await api("POST", `/api/projects/${enc(pid)}/link`, { videos: chosen, download: dlg.querySelector("#shDl").checked, comments: dlg.querySelector("#shCm").checked });
+      while (job.state === "running") {
+        const pct = job.total_bytes ? Math.round((100 * job.done_bytes) / job.total_bytes) : 0;
+        prog.querySelector(".act-bar div").style.width = `${Math.max(4, pct)}%`;
+        prog.querySelector("small").textContent = job.total_bytes && job.stage.startsWith("Uploading") ? `${job.stage}: ${pct}% of ${fmtBytes(job.total_bytes)}` : job.stage;
+        await new Promise((r) => setTimeout(r, 700));
+        job = await api("GET", `/api/jobs/${job.id}`);
+      }
+      if (job.state !== "done") throw new Error(job.message || "That didn't work.");
+      link = job.result;
+      busy = false;
+      await load();
+      vids.splice(0, vids.length, ...finishedOf(pid));
+      draw();
+      try { await navigator.clipboard.writeText(link.url); toast("Link ready and copied"); } catch (e) { toast("Link ready"); }
+    } catch (e) {
+      busy = false;
+      draw(e.message);
+    }
+  }
+  draw();
+  dlg.showModal();
+}

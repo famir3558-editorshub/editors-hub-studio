@@ -277,3 +277,24 @@ pre { margin: 0; padding: 14px; background: rgba(0, 0, 0, 0.45); border: 1px sol
 .card:hover .card-tools, .card-tools:focus-within { opacity: 1; }
 .card-tool { display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 8px; background: rgba(8, 5, 6, 0.72); color: #fff; font-size: 16px; line-height: 1; cursor: pointer; backdrop-filter: blur(6px); box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.1); }
 .card-tool:hover { background: rgba(229, 25, 43, 0.85); }
+
+/* By client: each client's finished videos, and their link */
+.mosaic { position: absolute; inset: 0; display: grid; gap: 2px; background: #0b0809; }
+.mosaic img { width: 100%; height: 100%; object-fit: cover; display: block; min-height: 0; }
+.mosaic.n2 { grid-template-rows: 1fr 1fr; }
+.mosaic.n3 { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
+.mosaic.n3 img:first-child { grid-column: 1 / -1; }
+.mosaic.n4 { grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; }
+.client-head { grid-column: 1 / -1; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 4px; }
+.client-head h3 { margin: 0; font-family: var(--display); font-size: 20px; }
+.client-head .spacer { flex: 1; }
+.card-tool.share-tool.on { background: var(--red); color: #fff; }
+.share-videos { display: grid; gap: 8px; max-height: 42vh; overflow: auto; padding-right: 2px; }
+.share-video { display: grid; grid-template-columns: auto 40px minmax(0, 1fr) auto; gap: 10px; align-items: center; padding: 8px 10px; border: 1px solid var(--line); border-radius: 12px; }
+.share-video input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--red); }
+.sv-thumb { width: 40px; aspect-ratio: 9 / 16; border-radius: 6px; overflow: hidden; background: #0b0809; display: block; }
+.sv-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.sv-name { min-width: 0; display: grid; }
+.sv-name b { font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.sv-name small { color: var(--muted); font-size: 12px; }
+.share-video select { width: auto; padding: 6px 8px; }

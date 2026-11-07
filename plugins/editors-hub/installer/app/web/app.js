@@ -488,3 +488,85 @@ function setupBell() {
   bellLoad();
 }
 if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", setupBell); else setupBell();
+
+// ---- Share: a private link to one draft for a client with no account (Home's ⋯ menu and the review page share it)
+
+function openShareDialog(v, onChange = () => {}) {
+  const drafts = v.drafts ? v.drafts.map((d) => d.version) : v.latest ? Array.from({ length: v.latest }, (_, i) => i + 1) : [];
+  const latest = drafts.length ? Math.max(...drafts) : 0;
+  let link = v.link || null, busy = false;
+  const dlg = document.createElement("dialog");
+  dlg.className = "ask share";
+  document.body.appendChild(dlg);
+  const close = () => { if (busy) return; dlg.close(); dlg.remove(); };
+  dlg.addEventListener("cancel", (e) => { e.preventDefault(); close(); });
+  const toggle = (id, label, hint, on) => `<label class="share-opt"><span><b>${label}</b><small>${hint}</small></span><span class="switch"><input type="checkbox" id="${id}"${on ? " checked" : ""}><span></span></span></label>`;
+  const opts = (l) => toggle("shDl", "Downloading", "They can save the video.", l ? l.download : true) + toggle("shCm", "Commenting", "They can leave comments at a moment in the video. They come in as notes here.", l ? l.comments : true);
+  const pick = (chosen) => drafts.length > 1 ? `<label class="share-row">Draft to show <select id="shVer">${drafts.slice().reverse().map((n) => `<option value="${n}"${n === chosen ? " selected" : ""}>v${n}${n === latest ? " (latest)" : ""}</option>`).join("")}</select></label>` : "";
+  function draw(message = "") {
+    if (!latest) {
+      dlg.innerHTML = `<form method="dialog"><h2>Share</h2><p class="ask-text muted">There's no draft of “${esc(v.name)}” to share yet.</p><div class="actions"><button class="btn primary">Close</button></div></form>`;
+    } else if (!link) {
+      dlg.innerHTML = `<form method="dialog"><h2>Share “${esc(v.name)}”</h2>
+        <p class="ask-text muted">Makes a private link. Whoever has it can watch the draft, with no sign-in. They can't see anything else in your studio.</p>
+        ${pick(drafts.includes(v.current) ? v.current : latest)}${opts(null)}<div class="share-progress" id="shProg" hidden><div class="act-bar"><div></div></div><small></small></div><p class="share-err">${esc(message)}</p>
+        <div class="actions"><button type="button" class="btn ghost" data-close>Cancel</button><button type="button" class="btn primary" id="shMake">Make the link</button></div></form>`;
+      dlg.querySelector("#shMake").onclick = () => send({ version: +(dlg.querySelector("#shVer")?.value || (drafts.includes(v.current) ? v.current : latest)), download: dlg.querySelector("#shDl").checked, comments: dlg.querySelector("#shCm").checked });
+    } else {
+      dlg.innerHTML = `<form method="dialog"><h2>Share “${esc(v.name)}”</h2>
+        <div class="share-link"><input id="shUrl" readonly value="${esc(link.url)}"><button type="button" class="btn primary" id="shCopy">Copy</button></div>
+        <p class="ask-text muted small-print">The link shows v${link.version}.${link.version < latest ? ` v${latest} is newer: pick it below and press Update the link: the same link then plays it.` : " A new draft goes on it only when you pick it here."} Anyone who has the link can watch it, so send it only to your client.</p>
+        ${pick(link.version < latest ? latest : link.version) ? `<div class="share-row">${pick(link.version < latest ? latest : link.version)}<button type="button" class="btn" id="shSwap">Update the link</button></div>` : ""}
+        ${opts(link)}<div class="share-progress" id="shProg" hidden><div class="act-bar"><div></div></div><small></small></div><p class="share-err">${esc(message)}</p>
+        <div class="actions"><button type="button" class="btn danger" id="shOff">Turn off the link</button><span style="flex:1"></span><a class="btn ghost" href="${esc(link.url)}" target="_blank" rel="noopener">Open</a><button type="button" class="btn" data-close>Done</button></div></form>`;
+      dlg.querySelector("#shCopy").onclick = async () => {
+        try { await navigator.clipboard.writeText(link.url); toast("Link copied"); } catch (e) { dlg.querySelector("#shUrl").select(); }
+      };
+      dlg.querySelector("#shUrl").onfocus = (e) => e.target.select();
+      const swap = dlg.querySelector("#shSwap");
+      if (swap) swap.onclick = () => send({ version: +dlg.querySelector("#shVer").value });
+      for (const [id, field] of [["shDl", "download"], ["shCm", "comments"]]) {
+        dlg.querySelector("#" + id).onchange = async (e) => {
+          try {
+            ({ link } = await api("POST", `/api/videos/${enc(v.id)}/link/settings`, { [field]: e.target.checked }));
+            toast(`${field === "download" ? "Downloading" : "Commenting"} ${e.target.checked ? "on" : "off"}`);
+            onChange(link);
+          } catch (ex) { e.target.checked = !e.target.checked; toast(ex.message, true); }
+        };
+      }
+      dlg.querySelector("#shOff").onclick = async () => {
+        if (!(await ehConfirm("The link stops working for everyone, and its copy of the video is deleted from Drive. Comments already in stay as notes. Sharing again makes a new link.", { title: "Turn off the link?", ok: "Turn it off", danger: true }))) return;
+        try { await api("DELETE", `/api/videos/${enc(v.id)}/link`); link = null; toast("Link turned off"); onChange(null); draw(); } catch (e) { toast(e.message, true); }
+      };
+    }
+    dlg.querySelectorAll("[data-close]").forEach((b) => (b.onclick = close));
+    dlg.querySelector("form").addEventListener("submit", (e) => { e.preventDefault(); close(); });
+  }
+  async function send(body) {
+    busy = true;
+    dlg.querySelectorAll("button, input, select").forEach((el) => (el.disabled = true));
+    const prog = dlg.querySelector("#shProg");
+    prog.hidden = false;
+    try {
+      let job = await api("POST", `/api/videos/${enc(v.id)}/link`, body);
+      while (job.state === "running") {
+        const pct = job.total_bytes ? Math.round((100 * job.done_bytes) / job.total_bytes) : 0;
+        prog.querySelector(".act-bar div").style.width = `${job.stage === "Uploading" ? pct : 4}%`;
+        prog.querySelector("small").textContent = job.stage === "Uploading" ? `Uploading ${pct}% of ${fmtBytes(job.total_bytes)}` : job.stage;
+        await new Promise((r) => setTimeout(r, 700));
+        job = await api("GET", `/api/jobs/${job.id}`);
+      }
+      if (job.state !== "done") throw new Error(job.message || "That didn't work.");
+      link = job.result;
+      busy = false;
+      onChange(link);
+      draw();
+      try { await navigator.clipboard.writeText(link.url); toast("Link ready and copied"); } catch (e) { toast("Link ready"); }
+    } catch (e) {
+      busy = false;
+      draw(e.message);
+    }
+  }
+  draw();
+  dlg.showModal();
+}

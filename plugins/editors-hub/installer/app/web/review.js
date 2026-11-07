@@ -75,6 +75,8 @@ function render() {
   if (isLocked()) $("changesBtn").disabled = true;
   $("approvedBar").hidden = !v.approved;
   if (v.approved) $("approvedBar").textContent = `✓ v${v.approved.version} approved ${ago(v.approved.at)}`;
+  $("shareBtn").textContent = v.link ? `Shared · v${v.link.version}` : "Share";
+  $("shareBtn").classList.toggle("on", !!v.link);
   if (d && location.hash !== `#v${d.version}`) history.replaceState(null, "", `#v${d.version}`);
 
   renderStage();
@@ -1216,3 +1218,5 @@ $("sideGrip").addEventListener("keydown", (e) => {
   e.preventDefault();
   sideSave(sideWidth($("sideGrip").parentElement.getBoundingClientRect().width + step));
 });
+
+$("shareBtn").onclick = () => openShareDialog({ ...R.v, current: R.version }, (link) => { R.v.link = link; R.raw = ""; load(); });

@@ -249,3 +249,26 @@ a.bell-row:hover { background: rgba(255, 255, 255, 0.06); }
 .bell-words b { display: block; font-weight: 500; }
 .bell-words small { display: block; margin-top: 1px; color: var(--faint); font-size: 11.5px; }
 .bell-empty { margin: 0; padding: 20px 12px; color: var(--muted); font-size: 13px; text-align: center; }
+
+/* Share: a private link for a client */
+dialog.share { width: min(520px, calc(100vw - 32px)); }
+.share-link { display: flex; gap: 8px; }
+.share-link input { flex: 1; min-width: 0; font-size: 13px; }
+.share-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; font-size: 14px; }
+.share-row select { width: auto; }
+.share-opt { display: flex; gap: 14px; align-items: center; justify-content: space-between; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; cursor: pointer; }
+.share-opt b { display: block; font-size: 14px; }
+.share-opt small { color: var(--muted); font-size: 12.5px; }
+.share .switch { position: relative; width: 42px; height: 24px; flex: none; }
+.share .switch input { position: absolute; opacity: 0; width: 0; height: 0; }
+.share .switch span { position: absolute; inset: 0; border-radius: 999px; background: rgba(255, 255, 255, 0.12); transition: 0.2s; }
+.share .switch span::after { content: ""; position: absolute; left: 3px; top: 3px; width: 18px; height: 18px; border-radius: 50%; background: #fff; transition: 0.2s; }
+.share .switch input:checked + span { background: var(--red); }
+.share .switch input:checked + span::after { transform: translateX(18px); }
+.share .switch input:focus-visible + span { outline: 2px solid var(--red); outline-offset: 2px; }
+.share-progress { display: grid; gap: 6px; }
+.share-progress small { color: var(--muted); font-size: 12.5px; }
+.share-progress .act-bar div { transition: width 0.4s; }
+.share-err { margin: 0; color: #ff8a96; font-size: 13px; min-height: 0; }
+.share-err:empty { display: none; }
+.share .actions { align-items: center; flex-wrap: wrap; }
