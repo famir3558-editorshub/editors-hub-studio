@@ -622,9 +622,11 @@ function renderStage() {
     $("emptyText").innerHTML = "Drop a rendered video here, click <b>+ Upload draft</b>, or wait for Claude to ask for your render settings.";
   }
 
-  const noPlay = showVideo && (d.render?.format === "prores" || R.playFail === d.version);
-  $("playNote").hidden = !noPlay;
+  const fail = showVideo && R.playFail?.version === d.version ? R.playFail.kind : "";
+  const noPlay = showVideo && (d.render?.format === "prores" || fail === "format");
+  $("playNote").hidden = !noPlay && fail !== "load";
   if (noPlay) $("playNote").innerHTML = `This draft's format can't play in this browser. <a href="${esc(mediaUrl(d.file))}" download>Save the file</a> to watch it, or choose MP4 H.264 for the next render.`;
+  else if (fail === "load") $("playNote").innerHTML = `This draft didn't load. <a href="#" data-retry-play>Try again</a>, or <a href="${esc(mediaUrl(d.file))}" download>save the file</a> to watch it.`;
   if (showVideo) setSrc($("vid"), mediaUrl(d.file));
   if (!showVideo) $("vid").pause();
   if (showCompare) renderCompare();
@@ -1137,9 +1139,41 @@ api("GET", "/api/auth/me").then((me) => {
   if (R.v) renderSide();
 }).catch(() => {});
 load(true);
-$("vid").addEventListener("error", () => { R.playFail = R.version; renderStage(); });
+// Only a file the browser really can't play gets "wrong format". A read or network hiccup (say, the page opened just as the
+// draft was being added) tries again once by itself, then says it didn't load. Any good load clears the message.
+R.playRetried = {};
+function retryPlay(v) {
+  const vid = $("vid"), at = vid.currentTime;
+  R.playRetried[v] = true;
+  vid.addEventListener("loadedmetadata", () => { if (at) vid.currentTime = at; }, { once: true });
+  vid.load();
+}
+$("vid").addEventListener("error", async () => {
+  const vid = $("vid"), v = R.version, code = vid.error?.code;
+  if (!vid.currentSrc && !vid.getAttribute("src")) return;  // nothing was asked of it
+  let kind = code === 4 ? "format" : "load";  // MEDIA_ERR_SRC_NOT_SUPPORTED, or a read/network/decode problem
+  if (kind === "format") {  // the browser says the same when the file couldn't be fetched at all
+    const ok = await fetch(vid.currentSrc || vid.src, { method: "HEAD", cache: "no-store" }).then((r) => r.ok).catch(() => false);
+    if (!ok) kind = "load";
+  }
+  if (kind === "load" && !R.playRetried[v]) return retryPlay(v);
+  R.playFail = { version: v, kind };
+  renderStage();
+});
 $("vid").addEventListener("loadedmetadata", () => {
-  if ($("vid").videoWidth === 0) { R.playFail = R.version; renderStage(); }
+  if ($("vid").videoWidth === 0) { R.playFail = { version: R.version, kind: "format" }; renderStage(); }
+});
+$("vid").addEventListener("loadeddata", () => {
+  if ($("vid").videoWidth === 0) return;
+  R.playRetried[R.version] = false;
+  if (R.playFail?.version === R.version) { R.playFail = null; renderStage(); }
+});
+$("playNote").addEventListener("click", (e) => {
+  if (!e.target.closest("[data-retry-play]")) return;
+  e.preventDefault();
+  R.playFail = null;
+  renderStage();
+  retryPlay(R.version);
 });
 if (maker()) api("GET", "/api/state").then((s) => { R.styles = s.styles; if (R.v) renderMadeWith(); }).catch(() => {});
 $("renderForm").addEventListener("change", showRenderPlan);
