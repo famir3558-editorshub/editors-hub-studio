@@ -529,7 +529,7 @@ def delete_video(vid, user=None):
 # the comments come back here as the video's notes, marked "(link)". Only the owner or the video's maker can share it.
 # The link stays on the draft it was given until someone picks a newer one in the Share window: same address, new draft.
 
-LINK_PULL_EVERY = 45  # seconds between looks for new comments
+LINK_PULL_EVERY = 60  # seconds between looks at the one record saying which links have new comments
 LINK_PLAYS = {"h264"}
 _link_pulled = {}
 
@@ -963,13 +963,24 @@ def pull_link_notes_soon(vid):
 
 
 def link_watch():
+    """Once a minute, one small answer from the service says how many comments each of this person's links has; only a
+    link with more than last time is asked for its comments. (Asking every link every time used up the service's day.)"""
+    pulled = {}  # link key: how many comments it had when they were brought in
     while True:
         time.sleep(LINK_PULL_EVERY)
+        try:
+            counts = approval.shared_call(DATA, "/links/activity")["links"]
+        except (approval.ApprovalError, OSError, KeyError, TypeError, ValueError):
+            continue
         for vid, d in list(video_dirs().items()):
             try:
-                if (read_json(d / "video.json", {}) or {}).get("link"):
+                v = read_json(d / "video.json", {}) or {}
+                key = (v.get("link") or {}).get("key")
+                n = (counts.get(key) or {}).get("n", 0) if key else 0
+                if n and pulled.get(key) != n and v.get("status") not in LOCKED_STATUSES:  # an approved video's wait for Undo approve
                     pull_link_notes(vid)
-            except (StudioError, OSError, ValueError, KeyError):
+                    pulled[key] = n
+            except (StudioError, OSError, ValueError, KeyError, AttributeError):
                 pass
 
 
@@ -3465,7 +3476,7 @@ def claude_signed_in():
 # Worked out fresh from the videos and jobs each time, so it can't drift from what's true, and each person only gets what they can see.
 
 NOTIFY_RECENT = 25
-NOTIFY_REPORTS_EVERY = 60
+NOTIFY_REPORTS_EVERY = 300  # the service's list of reports is limited, so not more often than this
 _notify_reports = {"at": 0, "busy": False}
 
 
