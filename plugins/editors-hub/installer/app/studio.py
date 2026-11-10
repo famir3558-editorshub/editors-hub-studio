@@ -2264,8 +2264,11 @@ def update_note(vid, nid, changes):
         note = find_note(v, nid)
         if "done" in changes:
             note["done"] = bool(changes["done"])
-        if "text" in changes and str(changes["text"]).strip():
+        if "text" in changes and str(changes["text"]).strip() and str(changes["text"]).strip() != note.get("text"):
+            if note.get("batch"):  # Claude already has it: a change here wouldn't reach the edit
+                raise StudioError("This note was already sent to Claude, so it can't be changed. Add a new note instead.")
             note["text"] = str(changes["text"]).strip()
+            note["edited"] = now()
         save_video(v)
     return note
 

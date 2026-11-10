@@ -686,9 +686,10 @@ function noteCard(n, num) {
       <span class="state ${cls}">${label}</span>
       ${$("allVers").checked ? `<span>v${n.version}</span>` : ""}
       <span>${esc(n.author || "")}</span>
-      ${mine ? `<span class="tools"><button data-act="toggle" title="${n.done ? "Not fixed yet" : "Mark fixed"}">${n.done ? "↺" : "✓"}</button><button data-act="del" title="Delete">✕</button></span>` : ""}
+      ${mine ? `<span class="tools">${cls === "new" && R.editing !== n.id ? `<button data-act="edit" title="Edit">✎</button>` : ""}<button data-act="toggle" title="${n.done ? "Not fixed yet" : "Mark fixed"}">${n.done ? "↺" : "✓"}</button><button data-act="del" title="Delete">✕</button></span>` : ""}
     </div>
-    ${n.text ? `<div class="text">${esc(n.text)}</div>` : ""}
+    ${R.editing === n.id ? `<div class="note-edit"><textarea data-edit-text rows="3">${esc(R.editText ?? n.text ?? "")}</textarea><div class="note-edit-row"><span class="faint small-print">Ctrl+Enter to save</span><span class="spacer"></span><button class="btn small ghost" data-act="edit-cancel" type="button">Cancel</button><button class="btn small primary" data-act="edit-save" type="button">Save</button></div></div>`
+      : n.text ? `<div class="text">${esc(n.text)}${n.edited ? ' <span class="faint small-print">(edited)</span>' : ""}</div>` : ""}
     ${atts ? `<div class="atts">${atts}</div>` : ""}
     ${n.reply ? `<div class="reply"><b>Claude:</b> ${esc(n.reply.text)}</div>` : ""}
     ${n.saved_to ? `<div class="saved">✓ Saved to ${esc(n.saved_to)}</div>` : ""}
@@ -727,6 +728,7 @@ function renderSide() {
   $("noteCount").textContent = R.version ? `${open} open on v${R.version}` : "Notes";
   $("noteList").innerHTML = list.length ? list.map((n) => noteCard(n, order.indexOf(n.id) + 1 || "")).join("")
     : `<li class="notes-empty">${R.version ? (changed.length ? "Nothing else on this draft." : "No notes yet. Pause on a moment and type what should change.") : "Notes appear here once there's a draft."}</li>`;
+  if (R.editing) focusNoteEdit();
 
   $("draftList").innerHTML = v.drafts.slice().reverse().map((x) => {
     const notes = v.notes.filter((n) => n.version === x.version);
@@ -1021,6 +1023,17 @@ async function noteAction(e, list) {
   if (!act) return;
   const id = card.dataset.id, n = R.v.notes.find((x) => x.id === +id);
   try {
+    if (act === "edit") {
+      R.editing = n.id;
+      R.editText = n.text || "";
+      renderSide();
+      return focusNoteEdit();
+    }
+    if (act === "edit-cancel") {
+      R.editing = R.editText = null;
+      return renderSide();
+    }
+    if (act === "edit-save") return saveNoteEdit();
     if (act === "toggle") await api("PATCH", `/api/videos/${enc(vidId)}/notes/${id}`, { done: !n.done });
     if (act === "del") {
       if (!(await ehConfirm("The note and its attachments go.", { title: "Delete this note?", ok: "Delete", danger: true }))) return;
@@ -1032,6 +1045,31 @@ async function noteAction(e, list) {
   }
 }
 $("noteList").addEventListener("click", noteAction);
+// editing a note in place: what's typed survives the page redrawing the list when something else changes
+function focusNoteEdit() {
+  const box = document.querySelector("[data-edit-text]");
+  if (box && document.activeElement !== box) { box.focus(); box.setSelectionRange(box.value.length, box.value.length); }
+}
+async function saveNoteEdit() {
+  const id = R.editing, text = (R.editText || "").trim();
+  if (!id) return;
+  if (!text) return toast("A note needs some words. Delete it instead if it's not needed.", true);
+  try {
+    await api("PATCH", `/api/videos/${enc(vidId)}/notes/${id}`, { text });
+    R.editing = R.editText = null;
+    toast("Note saved");
+    await load();
+    renderSide();
+  } catch (ex) {
+    toast(ex.message, true);
+  }
+}
+$("noteList").addEventListener("input", (e) => { if (e.target.matches("[data-edit-text]")) R.editText = e.target.value; });
+$("noteList").addEventListener("keydown", (e) => {
+  if (!e.target.matches("[data-edit-text]")) return;
+  if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) { e.preventDefault(); saveNoteEdit(); }
+  if (e.key === "Escape") { e.preventDefault(); R.editing = R.editText = null; renderSide(); }
+});
 $("changedList").addEventListener("click", noteAction);
 $("allVers").onchange = renderSide;
 

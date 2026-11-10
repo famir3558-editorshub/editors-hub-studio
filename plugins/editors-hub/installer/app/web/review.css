@@ -307,3 +307,9 @@ body.side-dragging iframe, body.side-dragging video { pointer-events: none; }
 .locked-box p { margin: 0; line-height: 1.45; }
 .locked-box .btn { margin-top: 4px; }
 body.locked #noteList .tools, body.locked .upload-draft { display: none; }
+
+/* a note being edited in place */
+.note-edit { display: grid; gap: 8px; margin-top: 6px; }
+.note-edit textarea { width: 100%; min-height: 70px; resize: vertical; font: inherit; }
+.note-edit-row { display: flex; align-items: center; gap: 6px; }
+.note-edit-row .spacer { flex: 1; }
