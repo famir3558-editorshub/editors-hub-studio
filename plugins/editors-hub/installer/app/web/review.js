@@ -77,6 +77,12 @@ function render() {
   if (v.approved) $("approvedBar").textContent = `✓ v${v.approved.version} approved ${ago(v.approved.at)}`;
   $("shareBtn").textContent = v.link ? `Shared · v${v.link.version}` : "Share";
   $("shareBtn").classList.toggle("on", !!v.link);
+  const inc = v.incoming;
+  $("incomingNote").hidden = !inc || !maker();
+  if (inc && maker()) {
+    const pct = inc.total ? Math.round((100 * inc.done) / inc.total) : 0;
+    $("incomingNote").innerHTML = `<b>v${inc.version} is rendered.</b> It's uploading so Share is instant, and shows here when that's done.<div class="act-bar"><div style="width:${Math.max(3, pct)}%"></div></div><small>${esc(inc.stage)}${inc.total ? ` · ${pct}% of ${fmtBytes(inc.total)}` : ""}</small>`;
+  }
   if (d && location.hash !== `#v${d.version}`) history.replaceState(null, "", `#v${d.version}`);
 
   renderStage();

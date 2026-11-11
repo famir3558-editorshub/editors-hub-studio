@@ -526,7 +526,7 @@ function openShareDialog(v, onChange = () => {}) {
       dlg.innerHTML = `<form method="dialog"><h2>Share</h2><p class="ask-text muted">There's no draft of “${esc(v.name)}” to share yet.</p><div class="actions"><button class="btn primary">Close</button></div></form>`;
     } else if (!link) {
       dlg.innerHTML = `<form method="dialog"><h2>Share “${esc(v.name)}”</h2>
-        <p class="ask-text muted">Makes a private link. Whoever has it can watch the draft, with no sign-in. They can't see anything else in your studio.</p>
+        <p class="ask-text muted">Makes a private link. Whoever has it can watch the draft, with no sign-in. They can't see anything else in your studio.${(v.uploaded || []).length ? ` <b>Already uploaded: ${v.uploaded.map((n) => "v" + n).join(", ")}</b>, so the link for ${v.uploaded.length > 1 ? "those is" : "it is"} ready in seconds.` : ""}</p>
         ${pick(drafts.includes(v.current) ? v.current : latest)}${opts(null)}<div class="share-progress" id="shProg" hidden><div class="act-bar"><div></div></div><small></small></div><p class="share-err">${esc(message)}</p>
         <div class="actions"><button type="button" class="btn ghost" data-close>Cancel</button><button type="button" class="btn primary" id="shMake">Make the link</button></div></form>`;
       dlg.querySelector("#shMake").onclick = () => send({ version: +(dlg.querySelector("#shVer")?.value || (drafts.includes(v.current) ? v.current : latest)), download: dlg.querySelector("#shDl").checked, comments: dlg.querySelector("#shCm").checked });

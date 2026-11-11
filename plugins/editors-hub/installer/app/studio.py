@@ -195,7 +195,7 @@ def settings():
     with LOCK:
         s = read_json(SETTINGS, {}) or {}
         defaults = {"studio_name": "Editors.Hub", "your_name": "", "library": str(ROOT / "library"),
-                    "port": DEFAULT_PORT, "owner_email": OWNER_EMAIL, "lan": False}
+                    "port": DEFAULT_PORT, "owner_email": OWNER_EMAIL, "lan": False, "ready_share": True, "ready_since": now()}
         if any(k not in s for k in defaults) or not s.get("token"):
             s = {**defaults, **s, "token": s.get("token") or secrets.token_urlsafe(24)}
             write_json(SETTINGS, s)
@@ -213,6 +213,10 @@ def update_settings(changes):
             if changes["lan"] and not approval.open_to_others(DATA):
                 raise StudioError(auth.ALONE)
             s["lan"] = bool(changes["lan"])
+        if "ready_share" in changes:
+            if bool(changes["ready_share"]) and not s.get("ready_share"):
+                s["ready_since"] = now()  # only drafts from now on
+            s["ready_share"] = bool(changes["ready_share"])
         if "library_confirmed" in changes:
             s["library_confirmed"] = bool(changes["library_confirmed"])
         for key in ("studio_name", "your_name", "library"):
@@ -670,10 +674,10 @@ def link_copies(send, folder, job):
     return short, out
 
 
-def put_draft_on_link(vid, draft, user, job, download=None, comments=None, via_client=None):
-    """Sends one draft up and puts it on the video's link (made the first time, the same one after). Runs inside a job."""
+def upload_draft_files(vid, draft, job):
+    """Sends one draft (as a browser plays it) and its quality copies to the Review links folder: what a link then points at.
+    Shown to nobody until a link is given it. Runs inside a job."""
     v = load_video(vid)
-    old = v.get("link") or {}
     src = Path(v["folder"]) / draft["file"]
     send, temp = link_video_file(src, job)
     if not temp:
@@ -689,14 +693,7 @@ def put_draft_on_link(vid, draft, user, job, download=None, comments=None, via_c
             job["total_bytes"] = job.get("total_bytes", 0) + extra
         job["stage"] = f"Uploading {v['name']}"
         name = f"{vid}-v{draft['version']}{send.suffix.lower()}"
-        key = old.get("key")
-        try:
-            started = approval.shared_call(DATA, "/links/start", name=name, bytes=size, **({"key": key} if key else {}))
-        except approval.ApprovalError as e:
-            if not (key and link_gone(e)):
-                raise
-            key = None  # turned off somewhere else: a new link
-            started = approval.shared_call(DATA, "/links/start", name=name, bytes=size)
+        started = approval.shared_call(DATA, "/links/start", name=name, bytes=size)
         if job.get("several"):  # one of a client's videos: the bar runs over all of them
             sent = drive_upload_file(started["upload_url"], send, JobPart(job, job.get("done_bytes", 0)))
         else:
@@ -707,21 +704,52 @@ def put_draft_on_link(vid, draft, user, job, download=None, comments=None, via_c
             check_stop(job)
             job["stage"] = f"Uploading {v['name']} ({target}p)"
             cname = f"{vid}-v{draft['version']}-{target}p.mp4"
-            started_copy = approval.shared_call(DATA, "/links/start", name=cname, bytes=f.stat().st_size, **({"key": key} if key else {}))
-            part = JobPart(job, job.get("done_bytes", 0))
-            got = drive_upload_file(started_copy["upload_url"], f, part)
+            started_copy = approval.shared_call(DATA, "/links/start", name=cname, bytes=f.stat().st_size)
+            got = drive_upload_file(started_copy["upload_url"], f, JobPart(job, job.get("done_bytes", 0)))
             sent_copies.append({"file_id": got.get("id"), "name": cname, "height": target})
-        job["stage"] = "Making the link"
-        sets = {k: bool(val) for k, val in (("download", download), ("comments", comments)) if val is not None}
-        poster = link_poster(send)
-        link = approval.shared_call(DATA, "/links/finish", file_id=sent.get("id"), name=name, video_name=v["name"], draft=f"v{draft['version']}",
-                                    height=height or None, copies=sent_copies,
-                                    **({"key": key} if key else {}), **({"poster": poster} if poster else {}), **sets)["link"]
+        return {"version": draft["version"], "file": draft["file"], "file_id": sent.get("id"), "name": name, "height": height or None,
+                "copies": sent_copies, "poster": link_poster(send), "qualities": sorted({height, *(t for t, _ in copies)} - {0}, reverse=True)}
     except approval.ApprovalError as e:
         raise StudioError(str(e))
     finally:
         if temp:
             shutil.rmtree(temp, ignore_errors=True)
+
+
+def ready_files(r):
+    return [r["file_id"], *(c["file_id"] for c in r.get("copies", []))] if r and r.get("file_id") else []
+
+
+def put_draft_on_link(vid, draft, user, job, download=None, comments=None, via_client=None):
+    """Puts one draft on the video's link (made the first time, the same one after). Uses the upload made in the background
+    when the draft arrived; waits for it if it's still going; sends it now if there's none. Runs inside a job."""
+    v = load_video(vid)
+    old = v.get("link") or {}
+    ready = wait_for_ready(vid, draft, job)
+    if not ready:
+        ready = upload_draft_files(vid, draft, job)
+        with vlock(vid):
+            fresh = load_video(vid)
+            fresh["uploads"] = {**(fresh.get("uploads") or {}), str(draft["version"]): {**ready, "at": now()}}
+            save_video(fresh)
+    else:
+        job["stage"] = "Already uploaded: making the link"
+    key = old.get("key")
+    sets = {k: bool(val) for k, val in (("download", download), ("comments", comments)) if val is not None}
+
+    def finish(key):
+        return approval.shared_call(DATA, "/links/finish", file_id=ready["file_id"], name=ready["name"], video_name=v["name"], draft=f"v{draft['version']}",
+                                    height=ready.get("height"), copies=ready.get("copies", []), keep_files=kept_upload_files(load_video(vid))[:40],
+                                    **({"key": key} if key else {}), **({"poster": ready["poster"]} if ready.get("poster") else {}), **sets)["link"]
+    try:
+        try:
+            link = finish(key)
+        except approval.ApprovalError as e:
+            if not (key and link_gone(e)):
+                raise
+            link = finish(None)  # turned off somewhere else: a new link
+    except approval.ApprovalError as e:
+        raise StudioError(str(e))
     same = link["key"] == old.get("key")
     with vlock(vid):
         fresh = load_video(vid)
@@ -729,9 +757,201 @@ def put_draft_on_link(vid, draft, user, job, download=None, comments=None, via_c
                          "comments": link["comments"], "shared": now(), "by": (user or {}).get("email", ""),
                          "taken": old.get("taken", []) if same else [],
                          "via_client": old.get("via_client") if same else via_client,
-                         "qualities": sorted({height, *(t for t, _ in copies)} - {0}, reverse=True)}
+                         "qualities": ready.get("qualities") or [], "files": ready_files(ready)}
         save_video(fresh)
+    prune_uploads(vid)
     return fresh["link"]
+
+
+# ---- drafts ready to share: when a client video's draft is rendered, it's uploaded (with its quality copies) BEFORE it shows
+# in the studio, so Share only has to point the link at it and is instant. Until then it waits in `incoming` and the review page
+# shows the upload's progress. If the upload fails or is stopped, the draft shows anyway and Share uploads it then. Nobody sees
+# an upload until a link is given it; one per video is kept, and an older one never shared goes when a newer one is ready.
+# Settings → "Upload drafts before they show".
+
+READY_TRIES = 3
+READY_TURN = threading.Lock()  # one at a time, so they don't fight over the connection
+_ready_look = {"at": 0}
+
+
+def ready_on():
+    s = settings()
+    return bool(s.get("ready_share", True)) and bool(approval._read(DATA).get("token")) and bool(approval.config())
+
+
+def holds_drafts(v):
+    return bool(v.get("project")) and ready_on()
+
+
+def ready_job(vid):
+    return next((j for j in JOBS.values() if j["kind"] == "ready" and j.get("video") == vid and j["state"] == "running"), None)
+
+
+def wait_for_ready(vid, draft, job):
+    """The finished background upload of this very draft, or None. (A draft only shows once its upload is done or given up.)"""
+    while True:
+        running = ready_job(vid)
+        if running and running.get("version") == draft["version"]:
+            job["stage"] = f"Uploading {running.get('name', '')}: already on its way"
+            job["total_bytes"], job["done_bytes"] = running.get("total_bytes", 0), running.get("done_bytes", 0)
+            check_stop(job)
+            time.sleep(0.7)
+            continue
+        r = (load_video(vid).get("uploads") or {}).get(str(draft["version"]))
+        return r if r and r.get("file") == draft["file"] else None
+
+
+def place_draft(v, draft):
+    """A draft joins the video: the review page shows it and the video is in review again (unless it's approved)."""
+    v["drafts"].append(draft)
+    if v.get("status") not in LOCKED_STATUSES:  # a draft finished after approval leaves the approval as it was
+        v["status"], v["approved"] = "in review", None
+
+
+def show_incoming(vid, version=None):
+    with vlock(vid):
+        v = load_video(vid)
+        d = v.get("incoming")
+        if not d or (version is not None and d["version"] != version):
+            return None  # a newer draft is waiting now, with its own upload
+        v.pop("incoming")
+        place_draft(v, d)
+        save_video(v)
+    make_thumb(Path(v["folder"]) / d["file"], Path(v["folder"]) / "thumb.jpg")
+    return d["version"]
+
+
+def wants_ready(v):
+    """A draft that should go up now: the one waiting to show, or else a shown latest draft (since this was turned on) whose
+    upload failed and isn't on its link yet."""
+    if v.get("incoming"):
+        return v["incoming"]
+    if not v.get("project") or not v.get("drafts"):
+        return None
+    d = v["drafts"][-1]
+    if (v.get("link") or {}).get("version") == d["version"] or str(d["version"]) in (v.get("uploads") or {}):
+        return None
+    if d.get("added", "") < settings().get("ready_since", "9999"):
+        return None
+    failed = v.get("ready_failed") or {}
+    if failed.get("version") != d["version"] or failed.get("tries", 0) >= READY_TRIES:
+        return None  # only a retry of one that failed: a draft shown without trying stays as it is
+    return d
+
+
+def get_ready(vid):
+    """Starts the upload of the draft waiting to show (or a retry), if none is going. The draft shows when it ends, however."""
+    if ready_job(vid):
+        return None
+    try:
+        v = load_video(vid)
+    except StudioError:
+        return None
+    d = wants_ready(v)
+    if not d:
+        return None
+    if not ready_on():
+        show_incoming(vid)
+        return None
+
+    def work(job):
+        job["stage"] = "Waiting for another upload to finish"
+        r = None
+        try:
+            with READY_TURN:
+                check_stop(job)
+                r = upload_draft_files(vid, d, job)
+        except (StudioError, OSError) as e:
+            with vlock(vid):
+                fresh = load_video(vid)
+                f = fresh.get("ready_failed") or {}
+                fresh["ready_failed"] = {"version": d["version"], "tries": (f.get("tries", 0) if f.get("version") == d["version"] else 0) + 1, "why": str(e)[:200]}
+                save_video(fresh)
+            raise
+        finally:
+            if r:
+                with vlock(vid):
+                    fresh = load_video(vid)
+                    fresh["uploads"] = {**(fresh.get("uploads") or {}), str(d["version"]): {**r, "at": now()}}
+                    fresh.pop("ready_failed", None)
+                    save_video(fresh)
+                prune_uploads(vid)
+            show_incoming(vid, d["version"])  # done, failed or stopped: the draft shows now
+
+            def next_one():  # a newer draft that came meanwhile, once this job counts as finished
+                time.sleep(1.5)
+                get_ready(vid)
+            threading.Thread(target=next_one, daemon=True).start()
+        return {"version": d["version"]}
+    job = start_job("ready", f"Getting {v['name']} v{d['version']} ready to share", None, work)
+    job.update(video=vid, version=d["version"], name=v["name"])
+    return job
+
+
+def incoming_view(v):
+    """For the review page: the draft that's rendered and uploading before it shows."""
+    d = v.get("incoming")
+    if not d:
+        return None
+    j = ready_job(v["id"])
+    return {"version": d["version"], "stage": (j or {}).get("stage") or "Waiting to upload", "done": (j or {}).get("done_bytes", 0), "total": (j or {}).get("total_bytes", 0)}
+
+
+READY_KEEP = 3  # uploads kept for a video: its latest draft and the two before it, until it's approved
+
+
+def prune_uploads(vid):
+    """Keeps the uploads of the newest three drafts (once the video is approved, only the approved draft's) and whatever its
+    link is showing; the rest go from the Drive."""
+    with vlock(vid):
+        v = load_video(vid)
+        ups = dict(v.get("uploads") or {})
+        if not ups:
+            return
+        if v.get("status") in LOCKED_STATUSES and v.get("approved"):
+            keep = {str(v["approved"]["version"])}
+        else:
+            keep = set(sorted(ups, key=int)[-READY_KEEP:])
+        if v.get("link"):
+            keep.add(str(v["link"].get("version")))
+        drop = {k: r for k, r in ups.items() if k not in keep}
+        if not drop:
+            return
+        v["uploads"] = {k: r for k, r in ups.items() if k in keep}
+        save_video(v)
+    for r in drop.values():
+        discard_ready(v, r)
+
+
+def kept_upload_files(v):
+    return [i for r in (v.get("uploads") or {}).values() for i in ready_files(r)]
+
+
+def discard_ready(v, r):
+    """An upload that was never shared, gone from the Drive (never what the video's link is showing)."""
+    ids = [i for i in ready_files(r) if i not in set((v.get("link") or {}).get("files", []))]
+    if not ids:
+        return
+    try:
+        approval.shared_call(DATA, "/links/discard", file_ids=ids, links=[(v.get("link") or {}).get("key")] if v.get("link") else [])
+    except (approval.ApprovalError, OSError):
+        pass
+
+
+def ready_catch_up(force=False):
+    """Every few minutes: a draft left waiting (the studio closed mid-upload), a failed upload to try again, old uploads to clear."""
+    if not force and time.time() - _ready_look["at"] < 300:
+        return
+    _ready_look["at"] = time.time()
+    for vid, d in list(video_dirs().items()):
+        try:
+            v = read_json(d / "video.json", {}) or {}
+            if v.get("uploads") and not ready_job(vid):
+                prune_uploads(vid)
+            if wants_ready(v):
+                get_ready(vid)
+        except (StudioError, OSError, ValueError, KeyError, AttributeError):
+            pass
 
 
 def share_video(vid, user=None, version=None, download=None, comments=None):
@@ -914,6 +1134,12 @@ def video_link_off(vid, user=None):
         if not link_gone(e):
             raise StudioError(str(e))
     drop_video_link(vid)
+    with vlock(vid):  # turning the link off clears the video's uploads from the Drive too, as the Share window says
+        v = load_video(vid)
+        ups = v.pop("uploads", None) or {}
+        save_video(v)
+    for r in ups.values():
+        discard_ready(v, r)
     return None
 
 
@@ -968,6 +1194,10 @@ def link_watch():
     pulled = {}  # link key: how many comments it had when they were brought in
     while True:
         time.sleep(LINK_PULL_EVERY)
+        try:
+            ready_catch_up()
+        except Exception:  # never stops the comments
+            pass
         try:
             counts = approval.shared_call(DATA, "/links/activity")["links"]
         except (approval.ApprovalError, OSError, KeyError, TypeError, ValueError):
@@ -1514,6 +1744,7 @@ def video_summary(v, styles=None, projects=None):
             "status": v["status"], "created": v["created"], "updated": v.get("updated", v["created"]),
             "draft_count": len(v["drafts"]), "latest": latest, "latest_file": v["drafts"][-1]["file"] if v["drafts"] else "", "maker": v.get("maker", ""),
             "link": {**{k: v["link"][k] for k in ("url", "version", "download", "comments")}, "qualities": v["link"].get("qualities")} if v.get("link") else None,
+            "uploaded": sorted(int(k) for k in (v.get("uploads") or {})),
             "open_notes": sum(1 for n in v["notes"] if not n["done"] and n["version"] == latest),
             "thumb": (Path(v["folder"]) / "thumb.jpg").exists(), "preview": video_preview(v), "style_shared": style_meta(sdir)["shared"] if sdir else False,
             "render_waiting": (v.get("render_request") or {}).get("status") == "waiting",
@@ -1590,7 +1821,7 @@ def video_view(v):
                 if p.is_file() and not p.name.startswith(".")]
 
     live = v.get("live")
-    return {**v, **video_summary(v), "raw": files("raw"), "exports": files("exports"), "statuses": STATUSES,
+    return {**v, **video_summary(v), "incoming": incoming_view(v), "raw": files("raw"), "exports": files("exports"), "statuses": STATUSES,
             "updates": v.get("updates", [])[-200:], "render_options": RENDER_OPTIONS, "start": start_state(v), "preview_frames": preview_frames(v),
             "broll_yours": len(broll_own_files(d)),
             "claude": claude_status(d), "live": {**live, "running": live_ok(live["url"])} if live else None}
@@ -2167,6 +2398,9 @@ def add_draft(vid, src, note="", move=False, original=None, render=None):
     with vlock(vid):
         v = load_video(vid)
         check_edit(v)
+        held = v.get("incoming")
+        if held:  # a newer draft came while the last was still uploading: that one shows now, as it is
+            place_draft(v, v.pop("incoming"))
         version = (latest_version(v) or 0) + 1
         rel = f"drafts/v{version}{src.suffix.lower() or '.mp4'}"
         dest = Path(v["folder"]) / rel
@@ -2182,12 +2416,17 @@ def add_draft(vid, src, note="", move=False, original=None, render=None):
             if b.get("picked_up_ts") and not b.get("answered_in"):
                 b["answered_in"] = version
                 draft["worked_for"] = int(time.time() - b["picked_up_ts"])
-        v["drafts"].append(draft)
-        if v.get("status") not in LOCKED_STATUSES:  # a draft finished after approval leaves the approval as it was
-            v["status"], v["approved"] = "in review", None
+        hold = holds_drafts(v)
+        if hold:  # a client's draft goes up first, so Share is instant: it shows when that's done (get_ready)
+            v["incoming"] = draft
+        else:
+            place_draft(v, draft)
         progress_finish(v)
         save_video(v)
-    make_thumb(dest, Path(v["folder"]) / "thumb.jpg")
+    if hold:
+        get_ready(vid)
+    else:
+        make_thumb(dest, Path(v["folder"]) / "thumb.jpg")
     return version
 
 
@@ -3384,6 +3623,7 @@ def approve(vid, version):
             learn_file(vid).parent.mkdir(parents=True, exist_ok=True)
             write_json(learn_file(vid), {"video": vid, "at": time.time()})
         save_video(v)
+    threading.Thread(target=lambda: prune_uploads(vid), daemon=True).start()  # the earlier drafts' uploads go
     return v
 
 
@@ -6155,7 +6395,7 @@ class Handler(BaseHTTPRequestHandler):
              "can_edit": can_edit_project(p, self.user)}
             for p in list_projects()]
         me = accounts().public(self.user)
-        visible = ("studio_name", "your_name", "library") if me["role"] == "owner" else ("studio_name",)
+        visible = ("studio_name", "your_name", "library", "ready_share") if me["role"] == "owner" else ("studio_name",)
         return {"can_effects": can_remove_effects(self.user), "me": me, "version": APP_VERSION, "approval": approval.status(DATA), "alone": not approval.open_to_others(DATA), "report": self.report_mode(), "updated": update_to_tell(me["email"]), "settings": {k: s[k] for k in visible},
                 "projects": projects, "styles": styles, "videos": videos, "statuses": STATUSES,
                 "platform": "windows" if WINDOWS else "mac" if sys.platform == "darwin" else "linux"}

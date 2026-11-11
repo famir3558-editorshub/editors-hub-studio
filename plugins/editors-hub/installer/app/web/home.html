@@ -158,6 +158,7 @@
     </div>
     <form class="panel settings" id="settingsForm" data-owner hidden>
       <label class="field">Library folder <small>Where styles and videos are kept. Use an external drive if your footage is big. Styles already made stay in the old folder; move them yourself if you change this.</small><input name="library"></label>
+      <label class="row toggle-row"><span><b>Upload drafts before they show</b><br><small class="muted">When a client video's draft is rendered, it's uploaded to your Drive first (with its quality copies) and shows once that's done, so Share is instant. The latest draft and the two before it stay uploaded; once the video is approved, only the approved one. Style videos are never uploaded.</small></span><span class="spacer"></span><span class="switch"><input type="checkbox" name="ready_share" id="readyShare"><span></span></span></label>
       <div class="row"><button class="btn" type="button" id="revealLib">Open library folder</button><div class="spacer"></div><button class="btn primary">Save</button></div>
     </form>
     <div class="panel settings" data-owner hidden id="keysPanel">

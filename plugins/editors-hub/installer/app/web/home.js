@@ -75,7 +75,10 @@ function render() {
   queueMicrotask(applyJobBars);
 
   const f = $("settingsForm");
-  if (me.role === "owner" && document.activeElement?.form !== f) f.elements.library.value = settings.library;
+  if (me.role === "owner" && document.activeElement?.form !== f) {
+    f.elements.library.value = settings.library;
+    f.elements.ready_share.checked = settings.ready_share !== false;
+  }
   const py = S.state.platform === "windows" ? "py" : "python3";
   const script = S.state.platform === "windows" ? "%USERPROFILE%\\editors-hub\\studio.py" : "~/editors-hub/studio.py";
   $("cmds").textContent = [
@@ -842,6 +845,15 @@ $("styleForm").addEventListener("submit", async (e) => {
   location.href = `/style/${enc(s.id)}`;
 });
 
+$("readyShare").addEventListener("change", async (e) => {  // saves straight away, like the other switches
+  try {
+    S.state = await api("POST", "/api/settings", { ready_share: e.target.checked });
+    toast(e.target.checked ? "New client drafts upload before they show" : "Drafts show straight away; Share uploads them");
+  } catch (ex) {
+    e.target.checked = !e.target.checked;
+    toast(ex.message, true);
+  }
+});
 $("settingsForm").addEventListener("submit", async (e) => {
   e.preventDefault();
   const f = e.target;

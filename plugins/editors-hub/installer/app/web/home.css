@@ -298,3 +298,6 @@ pre { margin: 0; padding: 14px; background: rgba(0, 0, 0, 0.45); border: 1px sol
 .sv-name b { font-size: 14px; font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .sv-name small { color: var(--muted); font-size: 12px; }
 .share-video select { width: auto; padding: 6px 8px; }
+
+.toggle-row { align-items: center; gap: 14px; cursor: pointer; margin: 4px 0 12px; }
+.toggle-row small { font-size: 12.5px; line-height: 1.5; }

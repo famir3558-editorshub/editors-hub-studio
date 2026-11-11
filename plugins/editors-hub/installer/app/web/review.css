@@ -313,3 +313,9 @@ body.locked #noteList .tools, body.locked .upload-draft { display: none; }
 .note-edit textarea { width: 100%; min-height: 70px; resize: vertical; font: inherit; }
 .note-edit-row { display: flex; align-items: center; gap: 6px; }
 .note-edit-row .spacer { flex: 1; }
+
+/* a client's draft uploading before it shows */
+.incoming-note { margin: 0 0 10px; padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(229, 25, 43, 0.4); background: rgba(229, 25, 43, 0.08); font-size: 13px; display: grid; gap: 6px; }
+.incoming-note .act-bar { margin: 2px 0 0; }
+.incoming-note .act-bar div { transition: width 0.6s; }
+.incoming-note small { color: var(--muted); }
