@@ -195,7 +195,7 @@ def settings():
     with LOCK:
         s = read_json(SETTINGS, {}) or {}
         defaults = {"studio_name": "Editors.Hub", "your_name": "", "library": str(ROOT / "library"),
-                    "port": DEFAULT_PORT, "owner_email": OWNER_EMAIL, "lan": False, "ready_share": True, "ready_since": now()}
+                    "port": DEFAULT_PORT, "owner_email": OWNER_EMAIL, "lan": False, "ready_share": True, "ready_since": now(), "link_copies": False}
         if any(k not in s for k in defaults) or not s.get("token"):
             s = {**defaults, **s, "token": s.get("token") or secrets.token_urlsafe(24)}
             write_json(SETTINGS, s)
@@ -217,6 +217,8 @@ def update_settings(changes):
             if bool(changes["ready_share"]) and not s.get("ready_share"):
                 s["ready_since"] = now()  # only drafts from now on
             s["ready_share"] = bool(changes["ready_share"])
+        if "link_copies" in changes:
+            s["link_copies"] = bool(changes["link_copies"])
         if "library_confirmed" in changes:
             s["library_confirmed"] = bool(changes["library_confirmed"])
         for key in ("studio_name", "your_name", "library"):
@@ -655,12 +657,13 @@ def ffmpeg_until_stopped(args, job):
 
 
 def link_copies(send, folder, job):
-    """720p, 480p and (for anything bigger) 1080p copies of what goes on a link: [(short side, file)]. Fewer for small drafts."""
+    """720p, 480p and (for anything bigger) 1080p copies of what goes on a link: [(short side, file)]. Fewer for small drafts.
+    None unless Settings → "Smaller quality copies" is on: by default a link plays only the draft as it was rendered."""
     m = probe_media(send)
     w, h = m.get("width") or 0, m.get("height") or 0
     short = min(w, h)
     out = []
-    if not short or not shutil.which("ffmpeg"):
+    if not short or not shutil.which("ffmpeg") or not settings().get("link_copies"):
         return short, out
     for target in LINK_QUALITIES:
         if short < target * 1.15:  # not worth a copy so close to the original
@@ -720,6 +723,22 @@ def ready_files(r):
     return [r["file_id"], *(c["file_id"] for c in r.get("copies", []))] if r and r.get("file_id") else []
 
 
+def link_fixed_ids(v, draft, link_notes):
+    """The link's comments on earlier drafts whose notes are marked done in the studio: they get a "Fixed in vN" tick on the
+    link when draft vN goes on it. Matched by the comment's id, or (notes brought in before ids were kept) by draft, time and text."""
+    done = [n for n in v["notes"] if n.get("done") and n["version"] < draft["version"]]
+    ids = {n["link_note"] for n in done if n.get("link_note")}
+    same = {(n["version"], round(float(n["t"]), 1), (n.get("text") or "").strip()) for n in done}
+    out = []
+    for ln in link_notes or []:
+        if not ln.get("id") or ln.get("fixed"):
+            continue
+        m = re.fullmatch(r"v(\d+)", str(ln.get("draft") or ""))
+        if ln["id"] in ids or (m and (int(m.group(1)), round(float(ln.get("t") or 0), 1), str(ln.get("text") or "").strip()) in same):
+            out.append(ln["id"])
+    return out
+
+
 def put_draft_on_link(vid, draft, user, job, download=None, comments=None, via_client=None):
     """Puts one draft on the video's link (made the first time, the same one after). Uses the upload made in the background
     when the draft arrived; waits for it if it's still going; sends it now if there's none. Runs inside a job."""
@@ -736,11 +755,17 @@ def put_draft_on_link(vid, draft, user, job, download=None, comments=None, via_c
         job["stage"] = "Already uploaded: making the link"
     key = old.get("key")
     sets = {k: bool(val) for k, val in (("download", download), ("comments", comments)) if val is not None}
+    fixed = []
+    if key and old.get("version") != draft["version"]:  # a newer draft: the comments it fixed get their tick
+        try:
+            fixed = link_fixed_ids(load_video(vid), draft, approval.shared_call(DATA, "/links/notes", key=key)["notes"])
+        except (approval.ApprovalError, OSError, KeyError, TypeError, ValueError):
+            fixed = []
 
     def finish(key):
         return approval.shared_call(DATA, "/links/finish", file_id=ready["file_id"], name=ready["name"], video_name=v["name"], draft=f"v{draft['version']}",
                                     height=ready.get("height"), copies=ready.get("copies", []), keep_files=kept_upload_files(load_video(vid))[:40],
-                                    **({"key": key} if key else {}), **({"poster": ready["poster"]} if ready.get("poster") else {}), **sets)["link"]
+                                    **({"key": key, "fixed": fixed} if key else {}), **({"poster": ready["poster"]} if ready.get("poster") else {}), **sets)["link"]
     try:
         try:
             link = finish(key)
@@ -995,7 +1020,7 @@ def client_link_call(pid, meta, key, keys, download=None, comments=None):
 
 def link_needs_sending(link, draft):
     """A video goes up again for a picked draft that isn't on its link yet, or one sent before links had quality copies."""
-    return not link or link.get("version") != draft["version"] or "qualities" not in link
+    return not link or link.get("version") != draft["version"] or ("qualities" not in link and bool(settings().get("link_copies")))
 
 
 def share_client(pid, picks, user=None, download=None, comments=None):
@@ -1168,7 +1193,7 @@ def pull_link_notes(vid):
         if version not in versions:
             version = latest_version(v)
         try:
-            add_note(vid, version, n.get("t") or 0, n.get("text") or "", author=f"{str(n.get('name') or 'Client')[:60]} (link)")
+            add_note(vid, version, n.get("t") or 0, n.get("text") or "", author=f"{str(n.get('name') or 'Client')[:60]} (link)", link_note=n.get("id"))
         except StudioError:
             continue
         added.append(n["id"])
@@ -1743,7 +1768,7 @@ def video_summary(v, styles=None, projects=None):
             "project": v.get("project", ""), "project_name": project.get("name", ""),
             "status": v["status"], "created": v["created"], "updated": v.get("updated", v["created"]),
             "draft_count": len(v["drafts"]), "latest": latest, "latest_file": v["drafts"][-1]["file"] if v["drafts"] else "", "maker": v.get("maker", ""),
-            "link": {**{k: v["link"][k] for k in ("url", "version", "download", "comments")}, "qualities": v["link"].get("qualities")} if v.get("link") else None,
+            "link": {**{k: v["link"][k] for k in ("url", "version", "download", "comments")}, "qualities": v["link"]["qualities"] if "qualities" in v["link"] else None if settings().get("link_copies") else []} if v.get("link") else None,
             "uploaded": sorted(int(k) for k in (v.get("uploads") or {})),
             "open_notes": sum(1 for n in v["notes"] if not n["done"] and n["version"] == latest),
             "thumb": (Path(v["folder"]) / "thumb.jpg").exists(), "preview": video_preview(v), "style_shared": style_meta(sdir)["shared"] if sdir else False,
@@ -2477,7 +2502,7 @@ def check_edit(v):
                           f"The owner can press Undo approve on the page to reopen it. If the style still has to learn from it, run: studio.py learn {v['id']}")
 
 
-def add_note(vid, version, t, text, author="", author_email="", attachments=None):
+def add_note(vid, version, t, text, author="", author_email="", attachments=None, link_note=None):
     text = str(text).strip()
     if not text and not attachments:
         raise StudioError("the note is empty")
@@ -2490,6 +2515,8 @@ def add_note(vid, version, t, text, author="", author_email="", attachments=None
         note = {"id": nid, "version": int(version), "t": round(max(0.0, float(t)), 2), "text": text,
                 "author": author or settings()["your_name"], "author_email": author_email, "done": False,
                 "created": now(), "attachments": clean_attachments(v["folder"], attachments)}
+        if link_note:
+            note["link_note"] = str(link_note)  # the comment on the video's link it came from (for its "Fixed" tick there)
         v["notes"].append(note)
         v["next_note"] = nid + 1
         save_video(v)
@@ -3648,7 +3675,7 @@ LEARN_AUTO_TIMEOUT = 25 * 60  # Home's own run of Claude
 LEARN_AUTO_TRIES = 2
 LEARN_GRACE = 60  # the video's own session knows the edit best, so a parent session leaves it this long
 LEARN_HEADING = "## What approved videos taught"
-LEARN_STYLE_PREFIX = "In "  # "## In Lara Acosta" in a client's BRAND.md: what holds only when this client uses that style
+LEARN_STYLE_PREFIX = "In "  # "## In Bold Captions" in a client's BRAND.md: what holds only when this client uses that style
 LEARN_PRIVATE = "from-approved"  # clips of client footage: in the Effects panel on this studio, left out when a style is shared
 LEARN_CLIP_MAX = 20
 
@@ -6395,7 +6422,7 @@ class Handler(BaseHTTPRequestHandler):
              "can_edit": can_edit_project(p, self.user)}
             for p in list_projects()]
         me = accounts().public(self.user)
-        visible = ("studio_name", "your_name", "library", "ready_share") if me["role"] == "owner" else ("studio_name",)
+        visible = ("studio_name", "your_name", "library", "ready_share", "link_copies") if me["role"] == "owner" else ("studio_name",)
         return {"can_effects": can_remove_effects(self.user), "me": me, "version": APP_VERSION, "approval": approval.status(DATA), "alone": not approval.open_to_others(DATA), "report": self.report_mode(), "updated": update_to_tell(me["email"]), "settings": {k: s[k] for k in visible},
                 "projects": projects, "styles": styles, "videos": videos, "statuses": STATUSES,
                 "platform": "windows" if WINDOWS else "mac" if sys.platform == "darwin" else "linux"}

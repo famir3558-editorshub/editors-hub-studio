@@ -78,6 +78,7 @@ function render() {
   if (me.role === "owner" && document.activeElement?.form !== f) {
     f.elements.library.value = settings.library;
     f.elements.ready_share.checked = settings.ready_share !== false;
+    f.elements.link_copies.checked = !!settings.link_copies;
   }
   const py = S.state.platform === "windows" ? "py" : "python3";
   const script = S.state.platform === "windows" ? "%USERPROFILE%\\editors-hub\\studio.py" : "~/editors-hub/studio.py";
@@ -843,6 +844,16 @@ $("styleForm").addEventListener("submit", async (e) => {
   $("styleDlg").close();
   await askForParentSession(`/api/styles/${enc(s.id)}`, s.name);
   location.href = `/style/${enc(s.id)}`;
+});
+
+$("linkCopies").addEventListener("change", async (e) => {
+  try {
+    S.state = await api("POST", "/api/settings", { link_copies: e.target.checked });
+    toast(e.target.checked ? "New links also get 1080p, 720p and 480p copies" : "Links play only the video as it was rendered");
+  } catch (ex) {
+    e.target.checked = !e.target.checked;
+    toast(ex.message, true);
+  }
 });
 
 $("readyShare").addEventListener("change", async (e) => {  // saves straight away, like the other switches
