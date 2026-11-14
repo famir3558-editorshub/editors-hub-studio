@@ -159,7 +159,8 @@ dialog .actions { display: flex; justify-content: flex-end; gap: 8px; margin-top
 .menu hr { border: 0; border-top: 1px solid var(--line); margin: 5px 4px; }
 
 /* the activity panel */
-#activity { position: fixed; right: 18px; bottom: 18px; z-index: 95; display: grid; gap: 10px; width: min(360px, calc(100vw - 36px)); }
+#activity { position: fixed; right: 18px; bottom: 18px; z-index: 95; display: grid; grid-template-columns: minmax(0, 1fr); gap: 10px; width: min(360px, calc(100vw - 36px)); }
+#activity .act { min-width: 0; }  /* a long one-line title is cut with … instead of pushing the card off the screen */
 #activity:empty { display: none; }
 .act { padding: 12px 14px; border-radius: 14px; background: var(--panel-solid); border: 1px solid var(--line-strong);
   box-shadow: 0 18px 50px rgba(0, 0, 0, 0.55); animation: act-in 0.25s ease; }

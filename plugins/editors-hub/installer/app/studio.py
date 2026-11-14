@@ -2760,6 +2760,8 @@ def wait_for_feedback(vid, timeout=0):
                 batch = next((b for b in v.get("feedback", []) if not b.get("picked_up")), None)
                 if batch:
                     batch["picked_up"], batch["picked_up_ts"] = now(), time.time()
+                    if v.get("status") not in LOCKED_STATUSES:
+                        v["status"] = "editing"  # Claude has the notes and is making the next draft
                     save_video(v)
                     return batch, v, [n for n in v["notes"] if n["id"] in batch["notes"]]
                 if learn_claim(v):
@@ -2980,6 +2982,8 @@ def post_update(vid, text, snapshot=None, at=None, draft=None, total=None, step=
         if active or moves:
             check_edit(v)
             p = progress_of(v, round_no)
+            if v.get("status") not in LOCKED_STATUSES and round_no > (latest_version(v) or 0):
+                v["status"] = "editing"  # Claude is making the next draft: Home shows Editing until it arrives (then In review)
             if steps:
                 p["steps"] = list(dict.fromkeys(steps))
             if step:
