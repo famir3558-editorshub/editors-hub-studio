@@ -858,7 +858,7 @@ def wants_ready(v):
     """A draft that should go up now: the one waiting to show, or else a shown latest draft (since this was turned on) whose
     upload failed and isn't on its link yet."""
     if v.get("incoming"):
-        return v["incoming"]
+        return None if v.get("ready_paused") == v["incoming"]["version"] else v["incoming"]  # paused: waits for Resume
     if not v.get("project") or not v.get("drafts"):
         return None
     d = v["drafts"][-1]
@@ -872,11 +872,17 @@ def wants_ready(v):
     return d
 
 
-def get_ready(vid):
-    """Starts the upload of the draft waiting to show (or a retry), if none is going. The draft shows when it ends, however."""
+def get_ready(vid, resume=False):
+    """Starts the upload of the draft waiting to show (or a retry), if none is going. The draft shows when it ends, however,
+    unless it was paused: then it waits, uploading nothing, until Resume (resume=True) or Stop."""
     if ready_job(vid):
         return None
     try:
+        if resume:
+            with vlock(vid):
+                fresh = load_video(vid)
+                if fresh.pop("ready_paused", None) is not None:
+                    save_video(fresh)
         v = load_video(vid)
     except StudioError:
         return None
@@ -894,6 +900,13 @@ def get_ready(vid):
             with READY_TURN:
                 check_stop(job)
                 r = upload_draft_files(vid, d, job)
+        except JobStopped:
+            if job.get("pause"):
+                with vlock(vid):
+                    fresh = load_video(vid)
+                    fresh["ready_paused"] = d["version"]
+                    save_video(fresh)
+            raise
         except (StudioError, OSError) as e:
             with vlock(vid):
                 fresh = load_video(vid)
@@ -909,16 +922,46 @@ def get_ready(vid):
                     fresh.pop("ready_failed", None)
                     save_video(fresh)
                 prune_uploads(vid)
-            show_incoming(vid, d["version"])  # done, failed or stopped: the draft shows now
+            if not job.get("pause"):
+                show_incoming(vid, d["version"])  # done, failed or stopped: the draft shows now (a paused one waits for Resume)
 
             def next_one():  # a newer draft that came meanwhile, once this job counts as finished
                 time.sleep(1.5)
                 get_ready(vid)
             threading.Thread(target=next_one, daemon=True).start()
         return {"version": d["version"]}
-    job = start_job("ready", f"Getting {v['name']} v{d['version']} ready to share", None, work)
+    job = start_job("ready", f"Getting {v['name']} v{d['version']} ready to share", None, work,
+                    again=lambda: get_ready(vid, resume=True), cancel=lambda: unpause_ready(vid))
     job.update(video=vid, version=d["version"], name=v["name"])
     return job
+
+
+def unpause_ready(vid):
+    """Stop on a paused draft: it shows now, without its upload; Share carries on from what Google already has."""
+    with vlock(vid):
+        v = load_video(vid)
+        v.pop("ready_paused", None)
+        save_video(v)
+    show_incoming(vid)
+
+
+def paused_ready_jobs():
+    """When the studio starts: a draft whose upload was paused gets its paused box again, with Resume and Stop."""
+    for vid, d in list(video_dirs().items()):
+        try:
+            v = read_json(d / "video.json", {}) or {}
+            inc = v.get("incoming")
+            if not inc or v.get("ready_paused") != inc.get("version") or ready_job(vid):
+                continue
+            jid = secrets.token_hex(6)
+            JOBS[jid] = {"id": jid, "kind": "ready", "title": f"Getting {v['name']} v{inc['version']} ready to share", "state": "paused",
+                         "done_bytes": 0, "total_bytes": 0, "stage": "Paused", "message": "Paused. Resume carries on from where it got to.",
+                         "result": None, "by": None, "style": None, "started": now(), "started_ts": time.time(), "finished_ts": time.time(),
+                         "can_pause": True, "video": vid, "version": inc["version"], "name": v["name"]}
+            RESUMERS[jid] = lambda vid=vid: get_ready(vid, resume=True)
+            CANCELERS[jid] = lambda vid=vid: unpause_ready(vid)
+        except (OSError, ValueError, KeyError, TypeError):
+            pass
 
 
 def incoming_view(v):
@@ -927,6 +970,9 @@ def incoming_view(v):
     if not d:
         return None
     j = ready_job(v["id"])
+    if not j and v.get("ready_paused") == d["version"]:
+        p = next((x for x in JOBS.values() if x["kind"] == "ready" and x.get("video") == v["id"] and x["state"] == "paused"), None)
+        return {"version": d["version"], "stage": "Paused", "paused": True, "job": (p or {}).get("id"), "done": (p or {}).get("done_bytes", 0), "total": (p or {}).get("total_bytes", 0)}
     return {"version": d["version"], "stage": (j or {}).get("stage") or "Waiting to upload", "done": (j or {}).get("done_bytes", 0), "total": (j or {}).get("total_bytes", 0)}
 
 
@@ -1003,7 +1049,8 @@ def share_video(vid, user=None, version=None, download=None, comments=None):
     def work(job):
         job["total_bytes"] = src.stat().st_size
         return put_draft_on_link(vid, draft, user, job, download, comments)
-    job = start_job("link", f"Sharing {v['name']} v{draft['version']}", user, work)
+    job = start_job("link", f"Sharing {v['name']} v{draft['version']}", user, work,
+                    again=lambda: share_video(vid, user, draft["version"], download, comments))
     job["video"] = vid
     return job
 
@@ -1079,7 +1126,8 @@ def share_client(pid, picks, user=None, download=None, comments=None):
             if v["id"] not in keys:
                 drop_client_video_link(v["id"], pid, user)
         return record
-    job = start_job("link", f"Sharing {meta.get('name') or pid}'s videos", user, work)
+    job = start_job("link", f"Sharing {meta.get('name') or pid}'s videos", user, work,
+                    again=lambda: share_client(pid, picks, user, download, comments))
     job["project"] = pid
     return job
 
@@ -1231,6 +1279,10 @@ def link_watch():
     """Once a minute, one small answer from the service says how many comments each of this person's links has; only a
     link with more than last time is asked for its comments. (Asking every link every time used up the service's day.)"""
     pulled = {}  # link key: how many comments it had when they were brought in
+    try:
+        paused_ready_jobs()
+    except Exception:
+        pass
     while True:
         time.sleep(LINK_PULL_EVERY)
         try:
@@ -4541,34 +4593,90 @@ def check_stop(job):
         raise JobStopped()
 
 
-def stop_job(jid, user=None):
+RESUMERS, CANCELERS = {}, {}  # job id: start it again (Resume) / what Stop does to a paused one. Only uploads that can carry on
+
+
+def own_job(jid, user):
     job = JOBS.get(jid)
     if not job or (user is not None and user["role"] != "owner" and job["by"] != user["email"]):
         raise NotFound("no such job")
-    if job["state"] == "running":
-        job["stop"] = True
-        job["stage"] = "Stopping and cleaning up"
     return job
 
 
-def start_job(kind, title, user, work, style=None):
-    """Work that takes a while, in the background. The page's activity panel shows its stage and progress."""
+def stop_job(jid, user=None):
+    job = own_job(jid, user)
+    if job["state"] == "running":
+        job["stop"] = True
+        job["stage"] = "Stopping and cleaning up"
+    elif job["state"] == "paused":
+        RESUMERS.pop(jid, None)
+        cancel = CANCELERS.pop(jid, None)
+        if cancel:
+            cancel()
+        job["state"], job["stage"], job["finished_ts"] = "stopped", "Stopped", time.time()
+        job["message"] = "Stopped. What was uploaded stays on your Drive for a few days, so Share carries on from there."
+    return job
+
+
+def pause_job(jid, user=None):
+    """An upload stops where it is, keeping what Google already has; Resume carries on from there."""
+    job = own_job(jid, user)
+    if jid not in RESUMERS:
+        raise StudioError("This one can't be paused, only stopped.")
+    if job["state"] == "running":
+        job["pause"] = job["stop"] = True
+        job["stage"] = "Pausing"
+    return job
+
+
+def resume_job(jid, user=None):
+    job = own_job(jid, user)
+    if job["state"] != "paused":
+        raise StudioError("It isn't paused.")
+    again = RESUMERS.pop(jid, None)
+    CANCELERS.pop(jid, None)
+    if not again:
+        raise StudioError("It can't carry on from here. Press Share to upload it.")
+    new = again()
+    if not new:
+        raise StudioError("It can't carry on right now. Try again in a moment.")
+    JOBS.pop(jid, None)
+    return new
+
+
+def start_job(kind, title, user, work, style=None, again=None, cancel=None):
+    """Work that takes a while, in the background. The page's activity panel shows its stage and progress.
+    again (an upload that can carry on): Pause is offered, and Resume calls it for a new job; cancel is Stop on a paused one."""
     jid = secrets.token_hex(6)
     job = {"id": jid, "kind": kind, "title": title, "state": "running", "done_bytes": 0, "total_bytes": 0,
            "stage": "Starting", "message": "", "result": None, "by": (user or {}).get("email"), "style": style,
-           "started": now(), "started_ts": time.time(), "finished_ts": None}
+           "started": now(), "started_ts": time.time(), "finished_ts": None, "can_pause": bool(again)}
     JOBS[jid] = job
+    if again:
+        RESUMERS[jid] = again
+    if cancel:
+        CANCELERS[jid] = cancel
 
     def run():
         try:
             job["result"] = work(job)
             job["state"], job["stage"] = "done", "Done"
         except JobStopped:
-            job["state"], job["stage"] = "stopped", "Stopped"
-            job["message"] = "Stopped. Nothing was left half done."
+            if job.get("pause"):
+                job.pop("stop", None)
+                job.pop("pause", None)
+                pct = int(100 * job["done_bytes"] / job["total_bytes"]) if job.get("total_bytes") else 0
+                job["state"], job["stage"] = "paused", "Paused"
+                job["message"] = f"Paused at {pct}%. Resume carries on from there." if pct else "Paused. Resume carries on from there."
+            else:
+                job["state"], job["stage"] = "stopped", "Stopped"
+                job["message"] = "Stopped. Nothing was left half done."
         except Exception as e:
             job["state"], job["message"] = "failed", str(e) if isinstance(e, (StudioError, auth.AuthError)) else f"{type(e).__name__}: {e}"
         job["finished_ts"] = time.time()
+        if job["state"] != "paused":
+            RESUMERS.pop(jid, None)
+            CANCELERS.pop(jid, None)
     threading.Thread(target=run, daemon=True).start()
     return job
 
@@ -4576,7 +4684,7 @@ def start_job(kind, title, user, work, style=None):
 def recent_jobs(user):
     """What the activity panel shows: running jobs, and ones that finished in the last 15 minutes."""
     out = [j for j in JOBS.values() if (user is None or user["role"] == "owner" or j["by"] == user["email"])
-           and (j["state"] == "running" or time.time() - (j["finished_ts"] or 0) < 900)]
+           and (j["state"] in ("running", "paused") or time.time() - (j["finished_ts"] or 0) < 900)]
     return sorted(out, key=lambda j: j["started_ts"], reverse=True)[:12]
 
 
@@ -6337,6 +6445,10 @@ class Handler(BaseHTTPRequestHandler):
                                                self.user, body.get("format", ""), links))
         if method == "POST" and parts[:2] == ["api", "jobs"] and parts[3:] == ["stop"]:
             return self.send_json(stop_job(parts[2], self.user))
+        if method == "POST" and parts[:2] == ["api", "jobs"] and parts[3:] == ["pause"]:
+            return self.send_json(pause_job(parts[2], self.user))
+        if method == "POST" and parts[:2] == ["api", "jobs"] and parts[3:] == ["resume"]:
+            return self.send_json(resume_job(parts[2], self.user))
         if method == "POST" and parts[:2] == ["api", "styles"] and parts[3:] == ["online"]:
             return self.send_json(upload_style_online(parts[2], self.user))
         if method == "POST" and parts[:2] == ["api", "online"] and parts[3:] == ["download"]:

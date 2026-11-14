@@ -81,7 +81,9 @@ function render() {
   $("incomingNote").hidden = !inc || !maker();
   if (inc && maker()) {
     const pct = inc.total ? Math.round((100 * inc.done) / inc.total) : 0;
-    $("incomingNote").innerHTML = `<b>v${inc.version} is rendered.</b> It's uploading so Share is instant, and shows here when that's done.<div class="act-bar"><div style="width:${Math.max(3, pct)}%"></div></div><small>${esc(inc.stage)}${inc.total ? ` · ${pct}% of ${fmtBytes(inc.total)}` : ""}</small>`;
+    $("incomingNote").innerHTML = inc.paused
+      ? `<b>v${inc.version} is rendered.</b> Its upload is paused, so it isn't shown yet.${inc.job ? ` <button class="act-pause" data-resume-job="${esc(inc.job)}">Resume</button> <button class="act-stop" data-stop-job="${esc(inc.job)}">Stop and show it</button>` : ""}`
+      : `<b>v${inc.version} is rendered.</b> It's uploading so Share is instant, and shows here when that's done.<div class="act-bar"><div style="width:${Math.max(3, pct)}%"></div></div><small>${esc(inc.stage)}${inc.total ? ` · ${pct}% of ${fmtBytes(inc.total)}` : ""}</small>`;
   }
   if (d && location.hash !== `#v${d.version}`) history.replaceState(null, "", `#v${d.version}`);
 

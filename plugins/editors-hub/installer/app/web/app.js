@@ -228,7 +228,9 @@ const STOP_WHAT = {
   import: "Nothing is added to your styles; what was copied so far is removed.",
 };
 async function stopJob(j) {
-  const ok = await ehConfirm(STOP_WHAT[j.kind] || "What was done so far is removed.", { title: `Stop ${j.title.replace(/^./, (c) => c.toLowerCase())}?`, ok: "Stop", cancel: "Keep going", danger: true });
+  const what = j.state === "paused" || j.can_pause ? "What was uploaded stays on your Drive for a few days, so Share carries on from there. A draft waiting to show shows now."
+    : STOP_WHAT[j.kind] || "What was done so far is removed.";
+  const ok = await ehConfirm(what, { title: `Stop ${j.title.replace(/^./, (c) => c.toLowerCase())}?`, ok: "Stop", cancel: "Keep going", danger: true });
   if (!ok) return;
   try {
     await api("POST", `/api/jobs/${enc(j.id)}/stop`, {});
@@ -238,6 +240,23 @@ async function stopJob(j) {
     toast(e.message, true);
   }
 }
+async function pauseOrResume(id, act) {
+  try {
+    await api("POST", `/api/jobs/${enc(id)}/${act}`, {});
+    toast(act === "pause" ? "Pausing…" : "Carrying on from where it got to");
+    refreshActivity();
+  } catch (e) {
+    toast(e.message, true);
+  }
+}
+document.addEventListener("click", (e) => {
+  const b = e.target.closest("[data-pause-job],[data-resume-job]");
+  if (!b) return;
+  e.preventDefault();
+  e.stopPropagation();
+  b.disabled = true;
+  pauseOrResume(b.dataset.pauseJob || b.dataset.resumeJob, b.dataset.pauseJob ? "pause" : "resume");
+}, true);
 // any Stop button (panel, cards, pages) carries its job's id
 document.addEventListener("click", (e) => {
   const b = e.target.closest("[data-stop-job]");
@@ -302,7 +321,7 @@ async function refreshActivity() {
   const now = Date.now() / 1000;
   Activity.last = jobs;
   window.dispatchEvent(new CustomEvent("editorshub:jobs-updated", { detail: jobs }));  // for bars on cards and pages
-  const shown = jobs.filter((j) => !Activity.dismissed.has(j.id) && (j.state === "running" || now - (j.finished_ts || 0) < (j.state === "failed" ? 3600 : j.state === "stopped" ? 20 : 12)));
+  const shown = jobs.filter((j) => !Activity.dismissed.has(j.id) && (j.state === "running" || j.state === "paused" || now - (j.finished_ts || 0) < (j.state === "failed" ? 3600 : j.state === "stopped" ? 20 : 12)));
   // each job's box is made once and then only its numbers change: building it again every second replayed its pop-in, so it popped on a loop
   const box = activityBox();
   const keep = new Set(shown.map((j) => j.id));
@@ -315,21 +334,23 @@ async function refreshActivity() {
     if (prev && prev.speed && speed !== null) speed = prev.speed * 0.7 + speed * 0.3;
     Activity.seen[j.id] = { bytes: j.done_bytes, t: now, speed: speed ?? prev?.speed };
     const left = speed ? fmtLeft((j.total_bytes - j.done_bytes) / speed) : "";
-    const state = j.state === "done" ? "done" : j.state === "failed" ? "failed" : j.state === "stopped" ? "stopped" : "running";
+    const state = j.state === "done" ? "done" : j.state === "failed" ? "failed" : j.state === "stopped" ? "stopped" : j.state === "paused" ? "paused" : "running";
     // all sent, still finishing: say so, and keep the bar moving, or it looks frozen at 100%
     const finishing = state === "running" && (/^Finishing/.test(j.stage || "") || (j.total_bytes && j.done_bytes >= j.total_bytes));
     const stage = finishing && j.kind === "online-upload" ? "Adding it to Shared…" : finishing && /^Finishing/.test(j.stage || "") ? "Finishing…" : (j.stage || "Working");
     const detail = state === "running"
       ? `${esc(stage)}${j.total_bytes && !finishing ? ` · ${fmtBytes(j.done_bytes)} of ${fmtBytes(j.total_bytes)}` : ""}${speed && !finishing ? ` · ${fmtBytes(speed)}/s` : ""}${left && !finishing ? ` · ${left}` : ""}`
-      : state === "done" ? esc(doneText(j)) : esc(j.message || "It stopped");
-    const stopping = state === "running" && /^Stopping|^Removing the unfinished/.test(j.stage || "");
+      : state === "done" ? esc(doneText(j)) : state === "paused" ? `${esc(j.message || "Paused")}${j.total_bytes ? ` · ${fmtBytes(j.done_bytes)} of ${fmtBytes(j.total_bytes)}` : ""}` : esc(j.message || "It stopped");
+    const stopping = state === "running" && /^Stopping|^Removing the unfinished|^Pausing/.test(j.stage || "");
     const look = `${state}|${stopping}|${j.title}`;  // what only changes now and then: when it does, the box is drawn again
     let el = box.querySelector(`:scope > .act[data-job-id="${CSS.escape(j.id)}"]`);
     if (!el || el.dataset.look !== look) {
-      const html = `<div class="act-top"><span class="act-icon">${state === "done" ? "✓" : state === "failed" ? "!" : state === "stopped" ? "■" : ""}</span><b>${esc(j.title)}</b>
+      const html = `<div class="act-top"><span class="act-icon">${state === "done" ? "✓" : state === "failed" ? "!" : state === "stopped" ? "■" : state === "paused" ? "❚❚" : ""}</span><b>${esc(j.title)}</b>
         <span class="act-pct"></span>
-        ${state === "running" && !stopping ? `<button class="act-stop" data-stop-job="${esc(j.id)}" title="Stop">Stop</button>` : ""}
-        ${state !== "running" ? `<button class="act-x" data-dismiss="${esc(j.id)}" title="Close">✕</button>` : ""}</div>
+        ${state === "running" && !stopping && j.can_pause ? `<button class="act-pause" data-pause-job="${esc(j.id)}" title="Pause">Pause</button>` : ""}
+        ${state === "paused" ? `<button class="act-pause" data-resume-job="${esc(j.id)}" title="Resume">Resume</button>` : ""}
+        ${(state === "running" && !stopping) || state === "paused" ? `<button class="act-stop" data-stop-job="${esc(j.id)}" title="Stop">Stop</button>` : ""}
+        ${state !== "running" && state !== "paused" ? `<button class="act-x" data-dismiss="${esc(j.id)}" title="Close">✕</button>` : ""}</div>
       <div class="act-bar"><div></div></div>
       <div class="act-detail"></div>`;
       if (!el) {
@@ -343,7 +364,7 @@ async function refreshActivity() {
       el.dataset.look = look;
     }
     el.className = `act ${state}${finishing ? " finishing" : ""}${el.classList.contains("act-same") ? " act-same" : ""}`;
-    el.querySelector(".act-pct").textContent = state === "running" ? `${Math.floor(pct)}%` : "";
+    el.querySelector(".act-pct").textContent = state === "running" || (state === "paused" && pct) ? `${Math.floor(pct)}%` : "";
     el.querySelector(".act-bar div").style.width = `${state === "done" ? 100 : pct}%`;
     const words = el.querySelector(".act-detail");
     if (words.innerHTML !== detail) words.innerHTML = detail;
@@ -352,7 +373,7 @@ async function refreshActivity() {
     if (j.state === "running") Activity.watching.add(j.id);
     else if (Activity.watching.delete(j.id)) window.dispatchEvent(new CustomEvent("editorshub:job-done", { detail: j }));
   }
-  Activity.timer = setTimeout(refreshActivity, jobs.some((j) => j.state === "running") ? 1000 : 6000);
+  Activity.timer = setTimeout(refreshActivity, jobs.some((j) => j.state === "running") ? 1000 : 6000);  // a paused one waits for a click
 }
 window.addEventListener("editorshub:jobs", () => refreshActivity());
 if (!location.pathname.startsWith("/signin")) refreshActivity();
