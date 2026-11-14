@@ -1,5 +1,5 @@
 {
-"version": "1.32.4",
+"version": "1.32.5",
 "files": {
 "approval-service.json": "5fbc80d9bce24d1de021f328df110e8957c35ad0bf10b8d143af9865820cda86",
 "approval.py": "46dd08f09831d63484e0e9ac674db6bab561900a313da9aad5dd83e60a047f19",
@@ -749,9 +749,9 @@
 "skills/youtube-clips/setup/SETUP.md": "c94401cce3da40a4c254de4c6443389df3a0fee8784e37489e6794fff5f1efe4",
 "skills/youtube-clips/setup/SHARED-SETUP.md": "8675064726241ddc8f19a715fff7cf16ea1b955dbd589d34df551a0f081159d2",
 "skills/youtube-clips/SKILL.md": "c6ef731482a70f87b951eb5312e2118fee0148fee78a5ee7c238e4dbe871e5e8",
-"studio.py": "4874a6fed1836577202fe534ca55e7ad5fc11e447851d2fcb363a288086051ab",
+"studio.py": "16783bfb0219130ff6f00408ed56c2a833c9ec50bf6205d846b62ced386542ec",
 "updater.py": "899c734ab2f79b3f41402cb755d80c977f5de29419660df739a3fb81a0da475d",
-"VERSION": "d5591d806021cfc4a12a24ea69034362a3527576be74ada6106b779b6d42d038",
+"VERSION": "497ad573e7a5dcc6d96a245291e92097fdd7b09b0daca0dcf30270778b4bfe22",
 "web/app.css": "c052fd24be995f1e516c74c5a4869c755c700622286623fa287713b518d91273",
 "web/app.js": "23fcb59950f357434afe8c5f1feea028b628698a835c49339ec07070b9a65d4d",
 "web/approve.html": "05632b78433c7f81e14e9be9c6236380db3f607d44113ba669c6f1091148ccb4",

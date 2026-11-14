@@ -816,8 +816,10 @@ def holds_drafts(v):
     return bool(v.get("project")) and ready_on()
 
 
-def ready_job(vid):
-    return next((j for j in JOBS.values() if j["kind"] == "ready" and j.get("video") == vid and j["state"] == "running"), None)
+def ready_job(vid, paused=False):
+    """The video's draft upload that's going (paused=True: or paused, waiting for Resume or Stop)."""
+    states = ("running", "paused") if paused else ("running",)
+    return next((j for j in JOBS.values() if j["kind"] == "ready" and j.get("video") == vid and j["state"] in states), None)
 
 
 def wait_for_ready(vid, draft, job):
@@ -866,6 +868,8 @@ def wants_ready(v):
         return None
     if d.get("added", "") < settings().get("ready_since", "9999"):
         return None
+    if v.get("ready_paused") == d["version"]:
+        return None  # paused: waits for Resume
     failed = v.get("ready_failed") or {}
     if failed.get("version") != d["version"] or failed.get("tries", 0) >= READY_TRIES:
         return None  # only a retry of one that failed: a draft shown without trying stays as it is
@@ -875,7 +879,7 @@ def wants_ready(v):
 def get_ready(vid, resume=False):
     """Starts the upload of the draft waiting to show (or a retry), if none is going. The draft shows when it ends, however,
     unless it was paused: then it waits, uploading nothing, until Resume (resume=True) or Stop."""
-    if ready_job(vid):
+    if ready_job(vid, paused=not resume):  # never two uploads to one address: a paused one counts until Resume or Stop
         return None
     try:
         if resume:
@@ -920,6 +924,7 @@ def get_ready(vid, resume=False):
                     fresh = load_video(vid)
                     fresh["uploads"] = {**(fresh.get("uploads") or {}), str(d["version"]): {**r, "at": now()}}
                     fresh.pop("ready_failed", None)
+                    fresh.pop("ready_paused", None)
                     save_video(fresh)
                 prune_uploads(vid)
             if not job.get("pause"):
@@ -937,10 +942,12 @@ def get_ready(vid, resume=False):
 
 
 def unpause_ready(vid):
-    """Stop on a paused draft: it shows now, without its upload; Share carries on from what Google already has."""
+    """Stop on a paused draft: it shows now, without its upload; Share carries on from what Google already has.
+    (A paused retry of a shown draft isn't tried again by itself either.)"""
     with vlock(vid):
         v = load_video(vid)
         v.pop("ready_paused", None)
+        v.pop("ready_failed", None)
         save_video(v)
     show_incoming(vid)
 
@@ -950,8 +957,8 @@ def paused_ready_jobs():
     for vid, d in list(video_dirs().items()):
         try:
             v = read_json(d / "video.json", {}) or {}
-            inc = v.get("incoming")
-            if not inc or v.get("ready_paused") != inc.get("version") or ready_job(vid):
+            inc = v.get("incoming") or (v.get("drafts") or [None])[-1]  # the draft waiting to show, or a shown one's retry
+            if not inc or v.get("ready_paused") != inc.get("version") or ready_job(vid, paused=True):
                 continue
             jid = secrets.token_hex(6)
             JOBS[jid] = {"id": jid, "kind": "ready", "title": f"Getting {v['name']} v{inc['version']} ready to share", "state": "paused",
@@ -1031,7 +1038,7 @@ def ready_catch_up(force=False):
     for vid, d in list(video_dirs().items()):
         try:
             v = read_json(d / "video.json", {}) or {}
-            if v.get("uploads") and not ready_job(vid):
+            if v.get("uploads") and not ready_job(vid, paused=True):
                 prune_uploads(vid)
             if wants_ready(v):
                 get_ready(vid)
@@ -4633,13 +4640,26 @@ def resume_job(jid, user=None):
     job = own_job(jid, user)
     if job["state"] != "paused":
         raise StudioError("It isn't paused.")
-    again = RESUMERS.pop(jid, None)
-    CANCELERS.pop(jid, None)
+    again = RESUMERS.get(jid)
     if not again:
         raise StudioError("It can't carry on from here. Press Share to upload it.")
-    new = again()
+    job["state"] = "resuming"  # so it doesn't count as the video's upload while its new one starts
+    try:
+        new = again()
+    finally:
+        if job["state"] == "resuming":
+            job["state"] = "paused"
     if not new:
+        if job["kind"] == "ready" and job.get("video") and not ready_job(job["video"]):
+            v = read_json(video_dirs().get(job["video"], Path("/nonexistent")) / "video.json", {}) or {}
+            if not wants_ready({**v, "ready_paused": None}):  # nothing left for it to do: it's already up, or shown and shared
+                RESUMERS.pop(jid, None)
+                CANCELERS.pop(jid, None)
+                job["state"], job["stage"], job["message"] = "done", "Done", "Nothing left to upload: it's already up."
+                return job
         raise StudioError("It can't carry on right now. Try again in a moment.")
+    RESUMERS.pop(jid, None)
+    CANCELERS.pop(jid, None)
     JOBS.pop(jid, None)
     return new
 
@@ -4681,8 +4701,30 @@ def start_job(kind, title, user, work, style=None, again=None, cancel=None):
     return job
 
 
+def close_done_paused():
+    """A paused draft upload whose draft got up some other way (Share, or another try) closes itself: no stale box."""
+    for j in [x for x in JOBS.values() if x["kind"] == "ready" and x["state"] == "paused" and x.get("video")]:
+        try:
+            v = load_video(j["video"])
+        except StudioError:
+            v = None
+        ver = j.get("version")
+        if v is not None and str(ver) not in (v.get("uploads") or {}) and (v.get("link") or {}).get("version") != ver:
+            continue
+        RESUMERS.pop(j["id"], None)
+        CANCELERS.pop(j["id"], None)
+        j["state"], j["stage"], j["finished_ts"] = "done", "Done", time.time()
+        j["message"] = "Uploaded." if v is not None else "Its video is gone."
+        if v is not None and v.get("ready_paused") == ver:
+            with vlock(j["video"]):
+                fresh = load_video(j["video"])
+                fresh.pop("ready_paused", None)
+                save_video(fresh)
+
+
 def recent_jobs(user):
     """What the activity panel shows: running jobs, and ones that finished in the last 15 minutes."""
+    close_done_paused()
     out = [j for j in JOBS.values() if (user is None or user["role"] == "owner" or j["by"] == user["email"])
            and (j["state"] in ("running", "paused") or time.time() - (j["finished_ts"] or 0) < 900)]
     return sorted(out, key=lambda j: j["started_ts"], reverse=True)[:12]
