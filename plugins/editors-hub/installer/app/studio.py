@@ -668,11 +668,16 @@ def link_copies(send, folder, job):
     for target in LINK_QUALITIES:
         if short < target * 1.15:  # not worth a copy so close to the original
             continue
-        job["stage"] = f"Making a {target}p copy"
         dest = folder / f"{send.stem}-{target}p.mp4"
+        made = dest.with_suffix(".made")  # a copy finished on an earlier try is used again, so its upload can carry on
+        if dest.exists() and made.exists():
+            out.append((target, dest))
+            continue
+        job["stage"] = f"Making a {target}p copy"
         scale = f"scale={target}:-2" if w < h else f"scale=-2:{target}"
         if ffmpeg_until_stopped(["-i", str(send), "-map", "0:v:0", "-map", "0:a:0?", "-vf", scale, "-c:v", "libx264", "-preset", "veryfast", "-crf", "23",
                                  "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", str(dest)], job) and dest.exists():
+            made.touch()
             out.append((target, dest))
     return short, out
 
@@ -683,33 +688,34 @@ def upload_draft_files(vid, draft, job):
     v = load_video(vid)
     src = Path(v["folder"]) / draft["file"]
     send, temp = link_video_file(src, job)
-    if not temp:
-        DATA.mkdir(parents=True, exist_ok=True)
-        temp = DATA / f"link-{secrets.token_hex(6)}"
-        temp.mkdir()
+    # the quality copies live in a folder kept until this draft is up, so a stopped upload can carry on with the same files
+    keep = DATA / "link-copies" / f"{vid}-v{draft['version']}"
+    keep.mkdir(parents=True, exist_ok=True)
+    finished = False
     try:
         check_stop(job)
-        height, copies = link_copies(send, temp, job)
+        height, copies = link_copies(send, keep, job)
         size = send.stat().st_size
         extra = sum(f.stat().st_size for _, f in copies)
         if job.get("several"):
             job["total_bytes"] = job.get("total_bytes", 0) + extra
         job["stage"] = f"Uploading {v['name']}"
         name = f"{vid}-v{draft['version']}{send.suffix.lower()}"
-        started = approval.shared_call(DATA, "/links/start", name=name, bytes=size)
+        start = lambda: approval.shared_call(DATA, "/links/start", name=name, bytes=size)
         if job.get("several"):  # one of a client's videos: the bar runs over all of them
-            sent = drive_upload_file(started["upload_url"], send, JobPart(job, job.get("done_bytes", 0)))
+            sent = resumable_upload(vid, name, send, start, JobPart(job, job.get("done_bytes", 0)))
         else:
             job["total_bytes"] = size + extra
-            sent = drive_upload_file(started["upload_url"], send, job)
+            sent = resumable_upload(vid, name, send, start, job)
         sent_copies = []
         for target, f in copies:
             check_stop(job)
             job["stage"] = f"Uploading {v['name']} ({target}p)"
             cname = f"{vid}-v{draft['version']}-{target}p.mp4"
-            started_copy = approval.shared_call(DATA, "/links/start", name=cname, bytes=f.stat().st_size)
-            got = drive_upload_file(started_copy["upload_url"], f, JobPart(job, job.get("done_bytes", 0)))
+            start_copy = lambda cname=cname, f=f: approval.shared_call(DATA, "/links/start", name=cname, bytes=f.stat().st_size)
+            got = resumable_upload(vid, cname, f, start_copy, JobPart(job, job.get("done_bytes", 0)))
             sent_copies.append({"file_id": got.get("id"), "name": cname, "height": target})
+        finished = True
         return {"version": draft["version"], "file": draft["file"], "file_id": sent.get("id"), "name": name, "height": height or None,
                 "copies": sent_copies, "poster": link_poster(send), "qualities": sorted({height, *(t for t, _ in copies)} - {0}, reverse=True)}
     except approval.ApprovalError as e:
@@ -717,6 +723,8 @@ def upload_draft_files(vid, draft, job):
     finally:
         if temp:
             shutil.rmtree(temp, ignore_errors=True)
+        if finished:
+            shutil.rmtree(keep, ignore_errors=True)
 
 
 def ready_files(r):
@@ -968,6 +976,12 @@ def ready_catch_up(force=False):
     if not force and time.time() - _ready_look["at"] < 300:
         return
     _ready_look["at"] = time.time()
+    for old in (DATA / "link-copies").glob("*") if (DATA / "link-copies").is_dir() else []:
+        try:  # quality copies of an upload that never finished, older than Google keeps an unfinished upload
+            if time.time() - old.stat().st_mtime > RESUME_KEEP:
+                shutil.rmtree(old, ignore_errors=True)
+        except OSError:
+            pass
     for vid, d in list(video_dirs().items()):
         try:
             v = read_json(d / "video.json", {}) or {}
@@ -5082,9 +5096,69 @@ def drive_styles():
     return [{**s, "tag": s["key"], "size": s["bytes"], "complete": True, "uploaded_by": s.get("maker_name")} for s in found]
 
 
-def drive_upload_file(url, path, job):
-    """Straight to Google a piece at a time, so a dropped connection only repeats the piece it dropped in."""
-    size, sent, tries = path.stat().st_size, 0, 0
+def drive_held(url, size):
+    """How much of an upload Google already holds: (bytes held, None), or (size, the finished file) if it's complete.
+    None when the upload address is gone or can't be asked right now."""
+    ask = urllib.request.Request(url, data=b"", method="PUT", headers={"Content-Range": f"bytes */{size}", "User-Agent": "Editors.Hub"})
+    try:
+        with urllib.request.urlopen(ask, timeout=60) as r:
+            return size, json.loads(r.read() or b"{}")
+    except urllib.error.HTTPError as e:
+        if e.code == 308:
+            held = e.headers.get("Range") or ""
+            return (int(held.rsplit("-", 1)[1]) + 1 if held else 0), None
+        return None
+    except (urllib.error.URLError, OSError, ValueError):
+        return None
+
+
+RESUME_KEEP = 6 * 86400  # Google keeps an unfinished upload about a week
+
+
+def resumable_upload(vid, key, path, start, job):
+    """Uploads a file so a stop, a dropped connection or a studio restart carries on where it got to.
+    The upload's address at Google is kept in the video's file under `key` until it's done; a new try asks Google how much it
+    holds and sends only the rest. A changed file or an old address starts afresh. `start()` opens a new upload: {upload_url}."""
+    st = path.stat()
+    mark = {"size": st.st_size, "mtime": int(st.st_mtime)}
+    saved = (load_video(vid).get("upload_sessions") or {}).get(key) or {}
+    url, sent = None, 0
+    if saved.get("url") and all(saved.get(k) == mark[k] for k in mark) and time.time() - saved.get("ts", 0) < RESUME_KEEP:
+        held = drive_held(saved["url"], st.st_size)
+        if held:
+            sent, finished = held
+            if finished:
+                forget_upload(vid, key)
+                job["done_bytes"] = st.st_size
+                return finished
+            url = saved["url"]
+            job["stage"] = f"Carrying on from {sent / 1e6:,.0f} MB"
+    if not url:
+        url = start()["upload_url"]
+        with vlock(vid):
+            v = load_video(vid)
+            v.setdefault("upload_sessions", {})[key] = {"url": url, **mark, "ts": time.time()}
+            save_video(v)
+    got = drive_upload_file(url, path, job, sent)
+    forget_upload(vid, key)
+    return got
+
+
+def forget_upload(vid, key):
+    with vlock(vid):
+        v = load_video(vid)
+        if key in (v.get("upload_sessions") or {}):
+            v["upload_sessions"].pop(key)
+            if not v["upload_sessions"]:
+                v.pop("upload_sessions")
+            save_video(v)
+
+
+def drive_upload_file(url, path, job, sent=0):
+    """Straight to Google a piece at a time, so a dropped connection only repeats the piece it dropped in.
+    `sent`: bytes Google already holds from an earlier try of this same upload."""
+    size, tries = path.stat().st_size, 0
+    job["done_bytes"] = sent
     with open(path, "rb") as f:
         while True:
             check_stop(job)
