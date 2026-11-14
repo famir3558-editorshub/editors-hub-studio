@@ -72,6 +72,7 @@ browser (`studio.py open <video>`) when you start, then keep it up to date throu
   use `npx hyperframes snapshot` and pass the image; for a video file pass it with `--at`. Look at each snapshot first.
   Never post one that shows a problem without saying so.
 - Never post passwords, keys or anything from outside this video.
+- During a long render or any long wait with nothing new to post, run `studio.py beat <video> "Rendering part 3"` every few minutes (at least every 20). The Live clock keeps counting and the page shows what's happening, without adding an update. The studio also keeps the clock going by itself while it sees a render running and the edit is on its Render step.
 
 ## Before you edit: the b-roll popup
 

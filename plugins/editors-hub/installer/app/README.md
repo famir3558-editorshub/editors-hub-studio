@@ -100,7 +100,7 @@ built-in browser. No account comes with the studio: each person signs in with th
 ## Following an edit, and choosing the render
 
 The review page's **Live** tab, beside Notes, shows what Claude is doing in plain words, with snapshots
-(`studio.py update`). Before each draft, a popup asks for the resolution, frame rate, bitrate (low, medium, high, higher),
+(`studio.py update`). Its clock keeps counting through a long render: the studio sees the render running (the edit on its Render step), and Claude can also send `studio.py beat`, so the page says "Rendering…" instead of looking stopped. Before each draft, a popup asks for the resolution, frame rate, bitrate (low, medium, high, higher),
 format and audio quality (`studio.py ask-render`). `studio.py finish-render` encodes the edit with those settings and adds it as the
 next draft. **Later** closes the popup; the choice waits in the Live tab, and Home shows a reminder.
 

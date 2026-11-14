@@ -342,7 +342,9 @@ function liveStarted(iso) {
 // the box on top: which video, which draft, how long it has taken
 function renderLiveTop(v) {
   const p = v.progress, state = liveState(p);
-  const say = v.approved && !editingOn(v) ? `Draft ${v.approved.version} approved` : { working: "Editing", waiting: "Waiting for you", quiet: "No update for a while", done: `Draft ${p?.draft} is ready`, none: v.drafts.length ? "Not being edited" : "Not started" }[state];
+  const busy = state === "working" && p.busy && Date.now() / 1000 - p.busy.ts < 10 * 60 ?  // a beat or a render seen in the last 10 minutes
+    `${p.busy.text}…` : "";
+  const say = v.approved && !editingOn(v) ? `Draft ${v.approved.version} approved` : { working: busy || "Editing", waiting: "Waiting for you", quiet: "No update for a while", done: `Draft ${p?.draft} is ready`, none: v.drafts.length ? "Not being edited" : "Not started" }[state];
   const facts = [["Draft", p ? `v${p.draft}` : v.latest ? `v${v.latest}` : "None yet"], ["Client", v.project_name], ["Style", v.style_name],
     ["Started", p && liveStarted(p.started)], ["Raw clip", p?.raw_seconds && liveClock(p.raw_seconds)]].filter((f) => f[1]);
   setHtml($("liveTop"), `<div class="lv-box lv-top">

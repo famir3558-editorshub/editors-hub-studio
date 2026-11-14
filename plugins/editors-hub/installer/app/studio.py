@@ -24,6 +24,7 @@ Everything is plain Python (3.9+, no packages to install). ffmpeg is optional (u
     studio.py wait-new --project P | --style S  a client's or style's parent session listens for Make video; prints the video, then stops
     studio.py download-style <tag>              bring a style from the online Shared folder into this studio
     studio.py update <video> "<plain words>" [--snapshot <image or video>] [--at S]   show progress in the Live tab
+    studio.py beat <video> ["Rendering part 3"]   every few minutes while a long render runs: the Live clock keeps counting
     studio.py ask-render <video> [--note "..."] [--size WxH] [--fps N] [--duration S]   open the render popup, wait for the choice
     studio.py finish-render <video> <file> [--note "..."]   encode with the chosen settings and add it as the next draft
     studio.py broll-ask <video>                 when an edit or next draft starts: opens the b-roll popup if needed, waits, says what to do
@@ -1032,6 +1033,12 @@ def ready_catch_up(force=False):
     for old in (DATA / "link-copies").glob("*") if (DATA / "link-copies").is_dir() else []:
         try:  # quality copies of an upload that never finished, older than Google keeps an unfinished upload
             if time.time() - old.stat().st_mtime > RESUME_KEEP:
+                shutil.rmtree(old, ignore_errors=True)
+        except OSError:
+            pass
+    for old in (library() / STYLE_UPLOADS).glob("*") if (library() / STYLE_UPLOADS).is_dir() else []:
+        try:  # a style's packed copy from an upload that never finished
+            if time.time() - old.stat().st_mtime > RESUME_KEEP and not any(j["kind"] == "online-upload" and j["state"] in ("running", "paused") for j in JOBS.values()):
                 shutil.rmtree(old, ignore_errors=True)
         except OSError:
             pass
@@ -3027,6 +3034,70 @@ def progress_clock(v):
         p["since"] = p["last"] = ts
 
 
+RENDER_PROGRAMS = {"ffmpeg", "chrome-headless-shell", "remotion", "blender", "melt", "aerender", "handbrakecli"}
+RENDER_QUIET_MAX = 8 * 3600  # a render seen this long after the edit's last update isn't counted for it
+
+
+def beat_video(vid, text=None):
+    """The edit is still working (a long render, say) though it has nothing to post: the Live clock keeps counting and
+    says what it's doing, without an update on the page."""
+    with vlock(vid):
+        v = load_video(vid)
+        p = v.get("progress")
+        if not p or p.get("finished"):
+            return None
+        if not p.get("since"):
+            return p  # waiting for the owner's answer: the clock stays stopped
+        p = progress_of(v, p["draft"])
+        p["busy"] = {"text": (str(text or "").strip() or "Rendering")[:60], "ts": time.time()}
+        save_video(v)
+    return p
+
+
+def running_programs():
+    """The names of the programs running on this computer now (lower case, no .exe)."""
+    try:
+        if os.name == "nt":
+            out = subprocess.run(["tasklist", "/fo", "csv", "/nh"], capture_output=True, text=True, timeout=60,
+                                 creationflags=subprocess.CREATE_NO_WINDOW).stdout
+            names = [line.split('","')[0].strip('"') for line in out.splitlines() if line.strip()]
+        else:
+            out = subprocess.run(["ps", "-axo", "comm="], capture_output=True, text=True, timeout=60).stdout
+            names = [Path(line.strip()).name for line in out.splitlines() if line.strip()]
+    except (OSError, subprocess.SubprocessError):
+        return set()
+    return {re.sub(r"\.exe$", "", n.lower()) for n in names}
+
+
+def live_keepalive(seen_before=False):
+    """Once a minute, from the studio: a render running on this computer (seen two minutes in a row, so the studio's own
+    quick ffmpeg doesn't count) keeps the clock going for each edit that's on its Render step, though the edit posts
+    nothing while it waits. Returns whether a render was seen."""
+    seen = bool(running_programs() & RENDER_PROGRAMS)
+    if not (seen and seen_before):
+        return seen
+    for vid, d in list(video_dirs().items()):
+        try:
+            v = read_json(d / "video.json", {}) or {}
+            p = v.get("progress") or {}
+            if p.get("finished") or not p.get("since") or p.get("step") != "Render" or time.time() - p.get("last", 0) > RENDER_QUIET_MAX:
+                continue
+            beat_video(vid, "Rendering")
+        except (StudioError, OSError, ValueError, KeyError, TypeError):
+            pass
+    return seen
+
+
+def live_watch():
+    seen = False
+    while True:
+        try:
+            seen = live_keepalive(seen)
+        except Exception:
+            seen = False
+        time.sleep(60)
+
+
 def progress_finish(v):
     """The draft is here: the clock stops for good and every step is done."""
     p = v.get("progress")
@@ -3055,6 +3126,7 @@ def post_update(vid, text, snapshot=None, at=None, draft=None, total=None, step=
         if active or moves:
             check_edit(v)
             p = progress_of(v, round_no)
+            p.pop("busy", None)
             if v.get("status") not in LOCKED_STATUSES and round_no > (latest_version(v) or 0):
                 v["status"] = "editing"  # Claude is making the next draft: Home shows Editing until it arrives (then In review)
             if steps:
@@ -5444,20 +5516,53 @@ def lighter_files(sdir, tmp, job, limit):
                       f"Move some large files out of it first. The biggest are {biggest}.")
 
 
+STYLE_UPLOADS = ".style-uploads"  # in the library: a style's packed copy and its Google upload address, until it's up
+
+
+def style_upload_sig(sdir, limit):
+    """Changes when anything in the style that's shared changes, so an old packed copy isn't sent."""
+    h = hashlib.sha256(str(limit).encode())
+    for rel, f in sorted(share_files(sdir)):
+        st = f.stat()
+        h.update(f"{rel}|{st.st_size}|{int(st.st_mtime)};".encode())
+    return h.hexdigest()
+
+
+def kept_style_upload(style_id, sig):
+    """The packed copy left by an unfinished upload of this same style, still fresh: {pack, info}, or None."""
+    keep = library() / STYLE_UPLOADS / style_id
+    info = read_json(keep / "upload.json", {}) or {}
+    pack = keep / f"{style_id}{ZIP_SUFFIX}"
+    if info.get("sig") == sig and pack.is_file() and pack.stat().st_size == info.get("size") and time.time() - info.get("packed", 0) < RESUME_KEEP:
+        return {"dir": keep, "pack": pack, "info": info}
+    return None
+
+
 def drive_share_style(style_id, user=None):
     sdir = style_dir(style_id, user)
     meta = style_meta(sdir)
     if not can_manage(meta, user):
         raise auth.Forbidden("Only the person who made this style, or the owner, can share it online.")
     original = sum(f.stat().st_size for _, f in share_files(sdir))
-    if shutil.disk_usage(library()).free < original * 2.1 + 100_000_000:
-        raise StudioError(f"Not enough space to pack it: sharing needs about {original * 2.1 / 1e9:.1f} GB free for a moment.")
     limit = SHARE_LIMIT["long" if meta.get("format") == "long" else "short"]
+    if not kept_style_upload(style_id, style_upload_sig(sdir, limit)) and shutil.disk_usage(library()).free < original * 2.1 + 100_000_000:
+        raise StudioError(f"Not enough space to pack it: sharing needs about {original * 2.1 / 1e9:.1f} GB free for a moment.")
     named = {}
     if user is not None and user["email"] != (approval.status(DATA).get("email") or "").strip().lower():
         named = {"from_name": user["username"]}
 
     def work(job):
+        sig = style_upload_sig(sdir, limit)
+        kept = kept_style_upload(style_id, sig)
+        keep = library() / STYLE_UPLOADS / style_id
+        if kept:
+            try:
+                return send_style(job, kept["pack"], kept["info"])
+            except JobStopped:
+                if not job.get("pause"):
+                    shutil.rmtree(keep, ignore_errors=True)
+                raise
+        shutil.rmtree(keep, ignore_errors=True)  # an old or changed copy: packed again
         tmp = library() / f".online-{secrets.token_hex(4)}"
         tmp.mkdir()
         try:
@@ -5475,32 +5580,63 @@ def drive_share_style(style_id, user=None):
                 for rel, f in files:
                     zf.write(f, f"{style_id}/{rel}")
             writer.close()
-            whole = writer.parts[0]
-            job["done_bytes"], job["total_bytes"] = 0, whole.stat().st_size
-            check_stop(job)
-            job["stage"] = "Connecting to the online Shared folder"
-            job["stage"] = "Making its picture"
-            picture = style_preview(sdir)
-            described = {"id": style_id, "name": meta["name"], "notes": (meta.get("notes") or "")[:400], "format": meta.get("format") or "",
-                         "palette": meta.get("palette", [])[:8], **named}
-            try:
-                url = approval.shared_call(DATA, "/styles/start", bytes=whole.stat().st_size, **described)["upload_url"]
-                job["stage"] = "Uploading"
-                file_id = drive_upload_file(url, whole, job).get("id")
-                if not file_id:
-                    raise StudioError("Google Drive didn't say where it saved the style. Try sharing it again.")
-                job["stage"] = "Finishing"
-                entry = approval.shared_call(DATA, "/styles/finish", file_id=file_id, **described, **({"preview": picture} if picture else {}))["style"]
-            except approval.ApprovalError as e:
-                raise StudioError(str(e))
-            with LOCK:
-                data = read_json(sdir / "style.json", {}) or {}
-                data["online"] = {"repo": "drive", "tag": entry["key"], "at": now()}
-                write_json(sdir / "style.json", data)
-            return {"name": meta["name"], "repo": "drive", "bytes": manifest["bytes"], "original_bytes": original, "status": entry["status"]}
+            keep.mkdir(parents=True, exist_ok=True)
+            pack = keep / f"{style_id}{ZIP_SUFFIX}"
+            shutil.move(str(writer.parts[0]), str(pack))  # kept, so a failed or paused upload carries on without packing again
+            info = {"sig": sig, "size": pack.stat().st_size, "bytes": manifest["bytes"], "packed": time.time()}
+            write_json(keep / "upload.json", info)
+        except BaseException:
+            shutil.rmtree(keep, ignore_errors=True)
+            raise
         finally:
             shutil.rmtree(tmp, ignore_errors=True)
-    return start_job("online-upload", f"Sharing {meta['name']}", user, work, style=style_id)
+        try:
+            return send_style(job, pack, info)
+        except JobStopped:
+            if not job.get("pause"):
+                shutil.rmtree(keep, ignore_errors=True)
+            raise
+
+    def send_style(job, whole, info):
+        """Up to Google from where it got to: the kept address is asked how much it holds, and only the rest is sent."""
+        keep = whole.parent
+        job["done_bytes"], job["total_bytes"] = 0, whole.stat().st_size
+        check_stop(job)
+        job["stage"] = "Making its picture"
+        picture = style_preview(sdir)
+        described = {"id": style_id, "name": meta["name"], "notes": (meta.get("notes") or "")[:400], "format": meta.get("format") or "",
+                     "palette": meta.get("palette", [])[:8], **named}
+        try:
+            url, sent, got = info.get("url"), 0, None
+            if url and time.time() - info.get("url_ts", 0) < RESUME_KEEP:
+                held = drive_held(url, info["size"])
+                if held:
+                    sent, got = held
+                    job["stage"] = f"Carrying on from {sent / 1e6:,.0f} MB"
+                else:
+                    url = None
+            else:
+                url = None
+            if not url:
+                url = approval.shared_call(DATA, "/styles/start", bytes=whole.stat().st_size, **described)["upload_url"]
+                info.update(url=url, url_ts=time.time())
+                write_json(keep / "upload.json", info)
+                job["stage"] = "Uploading"
+            file_id = (got or drive_upload_file(url, whole, job, sent)).get("id")
+            if not file_id:
+                raise StudioError("Google Drive didn't say where it saved the style. Try sharing it again.")
+            job["stage"] = "Finishing"
+            entry = approval.shared_call(DATA, "/styles/finish", file_id=file_id, **described, **({"preview": picture} if picture else {}))["style"]
+        except approval.ApprovalError as e:
+            raise StudioError(str(e))
+        with LOCK:
+            data = read_json(sdir / "style.json", {}) or {}
+            data["online"] = {"repo": "drive", "tag": entry["key"], "at": now()}
+            write_json(sdir / "style.json", data)
+        shutil.rmtree(keep, ignore_errors=True)
+        return {"name": meta["name"], "repo": "drive", "bytes": info["bytes"], "original_bytes": original, "status": entry["status"]}
+    return start_job("online-upload", f"Sharing {meta['name']}", user, work, style=style_id,
+                     again=lambda: drive_share_style(style_id, user))
 
 
 def drive_download_file(key, dest, size, job):
@@ -6908,6 +7044,7 @@ def serve(port):
     threading.Thread(target=keep_approval, daemon=True).start()
     threading.Thread(target=learn_watch, daemon=True).start()
     threading.Thread(target=link_watch, daemon=True).start()
+    threading.Thread(target=live_watch, daemon=True).start()
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:
@@ -7121,6 +7258,9 @@ def main(argv=None):
     up.add_argument("--step", default=None, help="the step you're on now")
     up.add_argument("--clip", action="append", default=[], help="a clip on a Live track, e.g. \"B-roll:10-17\" (seconds); use it as many times as you need")
     up.add_argument("--clear-track", action="append", default=[], help="empty a Live track first, when you've redone it")
+    bt = sub.add_parser("beat")
+    bt.add_argument("video")
+    bt.add_argument("text", nargs="?", default="")
     ar = sub.add_parser("ask-render")
     ar.add_argument("video")
     ar.add_argument("--note", default="")
@@ -7279,6 +7419,9 @@ def main(argv=None):
             gaps = progress_gaps(load_video(a.video))
             if gaps:
                 print("Live is still missing, so send these with your next update:\n" + "\n".join(f"- {g}" for g in gaps))
+        elif a.cmd == "beat":
+            p = beat_video(a.video, a.text)
+            print("The Live clock keeps counting." if p and p.get("since") else "Nothing to keep going: this draft's edit isn't on the clock.")
         elif a.cmd == "ask-render":
             req = ask_render(a.video, a.note, a.size, a.fps, a.duration)
             print(f"The render popup is open: {home_url('/review/' + a.video)}\nWaiting for the settings...", flush=True)
