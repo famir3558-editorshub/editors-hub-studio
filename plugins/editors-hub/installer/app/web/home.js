@@ -204,7 +204,11 @@ function projectCard(p) {
 function styleCard(s) {
   const initials = s.name.replace(/[^\p{L}\p{N}\s]/gu, "").split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join("").toUpperCase();
   const swatches = (s.palette || []).slice(0, 6).map((c) => `<i style="background:${esc(c)}" title="${esc(c)}"></i>`).join("");
-  return `<div class="card" data-style="${esc(s.id)}">
+  // a strip of pictures: the style's own videos first, then client videos made with it; with none, its references
+  const vids = (S.state.videos || []).filter((v) => v.style === s.id && v.thumb).sort((a, b) => (!a.project - !b.project) || (a.updated < b.updated ? 1 : -1)).slice(0, 4);
+  const strip = vids.length ? `<div class="pc-preview n${vids.length}">${vids.map((v) => `<img src="/media/${enc(v.id)}/thumb.jpg?${enc(v.updated)}" alt="" loading="lazy" title="${esc(v.name)}">`).join("")}</div>`
+    : s.shared ? "" : `<div class="pc-preview cover"><img src="/api/styles/${enc(s.id)}/cover?${enc(s.updated || "")}" alt="" loading="lazy" onerror="this.parentNode.className='pc-preview none';this.parentNode.innerHTML='<span>${esc(initials)}</span><small>No pictures yet</small>'"></div>`;
+  return `<div class="card" data-style="${esc(s.id)}">${strip}
     <div class="row"><div class="badge">${esc(initials)}</div><div><h3>${esc(s.name)}</h3><div class="faint">${esc(STYLE_FORMATS[s.format] || (s.client ? "Client: " + s.client : "Editing style"))}</div></div>
       <div class="spacer"></div>${s.online ? `<span class="share-tag online" title="In the online Shared folder">Online</span>` : `<span class="share-tag private">Private</span>`}</div>
     ${swatches ? `<div class="swatches">${swatches}</div>` : ""}

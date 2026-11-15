@@ -4698,7 +4698,7 @@ STYLE_MANIFEST = "editors-hub-style.json"
 ZIP_SUFFIX = ".editors-hub-style.zip"
 PROJECT_MANIFEST = "editors-hub-project.json"
 PROJECT_ZIP_SUFFIX = ".editors-hub-project.zip"
-TRANSFER_JUNK = {".video.lock", ".claude-wait.json", ".live.log", ".DS_Store", "Thumbs.db", "desktop.ini", STYLE_MANIFEST, PROJECT_MANIFEST}
+TRANSFER_JUNK = {".card-cover.jpg", ".video.lock", ".claude-wait.json", ".live.log", ".DS_Store", "Thumbs.db", "desktop.ini", STYLE_MANIFEST, PROJECT_MANIFEST}
 JOBS = {}
 
 
@@ -5291,6 +5291,34 @@ def online_repo():
 
 PREVIEW_MAX = 150_000
 _preview_backfill = set()
+
+
+def style_cover(sdir):
+    """A picture for a style's card when no video uses it yet: its preview strip, or frames and pictures from its references.
+    Made once and kept as .card-cover.jpg in the style's folder (remade when the references change). None if it has none."""
+    ffmpeg = shutil.which("ffmpeg")
+    sdir = Path(sdir)
+    out = sdir / ".card-cover.jpg"
+    items = [sdir / i["file"] for sec in ("references", "effects", "transitions", "graphics") for i in section_items(sdir, sec) if i["kind"] in ("video", "image")][:4]
+    strip = next((p for p in (sdir / "library" / "preview-strip.jpg", sdir / "preview-strip.jpg") if p.is_file()), None)
+    sources = [strip] if strip else items
+    if not sources or not ffmpeg:
+        return None
+    newest = max(p.stat().st_mtime for p in sources if p.exists())
+    if out.is_file() and out.stat().st_mtime >= newest:
+        return out
+    inputs, cells = [], []
+    for n, src in enumerate(sources):
+        inputs += (["-ss", "1"] if kind_of(src.name) == "video" else []) + ["-i", str(src)]
+        cells.append(f"[{n}:v]scale=480:300:force_original_aspect_ratio=increase,crop=480:300,setsar=1[c{n}]")
+    joined = "".join(f"[c{n}]" for n in range(len(sources)))
+    graph = ";".join(cells) + (f";{joined}hstack=inputs={len(sources)}[out]" if len(sources) > 1 else ";[c0]null[out]")
+    try:
+        subprocess.run([ffmpeg, "-y", "-v", "error", *inputs, "-filter_complex", graph, "-map", "[out]", "-frames:v", "1", "-q:v", "6", str(out)],
+                       capture_output=True, timeout=90, **claude_run_flags())
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    return out if out.is_file() and out.stat().st_size else None
 
 
 def style_preview(sdir):
@@ -6488,6 +6516,12 @@ class Handler(BaseHTTPRequestHandler):
                     return self.send_json({"items": project_files(project_dir(parts[2]), parts[4])})
                 if parts[3:] == ["download"]:
                     return self.send_project_zip(parts[2])
+            if parts[:2] == ["api", "styles"] and len(parts) == 4 and parts[3] == "cover":
+                self.need("owner", "editor")
+                cover = style_cover(style_dir(parts[2], self.user))
+                if not cover:
+                    raise NotFound("no picture")
+                return self.send_file(cover)
             if parts[:2] == ["api", "online"] and len(parts) == 4 and parts[3] == "preview":
                 self.need("owner", "editor")
                 return self.send_body(online_preview(parts[2], query.get("v", [""])[0] if isinstance(query, dict) else ""), "image/jpeg", extra=[("Cache-Control", "max-age=86400")])

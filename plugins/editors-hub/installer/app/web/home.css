@@ -317,3 +317,5 @@ pre { margin: 0; padding: 14px; background: rgba(0, 0, 0, 0.45); border: 1px sol
 .thumb-fill { display: none; }
 .overview { display: none; }
 .styles .card .pc-preview + .row { margin-top: 0; }
+.pc-preview.cover { display: block; }
+.pc-preview.cover img { width: 100%; height: 100%; object-fit: cover; }

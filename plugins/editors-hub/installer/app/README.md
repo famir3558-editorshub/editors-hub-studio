@@ -99,7 +99,7 @@ built-in browser. No account comes with the studio: each person signs in with th
 
 ## The look
 
-The studio has the **Aurora** look: frosted glass over black with a slow red glow behind the pages, pill buttons and glowing status lights. **Settings > Look** turns it off for the classic look, or keeps it and stops the glow moving. In Aurora, Home's tabs float in a dock at the bottom, and Home opens with tiles: the video waiting for review, the edit going on now with its clock, what needs you, your clients and the drive's space. It's kept per browser, and every page and option is the same in both looks. Client cards on the Projects tab show a strip of that client's newest video pictures.
+The studio has the **Aurora** look: frosted glass over black with a slow red glow behind the pages, pill buttons and glowing status lights. **Settings > Look** turns it off for the classic look, or keeps it and stops the glow moving. In Aurora, Home's tabs float in a dock at the bottom, and Home opens with tiles: the video waiting for review, the edit going on now with its clock, what needs you, your clients and the drive's space. It's kept per browser, and every page and option is the same in both looks. Client cards on the Projects tab, and style cards on My styles, show a strip of their video pictures (a style no video uses yet shows its references).
 
 ## Following an edit, and choosing the render
 
