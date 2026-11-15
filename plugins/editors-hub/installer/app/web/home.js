@@ -1383,3 +1383,20 @@ function openClientShareDialog(pid) {
   draw();
   dlg.showModal();
 }
+
+// Settings > Look (this browser): Aurora or the classic look, and whether the red glow moves
+(function lookSwitches() {
+  const aurora = $("lookAurora"), motion = $("lookMotion");
+  if (!aurora || !window.ehLook) return;
+  const now = window.ehLook();
+  aurora.checked = now.aurora;
+  motion.checked = !now.still;
+  motion.disabled = !now.aurora;
+  const save = () => {
+    window.ehSetLook(aurora.checked, !motion.checked);
+    motion.disabled = !aurora.checked;
+    toast(aurora.checked ? "Aurora look on" : "Classic look on");
+  };
+  aurora.addEventListener("change", save);
+  motion.addEventListener("change", save);
+})();

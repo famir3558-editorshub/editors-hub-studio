@@ -97,6 +97,10 @@ and you get new options for just those, or say **All b-roll is good**, and it wo
 Options come from your own footage, free sites such as Pexels, Pixabay and Mixkit, and Envato if you've signed in to your own account in the Claude app's
 built-in browser. No account comes with the studio: each person signs in with their own.
 
+## The look
+
+The studio has the **Aurora** look: frosted glass over black with a slow red glow behind the pages, pill buttons and glowing status lights. **Settings > Look** turns it off for the classic look, or keeps it and stops the glow moving. It's kept per browser, and every page and option is the same in both looks.
+
 ## Following an edit, and choosing the render
 
 The review page's **Live** tab, beside Notes, shows what Claude is doing in plain words, with snapshots

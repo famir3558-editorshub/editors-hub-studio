@@ -2,12 +2,14 @@
 <html lang="en">
 <head>
 <meta charset="utf-8">
+<script src="/static/look.js"></script>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Editors.Hub</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@600;700&family=Sora:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/static/app.css">
 <link rel="stylesheet" href="/static/home.css">
+<link rel="stylesheet" href="/static/aurora.css">
 </head>
 <body>
 <header class="top">
@@ -155,6 +157,11 @@
     <div class="hero"><div><h1>Settings</h1></div></div>
     <div class="panel settings">
       <div class="row"><div class="badge" id="meBadge"></div><div><h3 id="meName"></h3><div class="faint" id="meInfo"></div></div><div class="spacer"></div><button class="btn small" id="renameMeBtn">Change username</button><button class="btn small" id="signOutBtn">Sign out</button></div>
+    </div>
+    <div class="panel settings" id="lookPanel">
+      <h3>Look</h3>
+      <label class="row toggle-row"><span><b>Aurora look</b><br><small class="muted">Frosted glass over black with a slow red glow, pill buttons and glowing status lights. Off: the classic look. Every page and option is the same either way. Kept in this browser.</small></span><span class="spacer"></span><span class="switch"><input type="checkbox" id="lookAurora"><span></span></span></label>
+      <label class="row toggle-row"><span><b>Moving background</b><br><small class="muted">The red glow drifts slowly behind the pages. Off: it stays still.</small></span><span class="spacer"></span><span class="switch"><input type="checkbox" id="lookMotion"><span></span></span></label>
     </div>
     <form class="panel settings" id="settingsForm" data-owner hidden>
       <label class="field">Library folder <small>Where styles and videos are kept. Use an external drive if your footage is big. Styles already made stay in the old folder; move them yourself if you change this.</small><input name="library"></label>

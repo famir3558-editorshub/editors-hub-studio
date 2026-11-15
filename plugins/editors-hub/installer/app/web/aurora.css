@@ -1,0 +1,239 @@
+/* Aurora: the studio's look since 1.33. Frosted glass over black, a slow red glow moving behind everything, pill buttons,
+   glowing status lights, round corners. It only restyles: every page keeps all of its parts. Turned on by <html class="aurora">
+   (look.js, from Settings > Look); without the class the classic look shows, untouched. */
+
+html.aurora {
+  --bg: #070607;
+  --panel: rgba(255, 255, 255, 0.055);
+  --panel-solid: #140c0e;
+  --panel-2: rgba(255, 255, 255, 0.085);
+  --line: rgba(255, 255, 255, 0.11);
+  --line-strong: rgba(255, 255, 255, 0.2);
+  --text: #fbf3f4;
+  --muted: #bba6a9;
+  --faint: #806b6e;
+  --red: #e5192b;
+  --red-2: #ff5a66;
+  --red-deep: #8a0b18;
+  --grad: linear-gradient(135deg, #ff5a66 0%, #e5192b 52%, #8a0b18 100%);
+  --ok: #6ee7b7;
+  --warn: #fcd34d;
+  --blue: #ffb3ba;
+  --radius: 20px;
+  --font: "Sora", "Inter", -apple-system, "Segoe UI", system-ui, sans-serif;
+  --display: "Sora", "Inter", -apple-system, "Segoe UI", system-ui, sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  --glass: blur(22px) saturate(140%);
+  --glow: 0 10px 28px rgba(229, 25, 43, 0.42);
+  background: var(--bg);
+}
+
+/* ---- the moving red sky behind every page ---- */
+html.aurora body { background: transparent; position: relative; isolation: isolate; }
+html.aurora body::before, html.aurora body::after {
+  content: ""; position: fixed; z-index: -1; pointer-events: none; border-radius: 50%; filter: blur(90px);
+}
+html.aurora body::before {
+  width: 62vmax; height: 62vmax; left: -18vmax; top: -24vmax; opacity: 0.5;
+  background: radial-gradient(closest-side, #e5192b, rgba(229, 25, 43, 0) 72%);
+  animation: aurora-drift 22s ease-in-out infinite;
+}
+html.aurora body::after {
+  width: 56vmax; height: 56vmax; right: -16vmax; bottom: -22vmax; opacity: 0.55;
+  background: radial-gradient(closest-side, #7a0a14, rgba(122, 10, 20, 0) 72%), radial-gradient(closest-side at 30% 30%, rgba(255, 59, 74, 0.5), transparent 70%);
+  animation: aurora-drift 26s ease-in-out -9s infinite reverse;
+}
+html.aurora.still body::before, html.aurora.still body::after { animation: none; }
+@keyframes aurora-drift { 0%, 100% { transform: translate(0, 0) scale(1); } 50% { transform: translate(8vmax, 5vmax) scale(1.15); } }
+@keyframes aurora-pulse { 50% { opacity: 0.4; } }
+@media (prefers-reduced-motion: reduce) { html.aurora body::before, html.aurora body::after { animation: none; } }
+
+html.aurora body { font-family: var(--font); letter-spacing: -0.005em; }
+html.aurora ::selection { background: rgba(229, 25, 43, 0.5); }
+html.aurora * { scrollbar-color: rgba(255, 255, 255, 0.2) transparent; }
+
+/* ---- glass: every panel, card and box ---- */
+html.aurora .panel, html.aurora .card, html.aurora .act, html.aurora .bell-panel, html.aurora .panel-box, html.aurora .lv-box,
+html.aurora .settings, html.aurora .setup-panel, html.aurora .online-card, html.aurora .effect, html.aurora .tile, html.aurora .vcard,
+html.aurora .composer, html.aurora .menu, html.aurora .step, html.aurora .keyrow, html.aurora .member, html.aurora .skill,
+html.aurora .draft-card, html.aurora .render-card, html.aurora .locked-box, html.aurora .incoming-note, html.aurora .broll-part,
+html.aurora .tech, html.aurora .trash, html.aurora .deleted-group, html.aurora .share-video, html.aurora .frow, html.aurora .doc,
+html.aurora .first-note, html.aurora .empty, html.aurora .empty-pane, html.aurora .drop, html.aurora .share-opt, html.aurora .share-drafts label,
+html.aurora .stat, html.aurora .statline, html.aurora .setup-banner, html.aurora .notice, html.aurora .connect, html.aurora .places label {
+  background: var(--panel);
+  border: 1px solid var(--line);
+  backdrop-filter: var(--glass);
+  -webkit-backdrop-filter: var(--glass);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+html.aurora .card, html.aurora .panel, html.aurora .settings, html.aurora .setup-panel, html.aurora .online-card, html.aurora .lv-box,
+html.aurora .panel-box, html.aurora .bell-panel, html.aurora .menu, html.aurora .draft-card, html.aurora .render-card, html.aurora .doc,
+html.aurora .first-note, html.aurora .empty, html.aurora .drop, html.aurora .tile, html.aurora .vcard, html.aurora .effect { border-radius: var(--radius); }
+html.aurora .act, html.aurora .step, html.aurora .keyrow, html.aurora .member, html.aurora .skill, html.aurora .share-opt, html.aurora .share-drafts label,
+html.aurora .broll-part, html.aurora .tech, html.aurora .frow, html.aurora .share-video, html.aurora .incoming-note, html.aurora .locked-box, html.aurora .stat { border-radius: 16px; }
+
+/* cards lift and catch a red edge when pointed at */
+html.aurora .card, html.aurora .vcard, html.aurora .online-card, html.aurora .tile, html.aurora .effect { transition: transform 0.25s, box-shadow 0.25s, border-color 0.25s; }
+html.aurora .home .card:hover, html.aurora #videoGrid .card:hover, html.aurora .grid .card:hover, html.aurora .vcard:hover, html.aurora .online-card:hover, html.aurora .tile:hover, html.aurora .effect:hover {
+  transform: translateY(-4px); border-color: rgba(229, 25, 43, 0.45); box-shadow: 0 20px 44px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(229, 25, 43, 0.25);
+}
+html.aurora .thumb, html.aurora .vcard .th, html.aurora .tile .box { border-radius: 16px 16px 0 0; }
+html.aurora #videoGrid .card .thumb { border-radius: 0; }
+
+/* ---- the top bar: a floating glass strip ---- */
+html.aurora .top {
+  margin: 12px 16px 0; border-radius: 22px; border: 1px solid var(--line);
+  background: rgba(20, 12, 14, 0.55); backdrop-filter: var(--glass); -webkit-backdrop-filter: var(--glass);
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.08); top: 10px;
+}
+html.aurora .top::after { display: none; }
+html.aurora .logo { font-family: var(--display); letter-spacing: -0.03em; }
+html.aurora .logo-mark { border-radius: 12px; background: var(--grad); box-shadow: var(--glow); }
+
+/* tabs: a glass track with a red pill for the one that's open */
+html.aurora .tabs, html.aurora .seg, html.aurora .src-tabs, html.aurora .stabs, html.aurora .video-kinds {
+  background: rgba(255, 255, 255, 0.05); border: 1px solid var(--line); border-radius: 999px; padding: 4px; gap: 2px;
+}
+html.aurora .tabs button, html.aurora .seg button, html.aurora .src-tabs button, html.aurora .stabs button { border-radius: 999px; border: 0; }
+html.aurora .tabs button:hover, html.aurora .seg button:hover, html.aurora .src-tabs button:hover, html.aurora .stabs button:hover { background: rgba(255, 255, 255, 0.07); }
+html.aurora .tabs button.on, html.aurora .seg button.on, html.aurora .src-tabs button.on, html.aurora .stabs button.on {
+  background: var(--grad); color: #fff; box-shadow: 0 6px 18px rgba(229, 25, 43, 0.4); border: 0;
+}
+html.aurora .tabs button.on em, html.aurora .src-tabs button.on em { color: rgba(255, 255, 255, 0.85); }
+html.aurora .side-tabs .seg { border-radius: 999px; }
+
+/* ---- buttons: pills; the main one glows red ---- */
+html.aurora .btn { border-radius: 999px; border: 1px solid var(--line); background: rgba(255, 255, 255, 0.06); backdrop-filter: blur(12px); font-weight: 600; transition: background 0.2s, box-shadow 0.2s, transform 0.15s, filter 0.2s; }
+html.aurora .btn:hover { background: rgba(255, 255, 255, 0.12); }
+html.aurora .btn:active { transform: scale(0.97); }
+html.aurora .btn.primary { background: var(--grad); border-color: transparent; color: #fff; box-shadow: var(--glow), inset 0 1px 0 rgba(255, 255, 255, 0.25); }
+html.aurora .btn.primary:hover { filter: brightness(1.08); background: var(--grad); }
+html.aurora .btn.ok { background: linear-gradient(135deg, #6ee7b7, #10b981); color: #052117; border-color: transparent; box-shadow: 0 8px 22px rgba(16, 185, 129, 0.35); }
+html.aurora .btn.warn { background: rgba(252, 211, 77, 0.14); color: var(--warn); border-color: rgba(252, 211, 77, 0.35); }
+html.aurora .btn.ghost { background: transparent; border-color: transparent; }
+html.aurora .btn.ghost:hover { background: rgba(255, 255, 255, 0.08); }
+html.aurora .btn.danger { background: rgba(229, 25, 43, 0.12); color: #ff8a94; border-color: rgba(229, 25, 43, 0.38); }
+html.aurora .btn.danger:hover { background: rgba(229, 25, 43, 0.24); color: #fff; }
+html.aurora .btn.on { background: var(--grad); color: #fff; border-color: transparent; }
+html.aurora .btn.icon, html.aurora .icon-btn, html.aurora .card-tool, html.aurora .act-x, html.aurora .bell-btn { border-radius: 50%; }
+html.aurora .icon-btn.send, html.aurora .submit-btn:not(:disabled) { background: var(--grad); box-shadow: var(--glow); color: #fff; border-color: transparent; }
+html.aurora .submit-btn, html.aurora .wide-btn { border-radius: 999px; }
+html.aurora .act-pause, html.aurora .act-stop, html.aurora .job-stop { border-radius: 999px; }
+
+/* ---- fields ---- */
+html.aurora input[type=text], html.aurora input[type=email], html.aurora input[type=password], html.aurora input[type=number], html.aurora input[type=search], html.aurora input:not([type]), html.aurora select, html.aurora textarea {
+  background: rgba(0, 0, 0, 0.28); border: 1px solid var(--line); border-radius: 14px; color: var(--text); transition: border-color 0.2s, box-shadow 0.2s;
+}
+html.aurora input:focus, html.aurora select:focus, html.aurora textarea:focus { border-color: rgba(255, 90, 102, 0.7); box-shadow: 0 0 0 3px rgba(229, 25, 43, 0.22); outline: none; }
+html.aurora select option { background: #1a1012; }
+html.aurora .toolbar input, html.aurora .effects-bar input, html.aurora .share-link input { border-radius: 999px; }
+html.aurora .note-box { border-radius: 18px; background: rgba(0, 0, 0, 0.28); border-color: var(--line); }
+html.aurora .note-box:focus-within { border-color: rgba(255, 90, 102, 0.7); box-shadow: 0 0 0 3px rgba(229, 25, 43, 0.22); }
+html.aurora :focus-visible { outline-color: var(--red-2); }
+
+/* ---- status lights and chips ---- */
+html.aurora .pill { border-radius: 999px; background: rgba(10, 6, 7, 0.62); border: 1px solid rgba(255, 255, 255, 0.12); backdrop-filter: blur(8px); text-transform: capitalize; }
+html.aurora .pill::before { box-shadow: 0 0 8px currentColor; }
+html.aurora .s-editing { color: #ffb3ba; } html.aurora .s-paused { color: var(--warn); } html.aurora .s-in-review { color: var(--red-2); }
+html.aurora .s-changes { color: #ffb37a; } html.aurora .s-approved { color: var(--ok); } html.aurora .s-delivered { color: var(--muted); }
+html.aurora .chip, html.aurora .chip-s { border-radius: 999px; background: rgba(255, 255, 255, 0.05); border: 1px solid var(--line); backdrop-filter: blur(10px); }
+html.aurora .chip:hover, html.aurora .chip-s:hover { background: rgba(255, 255, 255, 0.1); }
+html.aurora .chip.on { background: #fff; color: #120a0b; border-color: #fff; font-weight: 700; }
+html.aurora .chip.on em { color: #6b5a5c; }
+html.aurora .badge, html.aurora .share-tag, html.aurora .ready-pill { border-radius: 999px; }
+html.aurora .ready-pill .dot, html.aurora .bell-dot, html.aurora .live-dot i { box-shadow: 0 0 10px currentColor; }
+
+/* ---- switches: a red glow when on ---- */
+html.aurora .switch span, html.aurora .share .switch span { border-radius: 999px; background: rgba(255, 255, 255, 0.16); border: 0; transition: background 0.2s, box-shadow 0.2s; }
+html.aurora .switch span::after, html.aurora .share .switch span::after { background: #d8c8ca; }
+html.aurora .switch input:checked + span, html.aurora .share .switch input:checked + span { background: var(--grad); box-shadow: 0 0 16px rgba(229, 25, 43, 0.45); }
+html.aurora .switch input:checked + span::after, html.aurora .share .switch input:checked + span::after { background: #fff; }
+
+/* ---- progress bars and activity ---- */
+html.aurora .progress, html.aurora .act-bar, html.aurora .job-track, html.aurora .lv-bar { border-radius: 999px; background: rgba(255, 255, 255, 0.1); overflow: hidden; }
+html.aurora .progress > div, html.aurora .act-bar div, html.aurora .job-track div, html.aurora .lv-bar b { border-radius: 999px; background: linear-gradient(90deg, #ff5a66, #e5192b, #8a0b18); box-shadow: 0 0 14px rgba(229, 25, 43, 0.5); }
+html.aurora .act.done .act-bar div { background: linear-gradient(90deg, #6ee7b7, #10b981); box-shadow: none; }
+html.aurora .act.paused .act-bar div { background: rgba(252, 211, 77, 0.75); box-shadow: none; }
+html.aurora .act.failed .act-bar div, html.aurora .act.stopped .act-bar div { background: rgba(255, 255, 255, 0.3); box-shadow: none; }
+html.aurora #activity .act { background: rgba(24, 14, 16, 0.78); box-shadow: 0 18px 40px rgba(0, 0, 0, 0.45); }
+html.aurora .act-pct, html.aurora .act-detail, html.aurora .job-text { font-family: var(--mono); }
+
+/* ---- popups ---- */
+html.aurora dialog { background: rgba(24, 14, 16, 0.84); border: 1px solid rgba(255, 255, 255, 0.14); border-radius: 26px; backdrop-filter: blur(26px); -webkit-backdrop-filter: blur(26px); box-shadow: 0 40px 90px rgba(0, 0, 0, 0.6); color: var(--text); }
+html.aurora dialog::backdrop { background: rgba(4, 2, 3, 0.55); backdrop-filter: blur(5px); }
+html.aurora dialog h2 { font-family: var(--display); letter-spacing: -0.025em; }
+html.aurora .menu { background: rgba(24, 14, 16, 0.9); box-shadow: 0 24px 50px rgba(0, 0, 0, 0.5); }
+html.aurora .menu button { border-radius: 10px; }
+html.aurora #toast { border-radius: 999px; background: rgba(24, 14, 16, 0.92); border: 1px solid rgba(110, 231, 183, 0.35); backdrop-filter: blur(20px); box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5); }
+html.aurora #toast.bad { border-color: rgba(229, 25, 43, 0.5); }
+html.aurora .bell-panel { background: rgba(24, 14, 16, 0.9); box-shadow: 0 30px 70px rgba(0, 0, 0, 0.55); }
+html.aurora .bell-row { border-radius: 14px; }
+html.aurora .bell-row.new { background: linear-gradient(90deg, rgba(229, 25, 43, 0.16), transparent); }
+html.aurora .bell-count { background: var(--red); box-shadow: 0 0 0 3px var(--bg), 0 0 12px rgba(229, 25, 43, 0.7); }
+
+/* ---- Home ---- */
+html.aurora .hero-clean h1, html.aurora .hero h1 { font-family: var(--display); font-weight: 300; letter-spacing: -0.035em; }
+html.aurora .hero-clean h1 .name { font-weight: 700; background: linear-gradient(90deg, #fff, #ff5a66, #e5192b); -webkit-background-clip: text; background-clip: text; color: transparent; }
+html.aurora .stat b, html.aurora .statline b { font-family: var(--display); letter-spacing: -0.03em; }
+html.aurora .statline { border-radius: 22px; padding-inline: 8px; }
+html.aurora .section-title { font-family: var(--display); letter-spacing: -0.02em; }
+html.aurora .section-title::before, html.aurora .section-title::after { background: linear-gradient(90deg, transparent, rgba(229, 25, 43, 0.6), transparent); }
+html.aurora .thumb .ver, html.aurora .vcard .th .ver { border-radius: 999px; font-family: var(--mono); }
+html.aurora .swatches i, html.aurora .swatches.big i { border-radius: 8px; }
+html.aurora .avatar { background: var(--grad); box-shadow: var(--glow); }
+html.aurora .code-big { font-family: var(--mono); letter-spacing: 0.12em; }
+html.aurora pre { border-radius: 14px; background: rgba(0, 0, 0, 0.35); border: 1px solid var(--line); font-family: var(--mono); }
+
+/* ---- Review page ---- */
+html.aurora .stage, html.aurora .side { border-radius: var(--radius); }
+html.aurora .player { border-radius: 18px; overflow: hidden; box-shadow: 0 30px 60px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.08); }
+html.aurora .controls { border-radius: 18px; }
+html.aurora .clock, html.aurora .time, html.aurora .ticks, html.aurora .bubble .t, html.aurora .card .head-row .t { font-family: var(--mono); }
+html.aurora .track { border-radius: 999px; background: rgba(255, 255, 255, 0.12); }
+html.aurora .played { border-radius: 999px; background: linear-gradient(90deg, #ff5a66, #e5192b); box-shadow: 0 0 12px rgba(229, 25, 43, 0.6); }
+html.aurora .head { box-shadow: 0 0 0 4px rgba(229, 25, 43, 0.35), 0 0 14px rgba(229, 25, 43, 0.7); }
+html.aurora .mark { box-shadow: 0 0 10px rgba(255, 90, 102, 0.8); }
+html.aurora .bubble { border-radius: 14px; background: rgba(24, 14, 16, 0.85); border: 1px solid var(--line); backdrop-filter: blur(14px); }
+html.aurora #noteList .card { border-radius: 4px 18px 18px 18px; }
+html.aurora #noteList .card.cur { border-color: rgba(255, 90, 102, 0.6); box-shadow: 0 0 0 1px rgba(229, 25, 43, 0.35), 0 12px 30px rgba(229, 25, 43, 0.15); }
+html.aurora #noteList .card.fixed { opacity: 0.8; }
+html.aurora .state { border-radius: 999px; }
+html.aurora .claude-state { border-radius: 999px; }
+html.aurora .claude-state.on { box-shadow: 0 0 14px rgba(110, 231, 183, 0.35); }
+html.aurora .att, html.aurora .att img { border-radius: 10px; }
+html.aurora .broll-opt { border-radius: 16px; }
+html.aurora .broll-opt.on { box-shadow: 0 0 0 2px var(--red), 0 12px 30px rgba(229, 25, 43, 0.3); }
+html.aurora .broll-mode { border-radius: 18px; background: var(--panel); border: 1px solid var(--line); }
+html.aurora .broll-mode:hover { border-color: rgba(229, 25, 43, 0.5); }
+html.aurora .side-grip::after { background: rgba(229, 25, 43, 0.6); }
+html.aurora .dropveil div { border-radius: 26px; border-color: rgba(255, 90, 102, 0.7); background: rgba(24, 14, 16, 0.8); backdrop-filter: blur(20px); }
+html.aurora .compare figure { border-radius: 18px; overflow: hidden; }
+
+/* the Live tab */
+html.aurora .lv-box { padding: 18px; }
+html.aurora .lv-state i { box-shadow: 0 0 12px currentColor; }
+html.aurora .lv-clock div { font-family: var(--mono); letter-spacing: -0.04em; }
+html.aurora .lv-facts > div { border-radius: 14px; background: rgba(0, 0, 0, 0.24); border: 1px solid var(--line); }
+html.aurora .lv-frame, html.aurora .lv-frame img { border-radius: 16px; }
+html.aurora .lv-frames img { border-radius: 6px; }
+html.aurora .lv-frames img.on { outline: 2px solid var(--red); outline-offset: -2px; box-shadow: 0 0 14px rgba(229, 25, 43, 0.6); }
+html.aurora .lv-track > div { border-radius: 8px; background: rgba(255, 255, 255, 0.07); }
+html.aurora .lv-track i { border-radius: 5px; }
+html.aurora .lv-track i.v { background: #d6cbcd; } html.aurora .lv-track i.b { background: #e5192b; } html.aurora .lv-track i.a { background: #ff8a94; }
+html.aurora .lv-track i.c { background: #8a0b18; } html.aurora .lv-track i.s { background: #5a4a4e; }
+html.aurora .lv-head { background: var(--red); box-shadow: 0 0 12px var(--red); }
+html.aurora .lv-step.done > span { background: rgba(110, 231, 183, 0.14); color: var(--ok); }
+html.aurora .lv-step.now > span { background: var(--grad); color: #fff; box-shadow: var(--glow); }
+html.aurora .lv-step.paused > span { background: rgba(252, 211, 77, 0.16); color: var(--warn); }
+html.aurora .lv-item img { border-radius: 12px; }
+
+/* ---- style and client pages ---- */
+html.aurora .stills .still, html.aurora .stills .still img { border-radius: 18px; }
+html.aurora .about h1 { font-family: var(--display); letter-spacing: -0.035em; }
+html.aurora .rules li::before { background: var(--grad); box-shadow: 0 0 8px rgba(229, 25, 43, 0.6); }
+html.aurora .doc code, html.aurora .notice code { font-family: var(--mono); background: rgba(0, 0, 0, 0.3); border-radius: 6px; }
+html.aurora .mosaic, html.aurora .mosaic img { border-radius: 14px; }
+
+/* ---- sign-in and approval pages ---- */
+html.aurora .auth .card { border-radius: 28px; background: rgba(24, 14, 16, 0.6); box-shadow: 0 40px 90px rgba(0, 0, 0, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.08); }
+html.aurora .code { font-family: var(--mono); letter-spacing: 0.2em; }
