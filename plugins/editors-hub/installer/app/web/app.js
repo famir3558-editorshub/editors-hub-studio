@@ -541,7 +541,17 @@ function openShareDialog(v, onChange = () => {}) {
   dlg.addEventListener("cancel", (e) => { e.preventDefault(); close(); });
   const toggle = (id, label, hint, on) => `<label class="share-opt"><span><b>${label}</b><small>${hint}</small></span><span class="switch"><input type="checkbox" id="${id}"${on ? " checked" : ""}><span></span></span></label>`;
   const opts = (l) => toggle("shDl", "Downloading", "They can save the video.", l ? l.download : true) + toggle("shCm", "Commenting", "They can leave comments at a moment in the video. They come in as notes here.", l ? l.comments : true);
-  const pick = (chosen) => drafts.length > 1 ? `<label class="share-row">Draft to show <select id="shVer">${drafts.slice().reverse().map((n) => `<option value="${n}"${n === chosen ? " selected" : ""}>v${n}${n === latest ? " (latest)" : ""}</option>`).join("")}</select></label>` : "";
+  // which draft goes up from the studio, and which number the client sees for it ("Draft 2"), whatever its studio number
+  const clientDefault = (n) => !link ? 1 : n === link.version && link.client_draft ? link.client_draft : n === link.version ? "" : (link.client_count || 0) + 1;
+  const pick = (chosen) => `<div class="share-drafts">
+      <label><span>Draft from your studio</span><select id="shVer">${drafts.slice().reverse().map((n) => `<option value="${n}"${n === chosen ? " selected" : ""}>v${n}${n === latest ? " (latest)" : ""}</option>`).join("")}</select></label>
+      <label><span>Your client sees it as</span><span class="share-num">Draft <input id="shNum" type="number" min="1" max="99" placeholder="auto" value="${clientDefault(chosen)}"></span></label>
+    </div>`;
+  const pickWire = () => {
+    const sel = dlg.querySelector("#shVer"), num = dlg.querySelector("#shNum");
+    if (sel && num) sel.onchange = () => { num.value = clientDefault(+sel.value); };
+  };
+  const clientDraft = () => { const n = +(dlg.querySelector("#shNum")?.value || 0); return n >= 1 ? n : undefined; };
   function draw(message = "") {
     if (!latest) {
       dlg.innerHTML = `<form method="dialog"><h2>Share</h2><p class="ask-text muted">There's no draft of “${esc(v.name)}” to share yet.</p><div class="actions"><button class="btn primary">Close</button></div></form>`;
@@ -550,12 +560,13 @@ function openShareDialog(v, onChange = () => {}) {
         <p class="ask-text muted">Makes a private link. Whoever has it can watch the draft, with no sign-in. They can't see anything else in your studio.${(v.uploaded || []).length ? ` <b>Already uploaded: ${v.uploaded.map((n) => "v" + n).join(", ")}</b>, so the link for ${v.uploaded.length > 1 ? "those is" : "it is"} ready in seconds.` : ""}</p>
         ${pick(drafts.includes(v.current) ? v.current : latest)}${opts(null)}<div class="share-progress" id="shProg" hidden><div class="act-bar"><div></div></div><small></small></div><p class="share-err">${esc(message)}</p>
         <div class="actions"><button type="button" class="btn ghost" data-close>Cancel</button><button type="button" class="btn primary" id="shMake">Make the link</button></div></form>`;
-      dlg.querySelector("#shMake").onclick = () => send({ version: +(dlg.querySelector("#shVer")?.value || (drafts.includes(v.current) ? v.current : latest)), download: dlg.querySelector("#shDl").checked, comments: dlg.querySelector("#shCm").checked });
+      pickWire();
+      dlg.querySelector("#shMake").onclick = () => send({ version: +(dlg.querySelector("#shVer")?.value || (drafts.includes(v.current) ? v.current : latest)), client_draft: clientDraft(), download: dlg.querySelector("#shDl").checked, comments: dlg.querySelector("#shCm").checked });
     } else {
       dlg.innerHTML = `<form method="dialog"><h2>Share “${esc(v.name)}”</h2>
         <div class="share-link"><input id="shUrl" readonly value="${esc(link.url)}"><button type="button" class="btn primary" id="shCopy">Copy</button></div>
-        <p class="ask-text muted small-print">The link shows v${link.version}.${link.version < latest ? ` v${latest} is newer: pick it below and press Update the link: the same link then plays it.` : !link.qualities ? " It was shared before quality choices: press Update the link to add them." : " A new draft goes on it only when you pick it here."} Anyone who has the link can watch it, so send it only to your client.</p>
-        ${pick(link.version < latest ? latest : link.version) || !link.qualities ? `<div class="share-row">${pick(link.version < latest ? latest : link.version)}<button type="button" class="btn" id="shSwap">Update the link</button></div>` : ""}
+        <p class="ask-text muted small-print">The link shows v${link.version}${link.client_draft ? `, which your client sees as Draft ${link.client_draft}` : ""}.${link.version < latest ? ` v${latest} is newer: pick it below and press Update the link: the same link then plays it.` : !link.qualities ? " It was shared before quality choices: press Update the link to add them." : " A new draft goes on it only when you pick it here."} Anyone who has the link can watch it, so send it only to your client.</p>
+        ${pick(link.version < latest ? latest : link.version)}<div class="share-row share-row-end"><button type="button" class="btn" id="shSwap">Update the link</button></div>
         ${opts(link)}<div class="share-progress" id="shProg" hidden><div class="act-bar"><div></div></div><small></small></div><p class="share-err">${esc(message)}</p>
         <div class="actions"><button type="button" class="btn danger" id="shOff">Turn off the link</button><span style="flex:1"></span><a class="btn ghost" href="${esc(link.url)}" target="_blank" rel="noopener">Open</a><button type="button" class="btn" data-close>Done</button></div></form>`;
       dlg.querySelector("#shCopy").onclick = async () => {
@@ -563,7 +574,8 @@ function openShareDialog(v, onChange = () => {}) {
       };
       dlg.querySelector("#shUrl").onfocus = (e) => e.target.select();
       const swap = dlg.querySelector("#shSwap");
-      if (swap) swap.onclick = () => send({ version: +(dlg.querySelector("#shVer")?.value || link.version) });
+      pickWire();
+      if (swap) swap.onclick = () => send({ version: +(dlg.querySelector("#shVer")?.value || link.version), client_draft: clientDraft() });
       for (const [id, field] of [["shDl", "download"], ["shCm", "comments"]]) {
         dlg.querySelector("#" + id).onchange = async (e) => {
           try {

@@ -226,6 +226,7 @@ body { height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
 .lv-state.working, .lv-state.done { color: var(--ok); }
 .lv-state.working i { animation: pulse 1.6s ease-in-out infinite; }
 .lv-state.waiting { color: var(--warn); }
+.lv-state.paused { color: var(--warn); }
 .lv-title { font-size: 20px; font-weight: 700; line-height: 1.2; overflow-wrap: anywhere; }
 .lv-clock { flex: none; text-align: right; }
 .lv-clock div { font-size: 26px; font-weight: 700; line-height: 1.1; font-variant-numeric: tabular-nums; }

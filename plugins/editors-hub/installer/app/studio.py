@@ -24,6 +24,7 @@ Everything is plain Python (3.9+, no packages to install). ffmpeg is optional (u
     studio.py wait-new --project P | --style S  a client's or style's parent session listens for Make video; prints the video, then stops
     studio.py download-style <tag>              bring a style from the online Shared folder into this studio
     studio.py update <video> "<plain words>" [--snapshot <image or video>] [--at S]   show progress in the Live tab
+    studio.py pause <video> ["why"] / resume <video>   the edit stops for a while: the clock freezes, the pages say Paused
     studio.py beat <video> ["Rendering part 3"]   every few minutes while a long render runs: the Live clock keeps counting
     studio.py ask-render <video> [--note "..."] [--size WxH] [--fps N] [--duration S]   open the render popup, wait for the choice
     studio.py finish-render <video> <file> [--note "..."]   encode with the chosen settings and add it as the next draft
@@ -94,7 +95,7 @@ DATA = ROOT / "data"
 SETTINGS = DATA / "settings.json"
 PIDFILE = DATA / "server.pid"
 DEFAULT_PORT = 48100
-STATUSES = ["editing", "in review", "changes", "approved", "delivered"]
+STATUSES = ["editing", "paused", "in review", "changes", "approved", "delivered"]
 WINDOWS = os.name == "nt"
 LOCK = threading.RLock()
 OWNER_EMAIL = ""  # the owner, the only account that can do admin things, is whoever sets up this computer's studio first
@@ -748,7 +749,7 @@ def link_fixed_ids(v, draft, link_notes):
     return out
 
 
-def put_draft_on_link(vid, draft, user, job, download=None, comments=None, via_client=None):
+def put_draft_on_link(vid, draft, user, job, download=None, comments=None, via_client=None, client_draft=None):
     """Puts one draft on the video's link (made the first time, the same one after). Uses the upload made in the background
     when the draft arrived; waits for it if it's still going; sends it now if there's none. Runs inside a job."""
     v = load_video(vid)
@@ -764,6 +765,8 @@ def put_draft_on_link(vid, draft, user, job, download=None, comments=None, via_c
         job["stage"] = "Already uploaded: making the link"
     key = old.get("key")
     sets = {k: bool(val) for k, val in (("download", download), ("comments", comments)) if val is not None}
+    if client_draft:
+        sets["client_draft"] = int(client_draft)  # the number the client sees: "Draft 2"
     fixed = []
     if key and old.get("version") != draft["version"]:  # a newer draft: the comments it fixed get their tick
         try:
@@ -791,7 +794,8 @@ def put_draft_on_link(vid, draft, user, job, download=None, comments=None, via_c
                          "comments": link["comments"], "shared": now(), "by": (user or {}).get("email", ""),
                          "taken": old.get("taken", []) if same else [],
                          "via_client": old.get("via_client") if same else via_client,
-                         "qualities": ready.get("qualities") or [], "files": ready_files(ready)}
+                         "qualities": ready.get("qualities") or [], "files": ready_files(ready),
+                         **({"client_draft": link["client_draft"], "client_count": link.get("client_count")} if link.get("client_draft") else {})}
         save_video(fresh)
     prune_uploads(vid)
     return fresh["link"]
@@ -1053,7 +1057,20 @@ def ready_catch_up(force=False):
             pass
 
 
-def share_video(vid, user=None, version=None, download=None, comments=None):
+def client_number(n):
+    """The draft number the client sees, as the Share window sent it: 1 to 99, or None to leave it to the link."""
+    if n in (None, ""):
+        return None
+    try:
+        n = int(n)
+    except (TypeError, ValueError):
+        raise StudioError("The draft number the client sees has to be a number.")
+    if not 1 <= n <= 99:
+        raise StudioError("The draft number the client sees has to be between 1 and 99.")
+    return n
+
+
+def share_video(vid, user=None, version=None, download=None, comments=None, client_draft=None):
     """Puts a draft (the latest unless one is picked) on the video's link, making the link the first time. Same link after.
     A new draft doesn't go on it by itself: the owner checks it first, then picks it in the Share window."""
     v = manage_video_or_refuse(vid, user)
@@ -1062,9 +1079,9 @@ def share_video(vid, user=None, version=None, download=None, comments=None):
 
     def work(job):
         job["total_bytes"] = src.stat().st_size
-        return put_draft_on_link(vid, draft, user, job, download, comments)
+        return put_draft_on_link(vid, draft, user, job, download, comments, client_draft=client_draft)
     job = start_job("link", f"Sharing {v['name']} v{draft['version']}", user, work,
-                    again=lambda: share_video(vid, user, draft["version"], download, comments))
+                    again=lambda: share_video(vid, user, draft["version"], download, comments, client_draft))
     job["video"] = vid
     return job
 
@@ -2971,6 +2988,10 @@ def progress_of(v, draft):
     if p["since"] and ts - p["last"] > PROGRESS_IDLE:  # back after a long quiet spell: only the working time counts
         p["worked"] += p["last"] + PROGRESS_IDLE - p["since"]
         p["since"] = ts
+    if p.pop("paused", None) is not None:  # back from a pause: the clock starts again now
+        p["since"] = ts
+        if v.get("status") == "paused":
+            v["status"] = "editing"
     p["last"] = ts
     return p
 
@@ -3025,7 +3046,7 @@ def progress_clock(v):
     p = v.get("progress")
     if not p or p.get("finished"):
         return
-    waiting = (v.get("render_request") or {}).get("status") == "waiting" or (v.get("broll") or {}).get("stage") in BROLL_ASKING
+    waiting = (v.get("render_request") or {}).get("status") == "waiting" or (v.get("broll") or {}).get("stage") in BROLL_ASKING or bool(p.get("paused"))
     ts = time.time()
     if waiting and p["since"]:
         p["worked"] += min(ts, p["last"] + PROGRESS_IDLE) - p["since"]
@@ -3046,12 +3067,45 @@ def beat_video(vid, text=None):
         p = v.get("progress")
         if not p or p.get("finished"):
             return None
-        if not p.get("since"):
-            return p  # waiting for the owner's answer: the clock stays stopped
+        if not p.get("since") and not p.get("paused"):
+            return p  # waiting for the owner's answer: the clock stays stopped (a paused edit carries on)
         p = progress_of(v, p["draft"])
         p["busy"] = {"text": (str(text or "").strip() or "Rendering")[:60], "ts": time.time()}
         save_video(v)
     return p
+
+
+def pause_edit(vid, why=""):
+    """The edit stops for a while (the owner asked, or it waits for something): the clock freezes, Home and the review page
+    say Paused, and the Live tab says why. The edit's next update or beat carries on."""
+    why = str(why or "").strip()[:300]
+    with vlock(vid):
+        v = load_video(vid)
+        p = v.get("progress")
+        if not p or p.get("finished"):
+            raise StudioError("There's no edit on the clock to pause.")
+        if p.get("since"):
+            p["worked"] += min(time.time(), p["last"] + PROGRESS_IDLE) - p["since"]
+            p["since"] = None
+        p["paused"] = {"why": why, "at": now()}
+        p.pop("busy", None)
+        if v.get("status") not in LOCKED_STATUSES:
+            v["status"] = "paused"
+        save_video(v)
+    post_update(vid, f"Paused: {why}" if why else "Paused for now.")
+    return load_video(vid)["progress"]
+
+
+def resume_edit(vid, text=""):
+    with vlock(vid):
+        v = load_video(vid)
+        p = v.get("progress")
+        if not p or not p.get("paused"):
+            raise StudioError("This edit isn't paused.")
+        progress_of(v, p["draft"])
+        save_video(v)
+    post_update(vid, str(text or "").strip() or "Carrying on with the edit.")
+    return load_video(vid)["progress"]
 
 
 def running_programs():
@@ -3394,7 +3448,8 @@ def finish_render(vid, master, note=""):
         v = load_video(vid)
         v["render_request"].update(status="used", used_in=version)
         save_video(v)
-    final = Path(v["folder"]) / v["drafts"][-1]["file"]
+    made_draft = next((d for d in [*v["drafts"], v.get("incoming") or {}] if d.get("version") == version), None)  # still uploading: held in incoming
+    final = Path(v["folder"]) / made_draft["file"] if made_draft else None
     post_update(vid, f"Draft {version} is ready to review: {render['width']} × {render['height']}, {render['fps']:g} fps, "
                      f"{size_mb:.1f} MB.", final, (made.get("duration") or 0) / 2, version)
     return version, render
@@ -6578,7 +6633,7 @@ class Handler(BaseHTTPRequestHandler):
         if method == "POST" and parts[:2] == ["api", "videos"] and parts[3:] == ["rename"]:
             return self.send_json(rename_video(parts[2], body.get("name"), self.user))
         if method == "POST" and parts[:2] == ["api", "videos"] and parts[3:] == ["link"]:
-            return self.send_json(share_video(parts[2], self.user, body.get("version"), body.get("download"), body.get("comments")))
+            return self.send_json(share_video(parts[2], self.user, body.get("version"), body.get("download"), body.get("comments"), client_number(body.get("client_draft"))))
         if method == "POST" and parts[:2] == ["api", "videos"] and parts[3:] == ["link", "settings"]:
             return self.send_json({"link": set_video_link(parts[2], self.user, body.get("download"), body.get("comments"))})
         if method == "POST" and parts[:2] == ["api", "videos"] and parts[3:] == ["link", "pull"]:
@@ -7258,6 +7313,12 @@ def main(argv=None):
     up.add_argument("--step", default=None, help="the step you're on now")
     up.add_argument("--clip", action="append", default=[], help="a clip on a Live track, e.g. \"B-roll:10-17\" (seconds); use it as many times as you need")
     up.add_argument("--clear-track", action="append", default=[], help="empty a Live track first, when you've redone it")
+    pz = sub.add_parser("pause")
+    pz.add_argument("video")
+    pz.add_argument("why", nargs="?", default="")
+    rz = sub.add_parser("resume")
+    rz.add_argument("video")
+    rz.add_argument("text", nargs="?", default="")
     bt = sub.add_parser("beat")
     bt.add_argument("video")
     bt.add_argument("text", nargs="?", default="")
@@ -7419,6 +7480,12 @@ def main(argv=None):
             gaps = progress_gaps(load_video(a.video))
             if gaps:
                 print("Live is still missing, so send these with your next update:\n" + "\n".join(f"- {g}" for g in gaps))
+        elif a.cmd == "pause":
+            pause_edit(a.video, a.why)
+            print("Paused: the Live clock is stopped and the page says Paused. Your next update or beat carries on.")
+        elif a.cmd == "resume":
+            resume_edit(a.video, a.text)
+            print("Carrying on: the Live clock is counting again.")
         elif a.cmd == "beat":
             p = beat_video(a.video, a.text)
             print("The Live clock keeps counting." if p and p.get("since") else "Nothing to keep going: this draft's edit isn't on the clock.")

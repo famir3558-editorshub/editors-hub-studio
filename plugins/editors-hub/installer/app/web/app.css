@@ -106,6 +106,7 @@ label.field small { font-weight: 400; color: var(--faint); }
 .pill { display: inline-flex; align-items: center; gap: 6px; padding: 3px 9px; border-radius: 999px; font-size: 11.5px; font-weight: 600; text-transform: capitalize; background: rgba(255, 255, 255, 0.08); color: var(--muted); }
 .pill::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
 .s-editing { color: var(--blue); background: rgba(143, 179, 255, 0.12); }
+.s-paused { color: var(--warn); background: rgba(251, 191, 36, 0.13); }
 .s-in-review { color: var(--red-2); background: rgba(229, 25, 43, 0.16); }
 .s-changes { color: var(--warn); background: rgba(251, 191, 36, 0.13); }
 .s-approved { color: var(--ok); background: rgba(52, 211, 153, 0.13); }
@@ -263,6 +264,14 @@ dialog.share { width: min(520px, calc(100vw - 32px)); }
 .share-link input { flex: 1; min-width: 0; font-size: 13px; }
 .share-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; font-size: 14px; }
 .share-row select { width: auto; }
+.share-row-end { justify-content: flex-end; }
+.share-drafts { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.share-drafts label { display: flex; flex-direction: column; gap: 6px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; font-size: 13px; }
+.share-drafts label > span:first-child { color: var(--muted); font-weight: 600; font-size: 12px; }
+.share-drafts select { width: 100%; }
+.share-num { display: flex; align-items: center; gap: 8px; font-weight: 700; }
+.share-num input { width: 70px; }
+@media (max-width: 520px) { .share-drafts { grid-template-columns: 1fr; } }
 .share-opt { display: flex; gap: 14px; align-items: center; justify-content: space-between; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; cursor: pointer; }
 .share-opt b { display: block; font-size: 14px; }
 .share-opt small { color: var(--muted); font-size: 12.5px; }
