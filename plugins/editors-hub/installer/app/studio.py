@@ -1854,6 +1854,15 @@ def video_preview(v):
     return f"raw/{clips[0]}" if clips else ""
 
 
+def library_space():
+    """How full the library's drive is, for Home's overview."""
+    try:
+        u = shutil.disk_usage(library())
+        return {"total": u.total, "free": u.free, "drive": str(library().anchor or library())}
+    except OSError:
+        return None
+
+
 def video_summary(v, styles=None, projects=None):
     latest = latest_version(v)
     sdir = (style_dirs() if styles is None else styles).get(v["style"])
@@ -1870,7 +1879,8 @@ def video_summary(v, styles=None, projects=None):
             "open_notes": sum(1 for n in v["notes"] if not n["done"] and n["version"] == latest),
             "thumb": (Path(v["folder"]) / "thumb.jpg").exists(), "preview": video_preview(v), "style_shared": style_meta(sdir)["shared"] if sdir else False,
             "render_waiting": (v.get("render_request") or {}).get("status") == "waiting",
-            "broll_waiting": (v.get("broll") or {}).get("stage") in BROLL_ASKING}
+            "broll_waiting": (v.get("broll") or {}).get("stage") in BROLL_ASKING,
+            "progress": {k: (v.get("progress") or {}).get(k) for k in ("draft", "worked", "since", "last", "step", "steps", "paused", "busy", "finished")} if v.get("progress") else None}
 
 
 PREVIEW_FRAMES = 12
@@ -6847,7 +6857,7 @@ class Handler(BaseHTTPRequestHandler):
         me = accounts().public(self.user)
         visible = ("studio_name", "your_name", "library", "ready_share", "link_copies") if me["role"] == "owner" else ("studio_name",)
         return {"can_effects": can_remove_effects(self.user), "me": me, "version": APP_VERSION, "approval": approval.status(DATA), "alone": not approval.open_to_others(DATA), "report": self.report_mode(), "updated": update_to_tell(me["email"]), "settings": {k: s[k] for k in visible},
-                "projects": projects, "styles": styles, "videos": videos, "statuses": STATUSES,
+                "projects": projects, "styles": styles, "videos": videos, "statuses": STATUSES, "disk": library_space(),
                 "platform": "windows" if WINDOWS else "mac" if sys.platform == "darwin" else "linux"}
 
     def receive(self, folder, name, limit=20_000_000_000):

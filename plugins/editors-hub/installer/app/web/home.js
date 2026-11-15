@@ -48,6 +48,8 @@ function render() {
     ["Approved", count("approved")],
   ].map(([label, n, hot]) => `<div class="sl${hot ? " hot" : ""}"><b>${n}</b><span>${label}</span></div>`).join("");
 
+  $("overview").innerHTML = overviewHtml();
+
   $("statusChips").innerHTML = ["all", ...statuses].map((s) =>
     `<button class="chip${S.status === s ? " on" : ""}" data-status="${esc(s)}">${esc(s)}<em>${s === "all" ? listed.length : countListed(s)}</em></button>`).join("");
   $("projectFilter").innerHTML = `<option value="">All clients</option>` +
@@ -161,8 +163,9 @@ function videoCard(v) {
   const tools = S.state.me.role === "reviewer" ? "" : `<span class="card-tools">
       <button type="button" class="card-tool" data-video-folder="${esc(v.id)}" title="Open its folder" aria-label="Open its folder">${FOLDER_ICON}</button>
       <button type="button" class="card-tool" data-menu data-video-menu="${esc(v.id)}" title="More" aria-label="More">⋯</button></span>`;
+  const fill = v.thumb ? `<span class="thumb-fill" style="background-image:url('/media/${enc(v.id)}/thumb.jpg?${enc(v.updated)}')"></span>` : "";  // Aurora: a blurred copy fills the sides
   return `<a class="card" href="/review/${enc(v.id)}"${previewAttr(v)}>
-    <div class="thumb">${thumb}<span class="pill ${statusClass(v.status)}">${esc(v.status)}</span>${tools}${v.latest ? `<span class="ver">v${v.latest}</span>` : ""}</div>
+    <div class="thumb">${fill}${thumb}<span class="pill ${statusClass(v.status)}">${esc(v.status)}</span>${tools}${v.latest ? `<span class="ver">v${v.latest}</span>` : ""}</div>
     <div class="body"><div class="title">${esc(v.name)}</div>
       <div class="meta">${v.project_name ? esc(v.project_name) + " · " : ""}${esc(v.style_name)}${v.latest ? "" : " · no draft yet"}${notes}</div>
       <div class="meta faint">Updated ${ago(v.updated)}</div></div></a>`;
@@ -187,7 +190,11 @@ function emptyVideos(listed) {
 
 function projectCard(p) {
   const initials = p.name.replace(/[^\p{L}\p{N}\s]/gu, "").split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join("").toUpperCase();
-  return `<div class="card" data-project="${esc(p.id)}">
+  // a strip of the client's newest video pictures, so each client is easy to spot
+  const pics = (S.state.videos || []).filter((v) => v.project === p.id && v.thumb).sort((a, b) => (a.updated < b.updated ? 1 : -1)).slice(0, 4);
+  const strip = pics.length ? `<div class="pc-preview n${pics.length}">${pics.map((v) => `<img src="/media/${enc(v.id)}/thumb.jpg?${enc(v.updated)}" alt="" loading="lazy" title="${esc(v.name)}">`).join("")}</div>`
+    : `<div class="pc-preview none"><span>${esc(initials)}</span><small>No video pictures yet</small></div>`;
+  return `<div class="card" data-project="${esc(p.id)}">${strip}
     <div class="row"><div class="badge">${esc(initials)}</div><div><h3>${esc(p.name)}</h3><div class="faint">${esc(p.contact || "Client")}</div></div></div>
     <div class="notes">${esc(p.about || "No details about this client yet.")}</div>
     <div class="row"><span class="muted">${p.videos} video${p.videos === 1 ? "" : "s"} · ${p.brand_files} brand file${p.brand_files === 1 ? "" : "s"}</span><div class="spacer"></div>
@@ -1400,3 +1407,56 @@ function openClientShareDialog(pid) {
   aurora.addEventListener("change", save);
   motion.addEventListener("change", save);
 })();
+
+// ---- Home's overview (the Aurora look's tiles): what's in review, the edit going on now, what needs you, clients, the drive.
+// Every tile only links to what's already in the studio; nothing here replaces a tab or a button.
+const fmtClock = (s) => { s = Math.max(0, Math.floor(s)); const h = Math.floor(s / 3600), m = Math.floor(s / 60) % 60, x = s % 60; return `${h ? h + ":" : ""}${String(m).padStart(2, "0")}:${String(x).padStart(2, "0")}`; };
+const workedNow = (p) => (p.worked || 0) + (p.since ? Math.max(0, Math.min(Date.now() / 1000, (p.last || 0) + 1800) - p.since) : 0);
+const ringSvg = (pct, id) => `<svg viewBox="0 0 100 100" aria-hidden="true"><defs><linearGradient id="${id}" x1="0" x2="1"><stop offset="0" stop-color="#ff5a66"/><stop offset="1" stop-color="#8a0b18"/></linearGradient></defs><circle cx="50" cy="50" r="42" fill="none" stroke="rgba(255,255,255,.09)" stroke-width="9"/><circle cx="50" cy="50" r="42" fill="none" stroke="url(#${id})" stroke-width="9" stroke-linecap="round" stroke-dasharray="${(2 * Math.PI * 42 * Math.max(0.02, Math.min(1, pct))).toFixed(1)} 400" transform="rotate(-90 50 50)"/></svg>`;
+function overviewHtml() {
+  const st = S.state;
+  if (!st || st.me.role === "reviewer") return "";
+  const vids = st.videos.filter((v) => v.project);
+  const byNew = (a, b) => (a.updated < b.updated ? 1 : -1);
+  const review = vids.filter((v) => v.status === "in review" && v.thumb).sort((a, b) => (b.open_notes - a.open_notes) || byNew(a, b))[0] || vids.filter((v) => v.thumb).sort(byNew)[0];
+  const live = st.videos.filter((v) => v.progress && !v.progress.finished && (v.status === "editing" || v.status === "paused")).sort((a, b) => ((b.progress.last || 0) - (a.progress.last || 0)))[0];
+  const tiles = [];
+  if (review) {
+    tiles.push(`<a class="ov-tile ov-hero" href="/review/${enc(review.id)}"><img src="/media/${enc(review.id)}/thumb.jpg?${enc(review.updated)}" alt="">
+      <span class="ov-play" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M8 5.5v13l10.5-6.5z"/></svg></span>
+      <span class="ov-over"><span class="ov-tags"><span class="pill ${statusClass(review.status)}">${esc(review.status)}</span>${review.latest ? `<span class="pill">v${review.latest}</span>` : ""}${review.open_notes ? `<span class="pill s-paused">${review.open_notes} open note${review.open_notes > 1 ? "s" : ""}</span>` : ""}</span>
+      <b>${esc(review.name)}</b><small>${esc(review.project_name)} · ${esc(review.style_name)}</small></span></a>`);
+  }
+  if (live) {
+    const p = live.progress, steps = p.steps || [], at = steps.indexOf(p.step), pct = steps.length ? (at + (p.since ? 0.5 : 0)) / steps.length : 0.1;
+    tiles.push(`<a class="ov-tile ov-live" href="/review/${enc(live.id)}#live"><span class="ov-ring">${ringSvg(pct, "ovr")}<b><span data-live-clock="${esc(live.id)}">${fmtClock(workedNow(p))}</span><small>time worked</small></b></span>
+      <span class="ov-live-text"><span class="ov-state ${p.paused ? "paused" : p.since ? "" : "waiting"}"><i></i>${p.paused ? `Paused${p.paused.why ? ": " + esc(p.paused.why) : ""}` : p.busy ? esc(p.busy.text) + "…" : p.since ? `Editing · ${esc(p.step || "starting")}` : "Waiting for you"}</span>
+      <b>${esc(live.name)}</b><span class="ov-steps">${steps.map((s, i) => `<span class="${i < at ? "d" : i === at ? "n" : ""}">${esc(s)}</span>`).join("")}</span></span></a>`);
+  }
+  const notes = vids.reduce((n, v) => n + (v.open_notes || 0), 0), renders = st.videos.filter((v) => v.render_waiting), broll = st.videos.filter((v) => v.broll_waiting), changes = st.videos.filter((v) => v.status === "changes");
+  const needs = [
+    ...renders.map((v) => [`/review/${enc(v.id)}`, "Choose the render settings", v.name]),
+    ...broll.map((v) => [`/review/${enc(v.id)}`, "Pick the b-roll", v.name]),
+    ...vids.filter((v) => v.open_notes).sort(byNew).slice(0, 3).map((v) => [`/review/${enc(v.id)}`, `${v.open_notes} open note${v.open_notes > 1 ? "s" : ""}`, v.name]),
+    ...changes.slice(0, 2).map((v) => [`/review/${enc(v.id)}`, "Changes asked for", v.name]),
+  ].slice(0, 5);
+  tiles.push(`<div class="ov-tile ov-needs"><h4>Needs you<em>${renders.length + broll.length + notes + changes.length}</em></h4>${needs.length ? needs.map(([href, what, name]) => `<a href="${href}"><b>${esc(what)}</b><small>${esc(name)}</small></a>`).join("") : `<p class="muted">Nothing waiting. Every note is done.</p>`}</div>`);
+  const clients = st.projects.slice().sort((a, b) => b.videos - a.videos).slice(0, 5);
+  if (clients.length) {
+    tiles.push(`<div class="ov-tile ov-clients"><h4>Clients<em>${st.projects.length}</em></h4>${clients.map((p) => {
+      const pv = vids.filter((v) => v.project === p.id), rv = pv.filter((v) => v.status === "in review").length;
+      const ini = p.name.replace(/[^\p{L}\p{N}\s]/gu, "").split(/\s+/).filter(Boolean).slice(0, 2).map((w) => w[0]).join("").toUpperCase();
+      return `<a href="/project/${enc(p.id)}"><span class="badge">${esc(ini)}</span><b>${esc(p.name)}</b><small>${rv ? rv + " in review" : pv.length + " video" + (pv.length === 1 ? "" : "s")}</small></a>`; }).join("")}</div>`);
+  }
+  if (st.disk && st.disk.total) {
+    const used = 1 - st.disk.free / st.disk.total;
+    tiles.push(`<div class="ov-tile ov-disk"><span class="ov-ring small">${ringSvg(used, "ovd")}<b>${Math.round(used * 100)}%</b></span><span><b>Library drive</b><small>${(st.disk.free / 1e9).toFixed(0)} GB free on ${esc(st.disk.drive)}</small></span></div>`);
+  }
+  return tiles.join("");
+}
+setInterval(() => {  // the edit's clock ticks on Home
+  document.querySelectorAll("[data-live-clock]").forEach((el) => {
+    const v = (S.state?.videos || []).find((x) => x.id === el.dataset.liveClock);
+    if (v && v.progress) el.textContent = fmtClock(workedNow(v.progress));
+  });
+}, 1000);
