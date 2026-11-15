@@ -97,6 +97,19 @@ def ed25519_verify(public, message, signature):
 _checked = {}  # a pass already checked needn't be worked out again on every page load
 
 
+def latest_version():
+    """The newest published studio, as the service says (None when there's no service or it can't be asked)."""
+    c = config()
+    if not c:
+        return None
+    req = urllib.request.Request(c["url"].rstrip("/") + "/version", headers={"User-Agent": "Editors.Hub"})
+    try:
+        with urllib.request.urlopen(req, timeout=15) as r:
+            return json.loads(r.read() or b"{}").get("version")
+    except (urllib.error.URLError, OSError, ValueError):
+        return None
+
+
 def config():
     try:
         data = json.loads(CONFIG.read_text(encoding="utf-8"))

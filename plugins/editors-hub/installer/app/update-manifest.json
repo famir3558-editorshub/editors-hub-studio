@@ -1,8 +1,8 @@
 {
-"version": "1.34.1",
+"version": "1.34.2",
 "files": {
 "approval-service.json": "5fbc80d9bce24d1de021f328df110e8957c35ad0bf10b8d143af9865820cda86",
-"approval.py": "46dd08f09831d63484e0e9ac674db6bab561900a313da9aad5dd83e60a047f19",
+"approval.py": "3c3348ec7389a211425e1619b6603d694ca37f98580e99d3763dfcd9e97ae373",
 "auth.py": "e456419959c2a244cdf511e3b084ac008a0822651e39028cc489c4d324d06414",
 "Editors.Hub.bat": "b028cd1cfcff54562c9094b9a5eb04d1c205b5279699339b2a8037bcab9c5278",
 "Editors.Hub.command": "a7a12b2401eada2a19b800aa31b888373efde3f52c1c746b6dbf7661ce83113e",
@@ -749,9 +749,9 @@
 "skills/youtube-clips/setup/SETUP.md": "c94401cce3da40a4c254de4c6443389df3a0fee8784e37489e6794fff5f1efe4",
 "skills/youtube-clips/setup/SHARED-SETUP.md": "8675064726241ddc8f19a715fff7cf16ea1b955dbd589d34df551a0f081159d2",
 "skills/youtube-clips/SKILL.md": "c6ef731482a70f87b951eb5312e2118fee0148fee78a5ee7c238e4dbe871e5e8",
-"studio.py": "fa33b12fdb3f45553d430c3f5f35d866be1154ae96f06b2efea4aee676193e9a",
+"studio.py": "0cdbb7339e836f5f31b936c8e6b299332aceca648d71326fc28e8b84be459c2e",
 "updater.py": "899c734ab2f79b3f41402cb755d80c977f5de29419660df739a3fb81a0da475d",
-"VERSION": "210e4a149bd3d10c7a63d256dc4be109aeab8cfd6daa9453b64fdf1e0c1a9a46",
+"VERSION": "4aaf2c1aeb8b241959c39b6d957c46cef7d5ac126f804ec621289cb999d174d0",
 "web/app.css": "0db104436bb7f57b7d90521a52bf01e3a3b6ec76d33e20572041f33aa68661bf",
 "web/app.js": "31ead91ce64c55023d947a136d561e448a81589c8b19c702f1573d8740966e8f",
 "web/approve.html": "288e467211c78407edc4e4f3a40e9fc5c703c58439d3630bc0bcffc6119142b7",

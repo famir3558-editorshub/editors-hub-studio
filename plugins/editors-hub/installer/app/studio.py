@@ -7079,11 +7079,29 @@ def spawn_detached(*args):
     subprocess.Popen([sys.executable, *args], **kwargs)
 
 
+def newer_version(theirs, ours):
+    """Whether version theirs (e.g. "1.34.2") is newer than ours."""
+    try:
+        return tuple(int(x) for x in str(theirs).split(".")) > tuple(int(x) for x in str(ours).split("."))
+    except (TypeError, ValueError):
+        return False
+
+
+UPDATE_ASK = 60       # seconds between asking the service for the newest version
+UPDATE_RETRY = 600    # after fetching one that GitHub didn't hand over yet, try again this long after
+
+
 def watch_for_updates():
-    """Looks for a new version now and then, and restarts Home onto one once nothing is being copied or uploaded."""
+    """Looks for a new version every hour, and once a minute asks the service whether one was published (so a release
+    reaches every studio within about a minute); restarts Home onto it once nothing is being copied or uploaded."""
     updater = str(ROOT / "updater.py")
-    next_look = 0
+    next_look = next_ask = 0
     while True:
+        if time.time() >= next_ask:
+            next_ask = time.time() + UPDATE_ASK
+            newest = approval.latest_version()
+            if newest and newer_version(newest, APP_VERSION) and next_look - time.time() <= 3600 - UPDATE_RETRY:
+                next_look = 0  # a release is out: fetch it now (not again for a while if GitHub hasn't caught up)
         if time.time() >= next_look:
             next_look = time.time() + 3600
             spawn_detached(updater)
