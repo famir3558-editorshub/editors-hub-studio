@@ -164,7 +164,15 @@
       <label class="row toggle-row"><span><b>Aurora look</b><br><small class="muted">Frosted glass over black with a slow red glow, pill buttons and glowing status lights. Off: the classic look. Every page and option is the same either way. Kept in this browser.</small></span><span class="spacer"></span><span class="switch"><input type="checkbox" id="lookAurora"><span></span></span></label>
       <label class="row toggle-row"><span><b>Moving background</b><br><small class="muted">The red glow drifts slowly behind the pages. Off: it stays still.</small></span><span class="spacer"></span><span class="switch"><input type="checkbox" id="lookMotion"><span></span></span></label>
     </div>
-    <form class="panel settings" id="settingsForm" data-owner hidden>
+    <div class="panel settings" id="phonePanel" data-owner hidden>
+      <div class="row"><h3>Phone notifications</h3><div class="spacer"></div><button class="btn small primary" type="button" id="phoneConnect">Connect a phone</button></div>
+      <p class="muted">Client comments, drafts ready, uploads, what needs you and everything in your bell, as notifications on your phone's lock screen, even with the studio closed for client comments. Works on iPhone (add it to the Home Screen from Safari) and Android.</p>
+      <div class="phone-pair" id="phonePair" hidden>
+        <div class="phone-qr" id="phoneQr"></div>
+        <div><p><b>Scan this with your phone's camera</b>, or open <b id="phoneUrl"></b> on your phone and type the code:</p><div class="code-big" id="phoneCode"></div><p class="faint" id="phoneLeft">It works once, for 10 minutes.</p></div>
+      </div>
+    </div>
+
       <label class="field">Library folder <small>Where styles and videos are kept. Use an external drive if your footage is big. Styles already made stay in the old folder; move them yourself if you change this.</small><input name="library"></label>
       <label class="row toggle-row"><span><b>Upload drafts before they show</b><br><small class="muted">When a client video's draft is rendered, it's uploaded to your Drive first and shows once that's done, so Share is instant. The latest draft and the two before it stay uploaded; once the video is approved, only the approved one. Style videos are never uploaded.</small></span><span class="spacer"></span><span class="switch"><input type="checkbox" name="ready_share" id="readyShare"><span></span></span></label>
       <label class="row toggle-row"><span><b>Smaller quality copies on review links</b><br><small class="muted">Off: a link plays and downloads only the video as it was rendered, which uploads fastest and uses the least Drive space. On: the studio also makes and uploads 1080p, 720p and 480p copies, so the client's player gets a quality menu.</small></span><span class="spacer"></span><span class="switch"><input type="checkbox" name="link_copies" id="linkCopies"><span></span></span></label>

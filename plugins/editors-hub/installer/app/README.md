@@ -97,6 +97,12 @@ and you get new options for just those, or say **All b-roll is good**, and it wo
 Options come from your own footage, free sites such as Pexels, Pixabay and Mixkit, and Envato if you've signed in to your own account in the Claude app's
 built-in browser. No account comes with the studio: each person signs in with their own.
 
+## On your phone
+
+**Settings > Phone notifications > Connect a phone** shows a QR code: scan it with your phone, add Editors.Hub to the Home Screen (iPhone: Safari's Share > Add to Home Screen; Android: Chrome's Install app), open it and turn notifications on. Client comments, a client approving a draft or asking for changes, drafts ready, uploads, what needs you, problems and everything else in your bell then come to your phone's notification centre, and the app's Inbox keeps them all. Each kind can be turned off in the app.
+
+Your client's review link has **Approve this draft** and **Request changes**. Their answer comes into the studio by itself: the video is approved at that draft, or set to Changes with their note as a comment.
+
 ## The look
 
 The studio has the **Aurora** look: frosted glass over black with a slow red glow behind the pages, pill buttons and glowing status lights. **Settings > Look** turns it off for the classic look, or keeps it and stops the glow moving. In Aurora, Home's tabs float in a dock at the bottom, and Home opens with tiles: the video waiting for review, the edit going on now with its clock, what needs you, your clients and the drive's space. It's kept per browser, and every page and option is the same in both looks. Client cards on the Projects tab, and style cards on My styles, show a strip of their video pictures (a style no video uses yet shows its references).

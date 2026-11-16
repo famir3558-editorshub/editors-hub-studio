@@ -1464,3 +1464,33 @@ setInterval(() => {  // the edit's clock ticks on Home
     if (v && v.progress) el.textContent = fmtClock(workedNow(v.progress));
   });
 }, 1000);
+
+// Settings > Phone notifications: a code and a QR code that connect the owner's phone (10 minutes, once)
+(function phoneConnect() {
+  const btn = $("phoneConnect");
+  if (!btn) return;
+  const qrLib = () => new Promise((ok) => {
+    if (window.QRCode) return ok(true);
+    const s = document.createElement("script");
+    s.src = "https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js";
+    s.onload = () => ok(true); s.onerror = () => ok(false);
+    document.head.appendChild(s);
+  });
+  btn.addEventListener("click", async () => {
+    btn.disabled = true;
+    try {
+      const r = await api("POST", "/api/phone/pair", {});
+      $("phonePair").hidden = false;
+      $("phoneCode").textContent = r.code.slice(0, 4) + " " + r.code.slice(4);
+      $("phoneUrl").textContent = r.url.split("#")[0];
+      $("phoneQr").innerHTML = "";
+      if (await qrLib()) new window.QRCode($("phoneQr"), { text: r.url, width: 200, height: 200, colorDark: "#000000", colorLight: "#ffffff" });
+      else $("phoneQr").hidden = true;
+      btn.textContent = "Make a new code";
+    } catch (e) {
+      toast(e.message, true);
+    } finally {
+      btn.disabled = false;
+    }
+  });
+})();

@@ -1261,6 +1261,32 @@ def video_link_off(vid, user=None):
     return None
 
 
+def link_decision(vid, link, said):
+    """The client's answer on the link, for the draft it shows: Approve approves that draft here; Request changes sets the
+    video to Changes. Each answer counts once. Returns whether one was taken in."""
+    d = said.get(f"v{link.get('version')}")
+    if not d or d.get("at") == link.get("decided"):
+        return False
+    try:
+        if d.get("decision") == "approve":
+            if load_video(vid).get("status") not in LOCKED_STATUSES:
+                approve(vid, link["version"])
+        elif d.get("decision") == "changes":
+            with vlock(vid):
+                v = load_video(vid)
+                if v.get("status") not in LOCKED_STATUSES:
+                    v["status"] = "changes"
+                    save_video(v)
+    except StudioError:
+        pass
+    with vlock(vid):
+        v = load_video(vid)
+        if v.get("link", {}).get("key") == link["key"]:
+            v["link"]["decided"] = d.get("at")
+            save_video(v)
+    return True
+
+
 def pull_link_notes(vid):
     """New comments from the video's link become notes on the draft they were left on. On an approved video they wait."""
     v = load_video(vid)
@@ -1269,11 +1295,14 @@ def pull_link_notes(vid):
         return 0
     _link_pulled[vid] = time.time()
     try:
-        notes = approval.shared_call(DATA, "/links/notes", key=link["key"])["notes"]
+        got = approval.shared_call(DATA, "/links/notes", key=link["key"])
+        notes, said = got["notes"], got.get("decisions") or {}
     except approval.ApprovalError as e:
         if link_gone(e):
             drop_video_link(vid)
         return 0
+    link_decision(vid, link, said)
+    v = load_video(vid)
     taken = set(link.get("taken", []))
     fresh = [n for n in notes if n.get("id") not in taken]
     if not fresh or v.get("status") in LOCKED_STATUSES:
@@ -4007,6 +4036,87 @@ def notify_mark_seen(user, at=None):
         write_json(file, seen)
 
 
+# ---- the phone app: every new item in the owner's bell goes to their phone (through the service), once each
+PHONE_SENT = "phone-sent.json"
+PHONE_EVERY = 30
+PHONE_KINDS = {"draft": "draft", "ok": "studio", "learn": "studio", "studio": "studio", "note": "comment", "job": "upload"}
+
+
+def phone_pair(user):
+    """A code (and an address with it, for a QR code) that connects a phone to this studio's owner for 10 minutes."""
+    if user is None or user["role"] != "owner":
+        raise auth.Forbidden("Only the studio's owner can connect a phone.")
+    try:
+        got = approval.shared_call(DATA, "/app/pair-start")
+    except approval.ApprovalError as e:
+        raise StudioError(str(e))
+    with LOCK:
+        s = settings()
+        if not s.get("phone"):
+            s["phone"] = True
+            write_json(SETTINGS, s)
+    return got
+
+
+def phone_kind(item):
+    if item.get("icon") == "warn":
+        return "problem" if re.search(r"fail|couldn't|could not|gone|stopped|error", item.get("text", ""), re.I) else "needs"
+    return PHONE_KINDS.get(item.get("icon"), "studio")
+
+
+def phone_link_comment(item):
+    """A note brought in from a review link: the service already told the phone when the client wrote it."""
+    parts = str(item.get("id", "")).split(":")
+    if parts[0] != "note" or len(parts) < 3:
+        return False
+    try:
+        v = load_video(parts[1])
+    except StudioError:
+        return False
+    return any(str(n.get("id")) == parts[2] and n.get("link_note") for n in v.get("notes", []))
+
+
+def phone_sync():
+    """Sends the owner's new bell items to their phone. The first time, what's already there is only remembered."""
+    s = settings()
+    if not s.get("phone") or not approval.config():
+        return 0
+    owner = accounts().find(s.get("owner_email") or OWNER_EMAIL)
+    if not owner:
+        return 0
+    bell = notifications({**owner, "role": "owner"})
+    items = bell["needs"] + bell["recent"]
+    path = DATA / PHONE_SENT
+    sent = read_json(path, None)
+    if sent is None:
+        write_json(path, {"ids": [i["id"] for i in items]})
+        return 0
+    known, n = set(sent.get("ids", [])), 0
+    for item in reversed(items):  # oldest first, so the phone's inbox keeps their order
+        if item["id"] in known:
+            continue
+        known.add(item["id"])
+        if phone_link_comment(item):
+            continue
+        try:
+            approval.shared_call(DATA, "/app/event", kind=phone_kind(item), title=item.get("text", ""), text=item.get("sub", ""), group=str(item["id"]).split(":")[0])
+            n += 1
+        except approval.ApprovalError:
+            known.discard(item["id"])  # the service can't be reached: try again next time
+            break
+    write_json(path, {"ids": list(known)[-800:]})
+    return n
+
+
+def phone_watch():
+    while True:
+        try:
+            phone_sync()
+        except Exception:
+            pass
+        time.sleep(PHONE_EVERY)
+
+
 def notifications(user=None):
     maker = user is None or user["role"] != "reviewer"
     needs, working, recent = [], [], []
@@ -4063,7 +4173,7 @@ def notifications(user=None):
                 needs.append({"id": f"job:{j['id']}", "icon": "warn", "text": j.get("title") or "Something didn't finish", "sub": str(j.get("message") or "")[:120]})
     try:
         version_file = Path(__file__).resolve().parent / "VERSION"
-        recent.append({"id": "studio", "icon": "studio", "text": f"The studio updated to {version_file.read_text(encoding='utf-8').strip()}", "at": time.strftime("%Y-%m-%dT%H:%M:%S", time.localtime(version_file.stat().st_mtime))})
+        recent.append({"id": f"studio:{version_file.read_text(encoding='utf-8').strip()}", "icon": "studio", "text": f"The studio updated to {version_file.read_text(encoding='utf-8').strip()}", "at": time.strftime("%Y-%m-%dT%H:%M:%S", time.localtime(version_file.stat().st_mtime))})
     except OSError:
         pass
     if can_remove_effects(user) and approval.config():  # the real owner, not someone else's copy of the studio
@@ -6720,6 +6830,8 @@ class Handler(BaseHTTPRequestHandler):
                 raise StudioError("links has to be a list")
             return self.send_json(create_style(body.get("name", ""), body.get("client", ""), body.get("notes", ""),
                                                self.user, body.get("format", ""), links))
+        if method == "POST" and parts == ["api", "phone", "pair"]:
+            return self.send_json(phone_pair(self.user))
         if method == "POST" and parts[:2] == ["api", "jobs"] and parts[3:] == ["stop"]:
             return self.send_json(stop_job(parts[2], self.user))
         if method == "POST" and parts[:2] == ["api", "jobs"] and parts[3:] == ["pause"]:
@@ -7162,6 +7274,7 @@ def serve(port):
     threading.Thread(target=learn_watch, daemon=True).start()
     threading.Thread(target=link_watch, daemon=True).start()
     threading.Thread(target=live_watch, daemon=True).start()
+    threading.Thread(target=phone_watch, daemon=True).start()
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:
