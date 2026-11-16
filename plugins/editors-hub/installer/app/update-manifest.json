@@ -1,5 +1,5 @@
 {
-"version": "1.35.1",
+"version": "1.35.2",
 "files": {
 "approval-service.json": "5fbc80d9bce24d1de021f328df110e8957c35ad0bf10b8d143af9865820cda86",
 "approval.py": "3c3348ec7389a211425e1619b6603d694ca37f98580e99d3763dfcd9e97ae373",
@@ -8,7 +8,7 @@
 "Editors.Hub.command": "a7a12b2401eada2a19b800aa31b888373efde3f52c1c746b6dbf7661ce83113e",
 "hubsetup.py": "422e2a8212bbc8313a4a135eb4b17662b10647d0a5cef047e6cc3ba7095b4e68",
 "keys.py": "e0716cefcec92782f4f660ee513e712131a8336f7f6c5826ed0c9eace449f46d",
-"README.md": "03ad02b82cca0a6d9fa601370d4e9e12690b2f15f9425cab5f36241a941fe054",
+"README.md": "41cfda79dc6a0ca8dcddfa5d50921ab0fc2baf719015a30b436293e7d979264e",
 "skills/broll-stacked-text-edit/assets/fonts/PlayfairDisplay-Italic.ttf": "66f68e2ec819f94126719ec65107dd3613338d28db2c4822a2902140afd1762c",
 "skills/broll-stacked-text-edit/references/text-reference.md": "c9d688b553901026695a61b080dc7db01e1f2027003c8a83ac2a3e792c854bb6",
 "skills/broll-stacked-text-edit/scripts/01_prep.py": "fdeae28cd67f3f583997424818848c782e2d931b795044917c21d38fc83802d0",
@@ -749,9 +749,9 @@
 "skills/youtube-clips/setup/SETUP.md": "c94401cce3da40a4c254de4c6443389df3a0fee8784e37489e6794fff5f1efe4",
 "skills/youtube-clips/setup/SHARED-SETUP.md": "8675064726241ddc8f19a715fff7cf16ea1b955dbd589d34df551a0f081159d2",
 "skills/youtube-clips/SKILL.md": "c6ef731482a70f87b951eb5312e2118fee0148fee78a5ee7c238e4dbe871e5e8",
-"studio.py": "58880980df2575c0c1133229b56080e881d586e5080a680f33edb4c3dcd32999",
+"studio.py": "2914423af51a19adda3a53f184d437c88ab9ba1893104d2dcb948eed378b6d48",
 "updater.py": "899c734ab2f79b3f41402cb755d80c977f5de29419660df739a3fb81a0da475d",
-"VERSION": "f94faeb30d3276f949866dfe7b9adcda39209d70ab07dec59a88452688468850",
+"VERSION": "6ff9376f0b447b2897eaaf9580f0476547444c57fa4df88799c847c644c013e0",
 "web/app.css": "0db104436bb7f57b7d90521a52bf01e3a3b6ec76d33e20572041f33aa68661bf",
 "web/app.js": "31ead91ce64c55023d947a136d561e448a81589c8b19c702f1573d8740966e8f",
 "web/approve.html": "288e467211c78407edc4e4f3a40e9fc5c703c58439d3630bc0bcffc6119142b7",

@@ -1261,6 +1261,29 @@ def video_link_off(vid, user=None):
     return None
 
 
+def sync_link_changes(vid, notes):
+    """A comment its writer edited or deleted on the link: its note here follows, while the note isn't done yet."""
+    on_link = {n.get("id"): n for n in notes}
+    with vlock(vid):
+        v = load_video(vid)
+        if v.get("status") in LOCKED_STATUSES:
+            return
+        changed = False
+        for n in list(v["notes"]):
+            lid = n.get("link_note")
+            if not lid or n.get("done"):
+                continue
+            there = on_link.get(lid)
+            if there is None:
+                v["notes"].remove(n)
+                changed = True
+            elif there.get("text") and there["text"] != n.get("text"):
+                n["text"] = there["text"]
+                changed = True
+        if changed:
+            save_video(v)
+
+
 def link_decision(vid, link, said):
     """The client's answer on the link, for the draft it shows: Approve approves that draft here; Request changes sets the
     video to Changes. Each answer counts once. Returns whether one was taken in."""
@@ -1302,6 +1325,7 @@ def pull_link_notes(vid):
             drop_video_link(vid)
         return 0
     link_decision(vid, link, said)
+    sync_link_changes(vid, notes)
     v = load_video(vid)
     taken = set(link.get("taken", []))
     fresh = [n for n in notes if n.get("id") not in taken]

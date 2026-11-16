@@ -101,7 +101,7 @@ built-in browser. No account comes with the studio: each person signs in with th
 
 **Settings > Phone notifications > Connect a phone** shows a QR code: scan it with your phone, add Editors.Hub to the Home Screen (iPhone: Safari's Share > Add to Home Screen; Android: Chrome's Install app), open it and turn notifications on. Client comments, a client approving a draft or asking for changes, drafts ready, uploads, what needs you, problems and everything else in your bell then come to your phone's notification centre, and the app's Inbox keeps them all. Each kind can be turned off in the app.
 
-Your client's review link has **Approve this draft** and **Request changes**. Their answer comes into the studio by itself: the video is approved at that draft, or set to Changes with their note as a comment.
+Your client's review link has **Approve this draft** and **Request changes**. Whoever writes a comment can **edit** or **delete** it later, from the phone or computer they wrote it on (nobody else can), and the note in your studio follows. Their answer comes into the studio by itself: the video is approved at that draft, or set to Changes with their note as a comment.
 
 ## The look
 
