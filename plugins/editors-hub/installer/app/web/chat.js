@@ -31,7 +31,7 @@ function drawChatList() {
   let h = `<div class="row"><h3 style="margin:0">Chats</h3><div class="spacer"></div><button class="btn small primary" id="chatAdd">+ Add friend</button></div>`;
   if (c.incoming.length) h += `<p class="chat-sec">Friend requests</p>` + c.incoming.map((r) => row(r, "wants to be your friend", `<button class="btn small primary" data-cacc="${esc(r.pid)}">Accept</button><button class="btn small" data-cdec="${esc(r.pid)}">✕</button>`)).join("");
   h += `<p class="chat-sec">Friends</p>` + (c.friends.length ? c.friends.map((f) => {
-    const l = f.last, pre = !l ? "Say hello 👋" : (l.mine ? "You: " : "") + (l.kind === "photo" ? "📷 Photo" : l.kind === "voice" ? "🎤 Voice note" : l.kind === "video" ? `🎬 ${l.body}` : l.body);
+    const l = f.last, pre = !l ? "Say hello 👋" : l.kind === "call" ? l.body : (l.mine ? "You: " : "") + (l.kind === "photo" ? "📷 Photo" : l.kind === "voice" ? "🎤 Voice note" : l.kind === "video" ? `🎬 ${l.body}` : l.body);
     return row(f, pre, `${l ? `<span class="faint chat-when">${chatAgo(l.at)}</span>` : ""}${f.unread ? `<span class="chat-un">${f.unread}</span>` : ""}`, `data-cconv="${esc(f.pid)}" role="button" tabindex="0"`);
   }).join("") : `<p class="muted">No friends yet: add one by their username or friend code.</p>`);
   if (c.outgoing.length) h += `<p class="chat-sec">Waiting for them</p>` + c.outgoing.map((r) => row(r, "Request sent", `<button class="btn small" data-ccan="${esc(r.pid)}">Cancel</button>`)).join("");
@@ -78,6 +78,7 @@ async function chatPoll(force) {
 
 function chatBubble(m) {
   const cls = `chat-bub ${m.mine ? "me" : "them"}`, mid = `data-cmsg="${m.id}"`;
+  if (m.call) return `<div class="chat-day">📞 ${m.call.state === "ended" ? `Voice call · ${Math.floor(m.call.secs / 60)}:${String(m.call.secs % 60).padStart(2, "0")}` : m.call.state === "declined" ? "Call declined" : "Missed call"} · ${chatTime(m.at)}</div>`;
   if (m.voice) return `<div class="${cls} voice" ${mid}>🎤 <audio controls preload="none" src="${esc(chatMedia(m.voice))}"></audio></div>`;
   if (m.photo) return `<div class="${cls} ph" ${mid}><a href="${esc(chatMedia(m.photo))}" target="_blank" rel="noopener"><img src="${esc(chatMedia(m.photo))}" alt="Photo" loading="lazy"></a></div>`;
   if (m.video) return `<a class="${cls} vid" ${mid} href="${esc(m.video.url)}" target="_blank" rel="noopener"><span class="chat-pl">▶</span><span><b>${esc(m.video.name)}</b><small>${esc(m.video.client ? m.video.client + " · " : "")}Open the review link</small></span></a>`;
@@ -112,7 +113,7 @@ function drawChatConv(toEnd) {
   if (!c) { pane.innerHTML = `<div class="chat-empty"><p class="muted">Pick a chat, or add a friend.<br>The same chats are on your phone app.</p></div>`; return; }
   const f = (CHAT.home && CHAT.home.friends.find((x) => x.pid === c.pid)) || c.with || {};
   pane.innerHTML = `<div class="chat-head"><span class="chat-av">${chatInitial(f.username)}</span><span style="flex:1"><b>${esc(f.username || "")}</b><br><small class="chat-typing" id="chatTyping" hidden>typing…</small></span>
-      <button class="btn small" id="chatRemove">Remove friend</button><button class="btn small danger" id="chatBlock">Block</button></div>
+      <button class="btn small primary" id="chatCall" title="Voice call">📞 Call</button><button class="btn small" id="chatRemove">Remove friend</button><button class="btn small danger" id="chatBlock">Block</button></div>
     <div class="chat-msgs" id="chatMsgs"></div>
     <div class="chat-compose"><button class="btn small" id="chatPhoto" title="Send a photo">📷</button><button class="btn small" id="chatVoice" title="Record a voice note">🎤</button>
       <textarea id="chatText" rows="1" maxlength="4000" placeholder="Message (Enter to send, Shift+Enter for a new line)"></textarea><button class="btn primary" id="chatSend">Send</button>
@@ -141,6 +142,7 @@ function drawChatConv(toEnd) {
     try { await chatApi(what, { pid: c.pid }); CHAT.conv = null; await chatLoadHome(); drawChatList(); drawChatConv(); toast(what === "block" ? "Blocked" : "Removed"); } catch (e) { toast(e.message, true); }
   };
   $("chatRemove").onclick = act("unfriend", "Remove");
+  $("chatCall").onclick = () => window.EHCall && EHCall.start(c.pid, f.username);
   $("chatBlock").onclick = act("block", "Block");
 }
 
@@ -202,6 +204,9 @@ document.addEventListener("click", (e) => {
   if (msg && !t.closest("audio") && !t.closest("a")) chatReact(+msg.dataset.cmsg);
   else if (!t.closest(".chat-picker")) { const old = document.querySelector(".chat-picker"); if (old) old.remove(); }
 });
+
+// calls: the owner can ring and be rung here too, while Home is open and showing (looked for every 8 seconds)
+setTimeout(() => { if (S.state?.me?.role === "owner" && window.EHCall) EHCall.setup({ api: chatApi, every: 8000, onEnd: () => { if (CHAT.conv) chatPoll(true); } }); }, 2500);
 
 // the tab's count, now and then, while Home is open (the owner only)
 setTimeout(() => { if (S.state?.me?.role === "owner") chatLoadHome(); }, 3000);

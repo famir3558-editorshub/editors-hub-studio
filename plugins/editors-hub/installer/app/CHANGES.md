@@ -2,6 +2,13 @@
 
 Shown in the studio after it updates. Each version: `## 1.2.3`, then `### New`, `### Better` or `### Fixed`, with one plain line per change.
 
+## 1.38.0
+### New
+- Voice calls with friends: tap 📞 in a chat, on your phone or in the studio's Chat tab. Answer, decline, mute and hang up; each call shows in the chat with how long it lasted, or as missed.
+- A call rings in the app while it's open, and as a notification when it isn't (tap it within about 45 seconds to answer; on Android, Answer and Decline buttons).
+### Fixed
+- In a chat on iPhone, the keyboard no longer pushes the whole app up: only the messages scroll, and the message box sits on the keyboard.
+
 ## 1.37.0
 ### New
 - Your client's review page has the Aurora look: frosted glass over black with a red glow. Every button and comment works as before.

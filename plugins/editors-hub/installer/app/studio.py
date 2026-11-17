@@ -4386,7 +4386,8 @@ def phone_snapshot_send(force=False):
     return True
 
 
-CHAT_OPS = {"home", "request", "answer", "cancel", "unfriend", "block", "unblock", "messages", "send", "react", "typing"}
+CHAT_OPS = {"home", "request", "answer", "cancel", "unfriend", "block", "unblock", "messages", "send", "react", "typing",
+            "ice", "ring", "call-start", "call-answer", "call-signal", "call-poll", "call-end"}
 PHONE_COMMANDS_EVERY = 10  # seconds: how soon a tap on the phone is done here
 
 
