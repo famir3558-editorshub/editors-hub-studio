@@ -1256,8 +1256,31 @@ async function tellIfUpdated() {
   const version = S.state?.updated;
   if (!version || document.querySelector("dialog[open]")) return;
   await api("POST", "/api/update-seen", {}).catch(() => {});  // first, so a reload while it's showing doesn't tell them twice
-  ehConfirm(`Your studio updated itself to version ${version}. Your videos, clients and styles are all still here.`, { title: "You're on the newest version", ok: "Got it", cancel: "" });
+  const r = await api("GET", "/api/whats-new?since-update=1").catch(() => null);
+  if (!r || !r.notes.length) return ehConfirm(`Your studio updated itself to version ${version}. Your videos, clients and styles are all still here.`, { title: "You're on the newest version", ok: "Got it", cancel: "" });
+  showWhatsNew(r.notes, `Your studio updated itself to version ${version}. Your videos, clients and styles are all still here.`, "You're on the newest version");
 }
+
+// the notes from CHANGES.md: what's new and what's fixed, version by version
+function showWhatsNew(notes, intro, title) {
+  if (document.querySelector("dialog[open]")) return;
+  const dlg = document.createElement("dialog");
+  dlg.className = "ask whats-new";
+  const icon = { new: "✦", better: "↑", fixed: "✓" };
+  const body = notes.map((v) => `<section><h4>Version ${esc(v.version)}</h4>${v.groups.map((g) => `<div class="wn-group wn-${esc(g.title.toLowerCase())}"><b>${esc(g.title)}</b><ul>${g.items.map((i) => `<li><span class="wn-ico">${icon[g.title.toLowerCase()] || "•"}</span><span>${esc(i)}</span></li>`).join("")}</ul></div>`).join("")}</section>`).join("");
+  dlg.innerHTML = `<form method="dialog"><h2>${esc(title)}</h2>${intro ? `<p class="muted">${esc(intro)}</p>` : ""}<div class="wn-list">${body}</div><div class="actions"><button class="btn primary" autofocus>Got it</button></div></form>`;
+  dlg.addEventListener("close", () => dlg.remove());
+  document.body.appendChild(dlg);
+  dlg.showModal();
+}
+async function openWhatsNew() {
+  try {
+    const r = await api("GET", "/api/whats-new");
+    if (!r.notes.length) return toast("No notes yet");
+    showWhatsNew(r.notes, `You're on version ${r.version}.`, "What's new");
+  } catch (ex) { toast(ex.message, true); }
+}
+if ($("whatsNewBtn")) $("whatsNewBtn").onclick = openWhatsNew;
 
 load().then(() => {
   if (["projects", "styles", "shared", "effects", "deleted", "team", "report", "settings", "setup"].includes(location.hash.slice(1))) setTab(location.hash.slice(1), true);

@@ -288,3 +288,15 @@ dialog.share { width: min(520px, calc(100vw - 32px)); }
 .share-err { margin: 0; color: #ff8a96; font-size: 13px; min-height: 0; }
 .share-err:empty { display: none; }
 .share .actions { align-items: center; flex-wrap: wrap; }
+
+/* What's new after an update */
+dialog.whats-new { width: min(560px, calc(100vw - 32px)); }
+dialog.whats-new .wn-list { max-height: min(60vh, 520px); overflow-y: auto; display: grid; gap: 16px; padding-right: 4px; outline: none; }
+dialog.whats-new h4 { margin: 0 0 6px; font-size: 14px; letter-spacing: .02em; }
+dialog.whats-new .wn-group { margin: 0 0 8px; }
+dialog.whats-new .wn-group > b { font-size: 12px; text-transform: uppercase; letter-spacing: .08em; opacity: .7; }
+dialog.whats-new ul { list-style: none; margin: 4px 0 0; padding: 0; display: grid; gap: 6px; }
+dialog.whats-new li { display: flex; gap: 10px; line-height: 1.45; }
+dialog.whats-new .wn-ico { flex: none; width: 16px; text-align: center; opacity: .8; }
+dialog.whats-new .wn-fixed .wn-ico { color: #3fb27f; }
+dialog.whats-new .wn-new .wn-ico { color: #e5484d; }

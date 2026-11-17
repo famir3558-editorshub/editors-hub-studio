@@ -88,6 +88,8 @@ The studio updates itself: `updater.py` checks a public repository (no GitHub ac
 `data/`, `library/` and `profile/` alone. Home restarts onto the new version once nothing is being copied or uploaded. To turn it off on a computer, set
 `"auto_update": false` in `data/settings.json`. Notes are in `data/update.log`.
 
+After an update, Home shows what's new and what's fixed in each version since the last one (from `CHANGES.md`); Settings > What's new shows them any time. A release can't be built without notes for its version.
+
 ## Choosing the b-roll
 
 When an edit or next draft starts, a popup asks: **Pick manually** or **Claude picks automatically** (`studio.py broll-ask`). Manually, Claude finds every
@@ -100,6 +102,10 @@ built-in browser. No account comes with the studio: each person signs in with th
 ## On your phone
 
 **Settings > Phone notifications > Connect a phone** shows a QR code: scan it with your phone, add Editors.Hub to the Home Screen (iPhone: Safari's Share > Add to Home Screen; Android: Chrome's Install app), open it and turn notifications on. Client comments, a client approving a draft or asking for changes, drafts ready, uploads, what needs you, problems and everything else in your bell then come to your phone's notification centre, and the app's Inbox keeps them all. Each kind can be turned off in the app.
+
+The app has three tabs. **Inbox**: everything that came in, with a Today card, search and filters; Reply on a client's comment answers it on the review link (marked Editor). **Clients**: every client and their videos with where each one is; tap a video to watch it on the client's link, approve a draft, ask for changes or put the newest draft on the link (your studio does it within a minute, when it's on). **Live**: the edits being made with their step and clock, and uploads you can pause, resume or stop. In the app's settings: quiet hours, an evening digest (one notification a day), which clients can buzz the phone, and your other phones. The phone also reminds you when a client hasn't answered on a shared draft for two days.
+
+**Chat** (a fourth tab): add other editors who use the app as friends, by their username or friend code (EH-XXXXXX). Once they accept, you can send messages, photos and a video's review link (from a video in Clients: Send to a friend). Remove or block someone from the ⋯ in a chat. Messages are kept by the online service; photos on the owner's Google Drive for 90 days.
 
 Your client's review link has **Approve this draft** and **Request changes**. Whoever writes a comment can **edit** or **delete** it later, from the phone or computer they wrote it on (nobody else can), and the note in your studio follows. Their answer comes into the studio by itself: the video is approved at that draft, or set to Changes with their note as a comment.
 

@@ -1328,7 +1328,7 @@ def pull_link_notes(vid):
     sync_link_changes(vid, notes)
     v = load_video(vid)
     taken = set(link.get("taken", []))
-    fresh = [n for n in notes if n.get("id") not in taken]
+    fresh = [n for n in notes if n.get("id") not in taken and not n.get("editor")]
     if not fresh or v.get("status") in LOCKED_STATUSES:
         return 0
     versions = {d["version"] for d in v["drafts"]}
@@ -4082,6 +4082,124 @@ def phone_pair(user):
     return got
 
 
+REMIND_AFTER = 2 * 86400  # a draft on a client's link this long with no answer: the phone reminds, once
+
+
+def phone_client(item):
+    """The client (project id) a bell item is about, from its page address, so the phone can mute that client."""
+    m = re.match(r"/review/([^/#?]+)", str(item.get("url") or ""))
+    if not m:
+        return ""
+    try:
+        return load_video(m.group(1)).get("project", "")
+    except StudioError:
+        return ""
+
+
+def _when(stamp):
+    try:
+        return float(stamp)
+    except (TypeError, ValueError):
+        pass
+    try:
+        return time.mktime(time.strptime(str(stamp)[:19], "%Y-%m-%dT%H:%M:%S"))
+    except (TypeError, ValueError):
+        return 0
+
+
+def phone_reminders():
+    """Drafts on a client's link with no answer for REMIND_AFTER: no comment and no approval on that draft."""
+    out, ts = [], time.time()
+    names = {p["id"]: p.get("name") or p["id"] for p in list_projects()}
+    for vid in video_dirs(None):
+        try:
+            v = load_video(vid)
+        except StudioError:
+            continue
+        link, latest = v.get("link") or {}, latest_version(v)
+        if v.get("status") != "in review" or not link or link.get("version") != latest:
+            continue
+        draft = next((d for d in v["drafts"] if d["version"] == latest), None)
+        since = max(_when(draft.get("added")) if draft else 0, _when(link.get("shared")))
+        if not since or ts - since < REMIND_AFTER:
+            continue
+        if any(n.get("link_note") and n.get("version") == latest for n in v["notes"]):
+            continue
+        days = int((ts - since) // 86400)
+        who = names.get(v.get("project", ""), "Your client")
+        out.append({"id": f"remind:{vid}:{latest}", "icon": "warn", "kind": "needs", "url": f"/review/{vid}",
+                    "text": f"{who} hasn't answered on {v['name']} for {days} days", "sub": "No comment or approval on the link yet. A nudge might help."})
+    return out
+
+
+def phone_commands():
+    """What the owner asked for from the phone app: collected from the service, done here as the owner, and reported back."""
+    s = settings()
+    if not s.get("phone") or not approval.config():
+        return 0
+    try:
+        got = approval.shared_call(DATA, "/app/commands").get("commands") or []
+    except approval.ApprovalError:
+        return 0
+    owner = accounts().find(s.get("owner_email") or OWNER_EMAIL)
+    if not owner:
+        return 0
+    owner = {**owner, "role": "owner"}
+
+    def done(c, ok, message, url=""):
+        try:
+            approval.shared_call(DATA, "/app/command-done", id=c["id"], ok=ok, message=message[:300], url=url)
+        except approval.ApprovalError:
+            pass
+
+    for c in got:
+        args, op = c.get("args") or {}, c.get("op")
+        try:
+            if op in ("pause", "resume", "stop"):
+                job = {"pause": pause_job, "resume": resume_job, "stop": stop_job}[op](str(args.get("job", "")), owner)
+                done(c, True, {"pause": "Paused", "resume": "Carrying on", "stop": "Stopped"}[op] + f": {job['title']}")
+                continue
+            vid = str(args.get("video", ""))
+            v = load_video(vid)
+            name = v["name"]
+            if op == "approve":
+                if v.get("status") in LOCKED_STATUSES:
+                    raise StudioError(f"{name} is already {v['status']}.")
+                version = int(args.get("version") or latest_version(v))
+                approve(vid, version)
+                done(c, True, f"Approved draft {version} of {name}")
+            elif op == "changes":
+                if v.get("status") in LOCKED_STATUSES:
+                    raise StudioError(f"{name} is already {v['status']}.")
+                set_status(vid, "changes")
+                done(c, True, f"{name} is set to Changes")
+            elif op == "share":
+                version = int(args.get("version") or latest_version(v))
+                job = share_video(vid, owner, version)
+
+                def wait(c=c, job=job, vid=vid, name=name, version=version):
+                    while job["state"] in ("running", "resuming"):
+                        time.sleep(2)
+                    if job["state"] == "done":
+                        url = (load_video(vid).get("link") or {}).get("url", "")
+                        done(c, True, f"Draft {version} of {name} is on the client's link", url)
+                    else:
+                        done(c, False, f"Sharing {name} didn't finish: {job.get('message') or job['state']}")
+                threading.Thread(target=wait, daemon=True).start()
+            elif op == "retry":
+                if not v.get("ready_failed"):
+                    raise StudioError(f"{name} has no failed upload to try again.")
+                get_ready(vid)
+                done(c, True, f"Uploading {name} again")
+            else:
+                raise StudioError("The studio can't do that from a phone.")
+        except (StudioError, NotFound, auth.Forbidden) as e:
+            done(c, False, str(e))
+        except Exception as e:  # never stop the phone's other commands
+            done(c, False, f"That didn't work: {e}")
+    return len(got)
+
+
 def phone_kind(item):
     if item.get("icon") == "warn":
         return "problem" if re.search(r"fail|couldn't|could not|gone|stopped|error", item.get("text", ""), re.I) else "needs"
@@ -4109,7 +4227,7 @@ def phone_sync():
     if not owner:
         return 0
     bell = notifications({**owner, "role": "owner"})
-    items = bell["needs"] + bell["recent"]
+    items = bell["needs"] + bell["recent"] + phone_reminders()
     path = DATA / PHONE_SENT
     sent = read_json(path, None)
     if sent is None:
@@ -4123,7 +4241,7 @@ def phone_sync():
         if phone_link_comment(item):
             continue
         try:
-            approval.shared_call(DATA, "/app/event", kind=phone_kind(item), title=item.get("text", ""), text=item.get("sub", ""), group=str(item["id"]).split(":")[0])
+            approval.shared_call(DATA, "/app/event", kind=item.get("kind") or phone_kind(item), title=item.get("text", ""), text=item.get("sub", ""), group=str(item["id"]).split(":")[0], client=phone_client(item))
             n += 1
         except approval.ApprovalError:
             known.discard(item["id"])  # the service can't be reached: try again next time
@@ -4132,13 +4250,95 @@ def phone_sync():
     return n
 
 
+PHONE_SNAP_BEAT = 900      # seconds: sent again unchanged this often while something runs (the service's free plan allows few writes a day)
+PHONE_SNAP_IDLE = 1800     # and this often when nothing does, so the phone can tell the studio is on
+PHONE_SNAP_CLIENTS = 40
+PHONE_SNAP_VIDEOS = 15     # per client, newest first
+_phone_snap = {"sig": None, "at": 0}
+
+
+def phone_snapshot():
+    """What the phone app's Clients and Live screens show: the owner's clients with their videos' status, and what's
+    being edited, rendered or uploaded now. Names and statuses only: no files, notes or sign-ins."""
+    ts = time.time()
+    projects = {p["id"]: p.get("name") or p["id"] for p in list_projects()}
+    groups, live = {}, []
+    for vid in video_dirs(None):
+        try:
+            v = load_video(vid)
+        except StudioError:
+            continue
+        latest = latest_version(v)
+        item = {"id": vid, "name": v["name"], "status": v["status"], "drafts": len(v["drafts"]), "latest": latest,
+                "open_notes": sum(1 for n in v["notes"] if not n["done"] and n["version"] == latest),
+                "updated": v.get("updated", v["created"]), "link": bool(v.get("link")),
+                "approved": (v.get("approved") or {}).get("version"), "ready_failed": bool(v.get("ready_failed")),
+                **({"link_key": v["link"].get("key"), "watch": v["link"].get("url"), "link_version": v["link"].get("version")} if v.get("link") else {})}
+        groups.setdefault(v.get("project", ""), []).append(item)
+        p = v.get("progress") or {}
+        if p and not p.get("finished") and v["status"] in ("editing", "paused") and ts - (p.get("last") or 0) < RENDER_QUIET_MAX:
+            busy = p.get("busy") or {}
+            steps = p.get("steps") or []
+            live.append({"kind": "edit", "id": vid, "name": v["name"], "client": projects.get(v.get("project", ""), ""), "draft": p.get("draft"),
+                         "step": p.get("step"), "steps": steps, "at": steps.index(p["step"]) + 1 if p.get("step") in steps else 0,
+                         "worked": int(p.get("worked") or 0), "since": int(p["since"]) if p.get("since") else None, "running": bool(p.get("since")),
+                         "paused": (p.get("paused") or {}).get("why") if p.get("paused") else None,
+                         "waiting": (v.get("render_request") or {}).get("status") == "waiting" or (v.get("broll") or {}).get("stage") in BROLL_ASKING,
+                         "busy": busy.get("text") if busy and ts - (busy.get("ts") or 0) < 600 else None})
+    for j in recent_jobs(None):
+        if j["state"] in ("running", "paused"):
+            pct = 10 * int(10 * j["done_bytes"] / j["total_bytes"]) if j.get("total_bytes") else None  # in tens, so it isn't sent on every byte
+            live.append({"kind": "job", "id": j["id"], "name": j["title"], "stage": j.get("stage"), "pct": pct, "state": j["state"], "can_pause": j["id"] in RESUMERS})
+    clients = []
+    for pid, vids in groups.items():
+        vids.sort(key=lambda x: x["updated"], reverse=True)
+        clients.append({"id": pid, "name": projects.get(pid) or ("Other videos" if not pid else pid), "count": len(vids),
+                        "updated": vids[0]["updated"], "videos": vids[:PHONE_SNAP_VIDEOS]})
+    clients.sort(key=lambda c: c["updated"], reverse=True)
+    s = settings()
+    return {"clients": clients[:PHONE_SNAP_CLIENTS], "live": live, "statuses": STATUSES,
+            "reply_name": str(s.get("your_name") or s.get("studio_name") or "").strip()[:60]}
+
+
+def phone_snapshot_send(force=False):
+    """Sends the snapshot when it changed, or as a heartbeat. Returns whether it was sent."""
+    s = settings()
+    if not s.get("phone") or not approval.config():
+        return False
+    snap = phone_snapshot()
+    sig = hashlib.sha256(json.dumps(snap, sort_keys=True, default=str).encode()).hexdigest()
+    wait = PHONE_SNAP_BEAT if snap["live"] else PHONE_SNAP_IDLE
+    if not force and sig == _phone_snap["sig"] and time.time() - _phone_snap["at"] < wait:
+        return False
+    try:
+        approval.shared_call(DATA, "/app/snapshot", snap={**snap, "version": APP_VERSION})
+    except approval.ApprovalError:
+        return False
+    _phone_snap.update(sig=sig, at=time.time())
+    return True
+
+
+PHONE_COMMANDS_EVERY = 10  # seconds: how soon a tap on the phone is done here
+
+
 def phone_watch():
+    last = 0
     while True:
         try:
-            phone_sync()
+            phone_commands()
         except Exception:
             pass
-        time.sleep(PHONE_EVERY)
+        if time.time() - last >= PHONE_EVERY:
+            last = time.time()
+            try:
+                phone_sync()
+            except Exception:
+                pass
+            try:
+                phone_snapshot_send()
+            except Exception:
+                pass
+        time.sleep(PHONE_COMMANDS_EVERY)
 
 
 def notifications(user=None):
@@ -6603,6 +6803,10 @@ class Handler(BaseHTTPRequestHandler):
             self.read_json_body()
             notify_mark_seen(self.user)
             return self.send_json({"ok": True})
+        if parts == ["api", "whats-new"] and method == "GET":
+            # just after an update: what came since the version this studio had; otherwise the latest few
+            since = read_json(DATA / "last-update.json", {}).get("from") if "since-update" in query else None
+            return self.send_json({"version": APP_VERSION, "notes": whats_new(since, most=10 if since else 6)})
         if parts == ["api", "update-seen"] and method == "POST":
             self.read_json_body()  # or what's left of it is taken for the start of the next request on this connection
             with LOCK:
@@ -7258,7 +7462,30 @@ def note_version():
     last = read_json(path, {})
     if last.get("version") == APP_VERSION:
         return
-    write_json(path, {"version": APP_VERSION, "seen": [], "tell": bool(last.get("version") or accounts().users())})
+    write_json(path, {"version": APP_VERSION, "from": last.get("version"), "seen": [], "tell": bool(last.get("version") or accounts().users())})
+
+
+def whats_new(since=None, upto=None, most=10):
+    """The notes in CHANGES.md, newest first: [{version, groups: [{title, items}]}] for versions after since up to upto."""
+    upto = upto or APP_VERSION
+    try:
+        text = (ROOT / "CHANGES.md").read_text(encoding="utf-8")
+    except OSError:
+        return []
+    out, group = [], None
+    for raw in text.splitlines():
+        line = raw.strip()
+        if line.startswith("## "):
+            out.append({"version": line[3:].strip(), "groups": []})
+            group = None
+        elif line.startswith("### ") and out:
+            group = {"title": line[4:].strip(), "items": []}
+            out[-1]["groups"].append(group)
+        elif line.startswith("- ") and group is not None:
+            group["items"].append(line[2:].strip())
+    out = [v for v in out if not newer_version(v["version"], upto) and (not since or newer_version(v["version"], since)) and v["groups"]]
+    out.sort(key=lambda v: tuple(int(x) for x in v["version"].split(".") if x.isdigit()), reverse=True)
+    return out[:most]
 
 
 def update_to_tell(email):
