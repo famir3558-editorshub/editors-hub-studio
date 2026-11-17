@@ -2,6 +2,16 @@
 
 Shown in the studio after it updates. Each version: `## 1.2.3`, then `### New`, `### Better` or `### Fixed`, with one plain line per change.
 
+## 1.37.0
+### New
+- Your client's review page has the Aurora look: frosted glass over black with a red glow. Every button and comment works as before.
+- Chat on the computer: a Chat tab in your studio with the same chats as your phone.
+- Chat: voice notes (up to three minutes), reactions (tap a message), and "typing…" when a friend is writing.
+- Phone app: send a video from your phone's gallery to a client. It goes to your Google Drive, then your studio adds it as a new video, ready to edit.
+- Phone notifications on Android have buttons: Approve a new draft, Reply to a comment or chat, or Mark as read. On iPhone, tapping still opens the right screen.
+### Fixed
+- The phone app no longer zooms in when you tap a text box or pinch, and long messages at the bottom of the screen show in full.
+
 ## 1.36.0
 ### New
 - After an update, this window lists what's new and what's fixed in every version you got. Settings has a What's new button to read them any time.

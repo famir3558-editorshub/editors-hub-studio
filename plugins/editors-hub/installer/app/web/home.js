@@ -682,7 +682,7 @@ $("deletedList").addEventListener("click", async (e) => {
 
 function setTab(tab, allow) {
   const owner = S.state?.me.role === "owner";
-  if ((tab === "team" || tab === "setup") && S.state && !owner) tab = "videos";
+  if ((tab === "team" || tab === "setup" || tab === "chat") && S.state && !owner) tab = "videos";
   if (tab === "team" && S.state?.alone) tab = "videos";
   // the owner finishes setup first; Settings stays open so keys can be added
   if (owner && wasReady === false && !["setup", "settings", "report"].includes(tab) && !allow) {
@@ -695,10 +695,11 @@ function setTab(tab, allow) {
   if (tab === "deleted") loadTrash();
   if (tab === "shared") loadOnlineGrid();
   if (tab === "effects") loadEffects();
+  if (tab === "chat" && typeof openChat === "function") openChat();
   if (tab === "setup") loadSetup();
   S.tab = tab;
   document.querySelectorAll(".tabs button").forEach((b) => b.classList.toggle("on", b.dataset.tab === tab));
-  ["videos", "projects", "styles", "shared", "effects", "deleted", "team", "report", "settings", "setup"].forEach((t) => ($("tab-" + t).hidden = t !== tab));
+  ["videos", "projects", "styles", "shared", "effects", "deleted", "team", "chat", "report", "settings", "setup"].forEach((t) => ($("tab-" + t).hidden = t !== tab));
   history.replaceState(null, "", tab === "videos" ? "/" : "/#" + tab);
 }
 
@@ -1283,7 +1284,7 @@ async function openWhatsNew() {
 if ($("whatsNewBtn")) $("whatsNewBtn").onclick = openWhatsNew;
 
 load().then(() => {
-  if (["projects", "styles", "shared", "effects", "deleted", "team", "report", "settings", "setup"].includes(location.hash.slice(1))) setTab(location.hash.slice(1), true);
+  if (["projects", "styles", "shared", "effects", "deleted", "team", "chat", "report", "settings", "setup"].includes(location.hash.slice(1))) setTab(location.hash.slice(1), true);
   if (S.state?.report?.send) loadReports(true).catch(() => {});  // for the count of new answers
   const wanted = location.hash.match(/^#new-video:(.+)$/);  // "+ Video" on a style page
   if (wanted) {

@@ -4085,6 +4085,54 @@ def phone_pair(user):
 REMIND_AFTER = 2 * 86400  # a draft on a client's link this long with no answer: the phone reminds, once
 
 
+def phone_draft(item):
+    """A "draft ready" item's video and version, for the Approve button on the phone's notification."""
+    parts = str(item.get("id", "")).split(":")
+    if parts[0] == "draft" and len(parts) == 3 and parts[2].isdigit():
+        return {"video": parts[1], "version": int(parts[2])}
+    return {}
+
+
+def phone_import(file_id, project, style, name):
+    """A video sent from the phone app: downloaded from the owner's Drive (through the service, carrying on after a
+    dropped connection) into a new video in that client's project, then removed from the Drive. Returns the video."""
+    project_dir(project)
+    style_dir(style)
+    tmp = DATA / "phone-uploads"
+    tmp.mkdir(parents=True, exist_ok=True)
+    dest = tmp / f"{safe_filename(file_id)}.part"
+    sent_as = ""
+    for attempt in range(8):
+        have = dest.stat().st_size if dest.exists() else 0
+        try:
+            with approval.open_phone_upload(DATA, file_id, have) as resp, open(dest, "ab" if have else "wb") as out:
+                if have and resp.status != 206:  # the service sent all of it again
+                    out.truncate(0)
+                sent_as = urllib.parse.unquote(resp.headers.get("X-File-Name") or "") or sent_as
+                total = None
+                rng = resp.headers.get("Content-Range") or ""
+                if "/" in rng:
+                    total = int(rng.rsplit("/", 1)[1])
+                elif resp.headers.get("Content-Length"):
+                    total = int(resp.headers["Content-Length"])
+                shutil.copyfileobj(resp, out, 8 << 20)
+            if total is None or dest.stat().st_size >= total:
+                break
+        except (OSError, approval.ApprovalError) as e:
+            if attempt == 7 or (isinstance(e, approval.ApprovalError) and "can't be found" in str(e)):
+                raise StudioError(f"The video from the phone didn't come through: {e}")
+            time.sleep(min(30, 2 ** attempt))
+    ext = Path(sent_as).suffix or Path(str(name)).suffix or ".mp4"
+    owner = accounts().find(settings().get("owner_email") or OWNER_EMAIL)
+    v = create_video(style, str(name).strip()[:120] or "Phone video", user={**owner, "role": "owner"} if owner else None, project=project)
+    add_raw(v["id"], dest, name=f"{safe_filename(Path(str(name)).stem or 'phone video')}{ext if ext.lower() in ('.mp4', '.mov', '.m4v', '.webm', '.mkv', '.3gp') else '.mp4'}", move=True)
+    try:
+        approval.shared_call(DATA, "/app/upload-done", file=file_id)
+    except approval.ApprovalError:
+        pass
+    return load_video(v["id"])
+
+
 def phone_client(item):
     """The client (project id) a bell item is about, from its page address, so the phone can mute that client."""
     m = re.match(r"/review/([^/#?]+)", str(item.get("url") or ""))
@@ -4155,6 +4203,18 @@ def phone_commands():
     for c in got:
         args, op = c.get("args") or {}, c.get("op")
         try:
+            if op == "import":
+                def take(c=c, args=args):
+                    try:
+                        v = phone_import(str(args.get("file", "")), str(args.get("project", "")), str(args.get("style", "")), str(args.get("name", "")))
+                        client = (read_json(project_dir(v["project"]) / "project.json", {}) or {}).get("name", "")
+                        done(c, True, f"{v['name']} is in {client}: open it in your studio to start the edit")
+                    except (StudioError, NotFound) as e:
+                        done(c, False, str(e))
+                    except Exception as e:
+                        done(c, False, f"The video from the phone didn't come through: {e}")
+                threading.Thread(target=take, daemon=True).start()
+                continue
             if op in ("pause", "resume", "stop"):
                 job = {"pause": pause_job, "resume": resume_job, "stop": stop_job}[op](str(args.get("job", "")), owner)
                 done(c, True, {"pause": "Paused", "resume": "Carrying on", "stop": "Stopped"}[op] + f": {job['title']}")
@@ -4241,7 +4301,7 @@ def phone_sync():
         if phone_link_comment(item):
             continue
         try:
-            approval.shared_call(DATA, "/app/event", kind=item.get("kind") or phone_kind(item), title=item.get("text", ""), text=item.get("sub", ""), group=str(item["id"]).split(":")[0], client=phone_client(item))
+            approval.shared_call(DATA, "/app/event", kind=item.get("kind") or phone_kind(item), title=item.get("text", ""), text=item.get("sub", ""), group=str(item["id"]).split(":")[0], client=phone_client(item), **phone_draft(item))
             n += 1
         except approval.ApprovalError:
             known.discard(item["id"])  # the service can't be reached: try again next time
@@ -4274,6 +4334,7 @@ def phone_snapshot():
                 "updated": v.get("updated", v["created"]), "link": bool(v.get("link")),
                 "approved": (v.get("approved") or {}).get("version"), "ready_failed": bool(v.get("ready_failed")),
                 **({"link_key": v["link"].get("key"), "watch": v["link"].get("url"), "link_version": v["link"].get("version")} if v.get("link") else {})}
+        item["_style"] = v.get("style", "")
         groups.setdefault(v.get("project", ""), []).append(item)
         p = v.get("progress") or {}
         if p and not p.get("finished") and v["status"] in ("editing", "paused") and ts - (p.get("last") or 0) < RENDER_QUIET_MAX:
@@ -4292,11 +4353,18 @@ def phone_snapshot():
     clients = []
     for pid, vids in groups.items():
         vids.sort(key=lambda x: x["updated"], reverse=True)
+        style = next((x["_style"] for x in vids if x["_style"]), "")
+        for x in vids:
+            x.pop("_style", None)
         clients.append({"id": pid, "name": projects.get(pid) or ("Other videos" if not pid else pid), "count": len(vids),
-                        "updated": vids[0]["updated"], "videos": vids[:PHONE_SNAP_VIDEOS]})
+                        "updated": vids[0]["updated"], "videos": vids[:PHONE_SNAP_VIDEOS], "style": style})
+    for pid, name in projects.items():  # clients with no video yet: a phone can still send them one
+        if pid not in groups:
+            clients.append({"id": pid, "name": name, "count": 0, "updated": "", "videos": [], "style": ""})
     clients.sort(key=lambda c: c["updated"], reverse=True)
     s = settings()
-    return {"clients": clients[:PHONE_SNAP_CLIENTS], "live": live, "statuses": STATUSES,
+    styles = [{"id": m["id"], "name": m.get("name") or m["id"]} for m in list_styles() if not m.get("shared_from")][:60]
+    return {"clients": clients[:PHONE_SNAP_CLIENTS], "live": live, "statuses": STATUSES, "styles": styles,
             "reply_name": str(s.get("your_name") or s.get("studio_name") or "").strip()[:60]}
 
 
@@ -4318,6 +4386,7 @@ def phone_snapshot_send(force=False):
     return True
 
 
+CHAT_OPS = {"home", "request", "answer", "cancel", "unfriend", "block", "unblock", "messages", "send", "react", "typing"}
 PHONE_COMMANDS_EVERY = 10  # seconds: how soon a tap on the phone is done here
 
 
@@ -6803,6 +6872,17 @@ class Handler(BaseHTTPRequestHandler):
             self.read_json_body()
             notify_mark_seen(self.user)
             return self.send_json({"ok": True})
+        if parts[:2] == ["api", "chat"] and len(parts) == 3 and method == "POST":
+            body = self.read_json_body()
+            if role != "owner":
+                raise auth.Forbidden("Chat is the studio owner's, on their phone and here.")
+            if parts[2] not in CHAT_OPS:
+                raise NotFound("no such chat action")
+            try:
+                got = approval.shared_call(DATA, f"/app/studio-chat/{parts[2]}", **{k: v for k, v in (body or {}).items() if k != "token"})
+            except approval.ApprovalError as e:
+                return self.send_json({"error": str(e)}, getattr(e, "status", 502) or 502)
+            return self.send_json({**got, "service": (approval.config() or {}).get("url", "").rstrip("/")})
         if parts == ["api", "whats-new"] and method == "GET":
             # just after an update: what came since the version this studio had; otherwise the latest few
             since = read_json(DATA / "last-update.json", {}).get("from") if "since-update" in query else None

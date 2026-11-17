@@ -329,3 +329,5 @@ html.aurora #videoGrid { grid-template-columns: repeat(auto-fill, minmax(260px, 
 
 /* ---- client cards: their picture strip sits at the top ---- */
 html.aurora .pc-preview { border-radius: 19px 19px 0 0; }
+html.aurora .top .tabs [data-tab="chat"] { --ic: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 5.5h16v10H10l-4.5 4v-4H4z'/%3E%3Cpath d='M8 9.5h8M8 12.5h5'/%3E%3C/svg%3E"); }
+html.aurora .chat-list, html.aurora .chat-conv { backdrop-filter: blur(22px); -webkit-backdrop-filter: blur(22px); }

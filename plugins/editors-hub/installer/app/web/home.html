@@ -22,6 +22,7 @@
     <button data-tab="deleted" data-maker>Recently deleted<em id="deletedCount"></em></button>
     <button data-tab="effects" data-maker>Effects</button>
     <button data-tab="team" data-owner hidden>Team</button>
+    <button data-tab="chat" data-owner hidden>Chat<em id="chatCount"></em></button>
     <button data-tab="settings">Settings</button>
     <button data-tab="report" id="reportTab" hidden><span id="reportLabel">Report to owner</span><em id="reportCount"></em></button>
   </nav>
@@ -102,6 +103,10 @@
       <div class="steps" id="stepList"></div>
       <div class="row"><button class="btn" id="checkAgain">Check everything again</button><div class="spacer"></div><button class="btn primary" id="setupDone" hidden>Go to my studio</button></div>
     </div>
+  </section>
+
+  <section id="tab-chat" hidden>
+    <div class="chat-wrap"><div class="panel chat-list" id="chatList"></div><div class="panel chat-conv" id="chatConv"></div></div>
   </section>
 
   <section id="tab-team" hidden>
@@ -284,5 +289,6 @@
 <div id="toast"></div>
 <script src="/static/app.js"></script>
 <script src="/static/home.js"></script>
+<script src="/static/chat.js"></script>
 </body>
 </html>
