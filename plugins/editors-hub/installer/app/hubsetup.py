@@ -249,6 +249,90 @@ def install_models():
     return ("failed", "; ".join(problems)) if problems else (None, "")
 
 
+# ---------------------------------------------------------------- the NVIDIA graphics card (Windows and Linux)
+# Whisper and the speaker cut-outs run on the card through PyTorch with CUDA; video encoding uses FFmpeg's NVENC,
+# which needs nothing extra. Without an NVIDIA card this step has nothing to do and edits use the processor.
+GPU_MODULES = ("whisper", "onnx", "onnx2torch", "cv2")
+OPTIONAL = {"gpu"}  # the studio is ready without it: edits just use the processor
+GPU_TRIED = Path.home() / ".cache" / "editors-hub" / "gpu-install-failed"  # a failed 3 GB download waits 3 days
+GPU_PACKAGES = ["openai-whisper", "onnx", "onnx2torch", "opencv-python"]
+TORCH_INDEX = "https://download.pytorch.org/whl/"
+
+
+def nvidia_card():
+    """(name, CUDA version the driver supports, compute capability) or None."""
+    exe = shutil.which("nvidia-smi")
+    if not exe or MAC:
+        return None
+    code, out = run([exe, "--query-gpu=name,compute_cap", "--format=csv,noheader"], timeout=30)
+    if code != 0 or not out.strip():
+        return None
+    name, _, cap = first_line(out).partition(",")
+    m = re.search(r"CUDA (?:UMD )?Version:\s*(\d+)\.(\d+)", run([exe], timeout=30)[1])
+    try:
+        capability = float(cap.strip())
+    except ValueError:
+        capability = 0.0
+    return name.strip(), (int(m.group(1)), int(m.group(2))) if m else (0, 0), capability
+
+
+def torch_build(card):
+    """The PyTorch CUDA build this card and driver can run, or None when the driver is too old."""
+    _, driver, capability = card
+    if capability and capability < 7.5:  # CUDA 13 builds dropped cards older than the GTX 16xx / RTX 20xx
+        return "cu126" if driver >= (12, 6) else None
+    for build, needs in (("cu132", (13, 2)), ("cu130", (13, 0)), ("cu126", (12, 6))):
+        if driver >= needs:
+            return build
+    return None
+
+
+def _gpu_python_ready(exe):
+    code, out = run([exe, "-c", "import torch, " + ", ".join(GPU_MODULES) + "; print(torch.cuda.is_available())"], 120)
+    return code == 0 and out.strip().endswith("True")
+
+
+def check_gpu():
+    card = nvidia_card()
+    if not card:
+        return True, "No NVIDIA graphics card: edits use the processor."
+    if not torch_build(card):
+        return True, f"{card[0]}: video encoding uses the card. Update the NVIDIA driver to also run Whisper and cut-outs on it."
+    if _gpu_python_ready(python()):
+        return True, f"{card[0]}: encoding, Whisper, cut-outs and the face check use the card."
+    return False, f"{card[0]}: to download, PyTorch with CUDA and Whisper (about 3 GB, once)"
+
+
+def install_gpu():
+    card = nvidia_card()
+    build = torch_build(card) if card else None
+    if not build:
+        return None, ""
+    if GPU_TRIED.exists() and time.time() - GPU_TRIED.stat().st_mtime < 3 * 86400:
+        return "failed", "The last download didn't work; setup tries again in a few days. Edits use the processor."
+    state, note = _install_gpu(build)
+    if state:
+        GPU_TRIED.parent.mkdir(parents=True, exist_ok=True)
+        GPU_TRIED.write_text(note, encoding="utf-8")
+    else:
+        GPU_TRIED.unlink(missing_ok=True)
+    return state, note
+
+
+def _install_gpu(build):
+    exe = python()
+    base = [exe, "-m", "pip", "install", "--user", "--quiet", "--only-binary=:all:"]
+    has_torch = run([exe, "-c", "import torch"], 60)[0] == 0
+    code, out = run(base + (["--upgrade", "--force-reinstall"] if has_torch else []) +
+                    ["torch", "torchvision", "--index-url", TORCH_INDEX + build], timeout=3600)
+    if code != 0:
+        return "failed", "PyTorch: " + first_line(out[-300:])
+    code, out = run(base + GPU_PACKAGES, timeout=1800)  # PyTorch is in place, so these keep it
+    if code != 0:
+        return "failed", "Whisper: " + first_line(out[-300:])
+    return (None, "") if _gpu_python_ready(exe) else ("failed", "PyTorch installed but can't see the card; the processor is used.")
+
+
 def check_skills():
     return HOOKS["skills"]() if "skills" in HOOKS else (False, "")
 
@@ -288,11 +372,15 @@ STEPS = [
     {"id": "keys", "title": "Your API keys", "manual": "keys",
      "text": "The keys your edits need. Add them in Settings, and setup carries on by itself.",
      "check": lambda: HOOKS["keys"]() if "keys" in HOOKS else (True, "")},
+    {"id": "gpu", "title": "Graphics card", "nomac": True,
+     "text": "With an NVIDIA card, edits use it for video encoding, Whisper, speaker cut-outs and the face check, several times faster. "
+             "Setup downloads PyTorch with CUDA and Whisper for it once (about 3 GB). No NVIDIA card: nothing to do.",
+     "check": check_gpu, "install": install_gpu, "after": ["python"]},
 ]
 
 
 def steps():
-    return [s for s in STEPS if not (s.get("mac") and not MAC)]
+    return [s for s in STEPS if not (s.get("mac") and not MAC) and not (s.get("nomac") and MAC)]
 
 
 # ---------------------------------------------------------------- running it
@@ -333,7 +421,7 @@ def setup(install=True, only=None, log=print):
                 log(f"setup: {s['title']} failed: {e}")
     finally:
         _set(running=False, step="", checked=time.strftime("%Y-%m-%dT%H:%M:%S"),
-             ready=all(i["state"] == "ok" for i in STATE["items"]))
+             ready=all(i["state"] == "ok" or i["id"] in OPTIONAL for i in STATE["items"]))
     return snapshot()
 
 

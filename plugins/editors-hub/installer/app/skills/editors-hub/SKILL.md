@@ -128,6 +128,40 @@ never get past a paywall or a sign-in, and no watermarks in the final edit. Trim
 you to accept terms or sign up, stop and ask the owner. If you can't find 3 real options for a part, tell the owner in the chat what you need rather than
 padding it with poor ones. The plan is refused with fewer than 3.
 
+## Use the graphics card (every edit, automatically)
+
+At the start of each edit run `py "@@EDITORS_HUB_DIR@@/gpu/check.py"` (`python3` on Mac) once. It says what this
+computer's card can do and prints the settings to use. Everything below falls back to the processor by itself, so use
+these tools on every computer; without an NVIDIA card they simply run slower. Run one heavy card job at a time.
+
+- **Whisper** (transcripts, re-transcribing a cut): `whisper.load_model(name, device="cuda")` when check.py says the
+  card is ready, else `device="cpu"`; always `transcribe(..., fp16=False)` (GTX 16xx cards get half precision wrong).
+- **Speaker cut-outs:** `py "@@EDITORS_HUB_DIR@@/gpu/gpu_matte.py" IN.mp4 -o OUT.webm --quality best` in place of
+  `hyperframes remove-background` (same model, same file, about 6x faster on the card). Never HyperFrames' own
+  `--device cuda`: on Windows it silently runs on the processor.
+- **In-between video files** (base footage, section parts, joins, test renders): use the FFmpeg settings check.py prints:
+  `-c:v h264_nvenc -preset p5 -rc vbr -cq 16 -b:v 0` on the card (add `-hwaccel cuda` before `-i`), instead of libx264.
+- **The draft render:** `studio.py finish-render` already encodes H.264 on the card when it can (Settings, "Render drafts
+  on the graphics card"), keeps the bitrate chosen in the popup, and falls back to x264. `--cpu` forces the processor.
+
+## Before every render: slice-listening
+
+A transcript of the whole file smooths away false starts, "ahh"s, throat noises and repeated takes. Before you ask for
+the render settings, run `py "@@EDITORS_HUB_DIR@@/gpu/slice_listen.py" <the cut's voice or mix> -o slices.txt`. It
+re-transcribes the voice in 1.6 s windows, one every second, and lists what to listen to. Check every flagged moment by
+ear and fix what's real (a false start, a noise, a retake left in) before rendering. Say in Live what you fixed.
+
+## Before delivery: the face check
+
+After `finish-render`, and before you tell the owner a draft is ready, run
+`py "@@EDITORS_HUB_DIR@@/gpu/face_card_check.py" <the draft> --sheet <video folder>/face-check.jpg` (about a minute per
+minute of 4K on the card; slower on the processor). The owner's rule: no card, picture or text on the speaker's face or
+over their body; cards go behind them or clear of them, and never run into the bottom edge. It prints spots as ON HIM,
+NEAR HEAD or TOO LOW. Look at every spot on the sheet: fix the real ones and render again; say in Live what you fixed.
+Limits: NEAR HEAD only looks within one face width of the head (`--margin`); a card behind the speaker that they overlap
+is allowed; it samples every 3rd frame, so use `--step 1` for a last pass on a tight spot. If it can't run (no PyTorch
+or OpenCV), check the cards against the speaker by eye at every card.
+
 ## Before every render: the render popup
 
 Never make a draft for review without asking first. This applies to the first draft and after every revision, and it

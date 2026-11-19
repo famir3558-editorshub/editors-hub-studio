@@ -2,6 +2,13 @@
 
 Shown in the studio after it updates. Each version: `## 1.2.3`, then `### New`, `### Better` or `### Fixed`, with one plain line per change.
 
+## 1.39.0
+### New
+- Drafts render on your NVIDIA graphics card: about 4-5x faster at the same bitrate and quality. Settings has a switch to keep them on the processor; if the card can't do one, it renders on the processor by itself. Live says which was used.
+- With an NVIDIA card on Windows, setup downloads the card's tools once (about 3 GB), then edits use the card for speaker cut-outs, listening checks and in-between video files.
+- Before every draft, the voice is listened to again in short slices, so false starts, "ahh"s, throat noises and repeated takes are caught before you see them.
+- Before a draft reaches you, a face check looks for cards, pictures or text on the speaker or crowding their head, and cards running into the bottom edge, so they're fixed first.
+
 ## 1.38.0
 ### New
 - Voice calls with friends: tap 📞 in a chat, on your phone or in the studio's Chat tab. Answer, decline, mute and hang up; each call shows in the chat with how long it lasted, or as missed.

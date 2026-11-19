@@ -12,5 +12,10 @@ ffmpeg -v error -y -i "$C" -vf "crop=$TW:$TH:$TX:$TY,scale=1080:960:flags=lanczo
 ffmpeg -v error -y -i "$C" -an -vf "crop=$FW:$FH:$FX:$FY,scale=1080:1920:flags=lanczos" -c:v libx264 -crf 15 -preset medium -pix_fmt yuv420p -movflags +faststart "$O/cam_full.mp4"
 # cam_fg.webm = the creator cut out of cam_full (transparent). Lets FACE-window graphics sit BEHIND the head.
 # ~0.13 s per frame (a 60 s reel takes ~3 min). Skip with NO_MATTE=1 when the reel has no behind-the-head graphics.
-if [ -z "$NO_MATTE" ]; then npx hyperframes remove-background "$O/cam_full.mp4" -o "$O/cam_fg.webm" --quality best > "$O/matte.log" 2>&1 || echo "matte failed - see $O/matte.log"; fi
+GPU_MATTE="@@EDITORS_HUB_DIR@@/gpu/gpu_matte.py"  # Editors.Hub's cut-out: on the graphics card when it can
+PY="$(command -v py || command -v python3 || command -v python)"
+if [ -z "$NO_MATTE" ]; then
+  if [ -f "$GPU_MATTE" ] && [ -n "$PY" ]; then "$PY" "$GPU_MATTE" "$O/cam_full.mp4" -o "$O/cam_fg.webm" --quality best > "$O/matte.log" 2>&1 || echo "matte failed - see $O/matte.log"
+  else npx hyperframes remove-background "$O/cam_full.mp4" -o "$O/cam_fg.webm" --quality best > "$O/matte.log" 2>&1 || echo "matte failed - see $O/matte.log"; fi
+fi
 ls -la "$O"

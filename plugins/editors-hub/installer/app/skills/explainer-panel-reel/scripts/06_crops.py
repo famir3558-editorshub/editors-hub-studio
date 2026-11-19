@@ -19,6 +19,16 @@ import json, os, subprocess, sys, tempfile
 from PIL import Image, ImageDraw
 from common import work, load, save, grab, popout_default
 
+_GPU_MATTE = "@@EDITORS_HUB_DIR@@/gpu/gpu_matte.py"  # Editors.Hub fills this in; it cuts out on the graphics card when it can
+
+
+def matte_cmd(src, out):
+    """The speaker cut-out: Editors.Hub's gpu_matte.py (card first, processor fallback), else HyperFrames on the processor."""
+    if os.path.isfile(_GPU_MATTE):
+        return [sys.executable, _GPU_MATTE, src, "-o", out, "--quality", "best"]
+    return ["npx", "hyperframes", "remove-background", src, "-o", out, "--quality", "best"]
+
+
 W = work(sys.argv[1]); M = load(W, "meta.json"); L = load(W, "layout.json") or sys.exit(f"write {W}/layout.json first (see this script's header)")
 SW, SH = M["w"], M["h"]; F = L["face"]; fh = F["chin"] - F["top"]; pop = L.get("popout", popout_default())
 PN = {"x": 70, "y": 1407, "w": 940, "h": 513, "r": 36, "head": 150 if pop else 0}
@@ -75,7 +85,7 @@ O = f"{M['out']}/hf-media"; os.makedirs(O, exist_ok=True); enc = ["-c:v", "libx2
 w, h, x, y = C["full"]; subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", cut, "-vf", f"crop={w}:{h}:{x}:{y},scale=1080:1920:flags=lanczos,setsar=1", *enc, "-c:a", "aac", "-b:a", "320k", f"{O}/cam_full.mp4"], check=True)
 w, h, x, y = C["panel"]; subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", cut, "-an", "-vf", f"crop={w}:{h}:{x}:{y},scale={PN['w']}:{ph // 2 * 2}:flags=lanczos,setsar=1", *enc, f"{O}/cam_panel.mp4"], check=True)
 if pop and "--no-matte" not in sys.argv:            # the speaker's cut-out for the pop-out above the panel edge (~0.1 s per frame)
-    r = subprocess.run(["npx", "hyperframes", "remove-background", f"{O}/cam_panel.mp4", "-o", f"{O}/cam_panel_fg.webm", "--quality", "best"], capture_output=True, text=True)
+    r = subprocess.run(matte_cmd(f"{O}/cam_panel.mp4", f"{O}/cam_panel_fg.webm"), capture_output=True, text=True)
     if r.returncode: print("MATTE FAILED (set \"popout\": false in layout.json, or fix and re-run):\n", (r.stdout + r.stderr)[-600:])
 json.dump(C, open(f"{O}/crops.json", "w"), indent=1); save(W, "crops.json", C)
 print("wrote", O, os.listdir(O))

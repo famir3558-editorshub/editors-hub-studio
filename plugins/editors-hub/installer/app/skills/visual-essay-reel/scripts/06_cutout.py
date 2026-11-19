@@ -19,6 +19,16 @@ import json, os, subprocess, sys, tempfile
 from PIL import Image, ImageDraw, ImageFilter
 from common import work, load, save, grab, brand, num
 
+_GPU_MATTE = "@@EDITORS_HUB_DIR@@/gpu/gpu_matte.py"  # Editors.Hub fills this in; it cuts out on the graphics card when it can
+
+
+def matte_cmd(src, out):
+    """The speaker cut-out: Editors.Hub's gpu_matte.py (card first, processor fallback), else HyperFrames on the processor."""
+    if os.path.isfile(_GPU_MATTE):
+        return [sys.executable, _GPU_MATTE, src, "-o", out, "--quality", "best"]
+    return ["npx", "hyperframes", "remove-background", src, "-o", out, "--quality", "best"]
+
+
 W = work(sys.argv[1]); M = load(W, "meta.json"); L = load(W, "layout.json") or sys.exit(f"write {W}/layout.json first (see this script's header)")
 SW, SH = M["w"], M["h"]; F = L["face"]; fh = F["chin"] - F["top"]
 HEAD_Y = int(L.get("head_y", num("head_y", 1000))); HEAD = int(L.get("head", num("head_px", 320))); ROOM = 300; MAXUP = 1.3; MAXHEAD = 430
@@ -75,7 +85,7 @@ enc = ["-c:v", "libx264", "-crf", "15", "-preset", "medium", "-pix_fmt", "yuv420
 w, h, x, y = C["crop"]
 subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", cut, "-vf", f"crop={w}:{h}:{x}:{y},scale={out_w}:{out_h}:flags=lanczos,setsar=1", *enc, "-c:a", "aac", "-b:a", "320k", f"{O}/cam.mp4"], check=True)
 if "--no-matte" not in sys.argv:                          # about 0.1 s per frame
-    r = subprocess.run(["npx", "hyperframes", "remove-background", f"{O}/cam.mp4", "-o", f"{O}/cam_fg.webm", "--quality", "best"], capture_output=True, text=True)
+    r = subprocess.run(matte_cmd(f"{O}/cam.mp4", f"{O}/cam_fg.webm"), capture_output=True, text=True)
     if r.returncode: print("CUT-OUT FAILED (fix and re-run; without cam_fg.webm the build shows them in a rounded panel with their real background):\n", (r.stdout + r.stderr)[-600:])
 json.dump(C, open(f"{O}/cutout.json", "w"), indent=1); save(W, "cutout.json", C)
 print("wrote", O, sorted(os.listdir(O)))

@@ -27,7 +27,7 @@ Everything is plain Python (3.9+, no packages to install). ffmpeg is optional (u
     studio.py pause <video> ["why"] / resume <video>   the edit stops for a while: the clock freezes, the pages say Paused
     studio.py beat <video> ["Rendering part 3"]   every few minutes while a long render runs: the Live clock keeps counting
     studio.py ask-render <video> [--note "..."] [--size WxH] [--fps N] [--duration S]   open the render popup, wait for the choice
-    studio.py finish-render <video> <file> [--note "..."]   encode with the chosen settings and add it as the next draft
+    studio.py finish-render <video> <file> [--note "..."] [--cpu]   encode with the chosen settings and add it as the next draft
     studio.py broll-ask <video>                 when an edit or next draft starts: opens the b-roll popup if needed, waits, says what to do
     studio.py broll-plan <video> <plan.json> [--change]   opens the picker with 3 or 4 options per part, waits for the picks
     studio.py broll-record <video> <plan.json> [--change]   notes the clips you chose by yourself, so they can be changed later
@@ -197,7 +197,7 @@ def settings():
     with LOCK:
         s = read_json(SETTINGS, {}) or {}
         defaults = {"studio_name": "Editors.Hub", "your_name": "", "library": str(ROOT / "library"),
-                    "port": DEFAULT_PORT, "owner_email": OWNER_EMAIL, "lan": False, "ready_share": True, "ready_since": now(), "link_copies": False}
+                    "port": DEFAULT_PORT, "owner_email": OWNER_EMAIL, "lan": False, "ready_share": True, "ready_since": now(), "link_copies": False, "gpu_encode": True}
         if any(k not in s for k in defaults) or not s.get("token"):
             s = {**defaults, **s, "token": s.get("token") or secrets.token_urlsafe(24)}
             write_json(SETTINGS, s)
@@ -221,6 +221,8 @@ def update_settings(changes):
             s["ready_share"] = bool(changes["ready_share"])
         if "link_copies" in changes:
             s["link_copies"] = bool(changes["link_copies"])
+        if "gpu_encode" in changes:
+            s["gpu_encode"] = bool(changes["gpu_encode"])
         if "library_confirmed" in changes:
             s["library_confirmed"] = bool(changes["library_confirmed"])
         for key in ("studio_name", "your_name", "library"):
@@ -3389,6 +3391,34 @@ def render_mbps(choice, width, height, fps):
     return max(0.5, round(amount * (0.7 if choice["format"] == "h265" else 1), 1))
 
 
+_NVENC = {}
+
+
+def nvenc_available(ffmpeg):
+    """True when this FFmpeg has h264_nvenc and the card can open a session (checked once per run)."""
+    if ffmpeg not in _NVENC:
+        ok = False
+        try:
+            r = subprocess.run([ffmpeg, "-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i", "color=black:s=256x256:d=0.1",
+                                "-c:v", "h264_nvenc", "-f", "null", "-"], capture_output=True, timeout=30)
+            ok = r.returncode == 0
+        except (OSError, subprocess.SubprocessError):
+            ok = False
+        _NVENC[ffmpeg] = ok
+    return _NVENC[ffmpeg]
+
+
+def h264_encoder_args(mbps, gpu):
+    """The H.264 settings for a bitrate target: NVENC on the graphics card, or libx264 on the processor.
+    Both keep the same target, peak (1.5x) and buffer (2x), and give High profile 4:2:0."""
+    rate = ["-b:v", f"{mbps}M", "-maxrate", f"{round(mbps * 1.5, 1)}M", "-bufsize", f"{round(mbps * 2, 1)}M"]
+    if gpu:
+        return ["-c:v", "h264_nvenc", "-preset", "p6", "-tune", "hq", "-rc", "vbr", *rate, "-multipass", "fullres",
+                "-spatial-aq", "1", "-temporal-aq", "1", "-rc-lookahead", "32", "-bf", "3", "-b_ref_mode", "middle",
+                "-profile:v", "high", "-pix_fmt", "yuv420p"]
+    return ["-c:v", "libx264", "-preset", "medium", *rate, "-pix_fmt", "yuv420p"]
+
+
 def describe_choice(choice):
     label = lambda key: dict(RENDER_OPTIONS[key])[choice[key]]
     return (f"resolution {label('resolution')}, frame rate {label('fps')}, bitrate {label('bitrate')}, "
@@ -3464,8 +3494,10 @@ def set_render_choice(vid, choice, by=""):
     return req
 
 
-def finish_render(vid, master, note=""):
-    """Encodes the edit with the settings chosen in the popup, and adds it as the next draft."""
+def finish_render(vid, master, note="", cpu=False):
+    """Encodes the edit with the settings chosen in the popup, and adds it as the next draft.
+    H.264 goes on the graphics card (NVENC) when it can, and falls back to the processor (x264) if NVENC
+    is missing or fails; cpu=True, or the gpu_encode setting off, always uses the processor."""
     check_edit(load_video(vid))
     master = Path(master)
     if not master.is_file():
@@ -3482,28 +3514,47 @@ def finish_render(vid, master, note=""):
     width, height = render_size(info["width"], info["height"], choice["resolution"])
     fps = info["fps"] if choice["fps"] == "same" else int(choice["fps"])
     mbps = render_mbps(choice, width, height, fps)
-    cmd = [ffmpeg, "-y", "-loglevel", "error", "-i", str(master), "-vf", f"scale={width}:{height}:flags=lanczos"]
+    head = [ffmpeg, "-y", "-loglevel", "error", "-i", str(master), "-vf", f"scale={width}:{height}:flags=lanczos"]
     if choice["fps"] != "same":
-        cmd += ["-r", str(fps)]
+        head += ["-r", str(fps)]
+    audio = ["-c:a", "aac", "-b:a", f"{choice['audio']}k"]
     if choice["format"] == "prores":
-        cmd += ["-c:v", "prores_ks", "-profile:v", "3", "-pix_fmt", "yuv422p10le", "-c:a", "pcm_s16le"]
+        tries = [("prores", ["-c:v", "prores_ks", "-profile:v", "3", "-pix_fmt", "yuv422p10le", "-c:a", "pcm_s16le"])]
         suffix = ".mov"
+    elif choice["format"] == "h265":
+        tries = [("x265", ["-c:v", "libx265", "-tag:v", "hvc1", "-preset", "medium", "-b:v", f"{mbps}M",
+                           "-maxrate", f"{round(mbps * 1.5, 1)}M", "-bufsize", f"{round(mbps * 2, 1)}M",
+                           "-pix_fmt", "yuv420p", "-movflags", "+faststart", *audio])]
+        suffix = ".mp4"
     else:
-        codec = ["-c:v", "libx265", "-tag:v", "hvc1"] if choice["format"] == "h265" else ["-c:v", "libx264"]
-        cmd += [*codec, "-preset", "medium", "-b:v", f"{mbps}M", "-maxrate", f"{round(mbps * 1.5, 1)}M",
-                "-bufsize", f"{round(mbps * 2, 1)}M", "-pix_fmt", "yuv420p", "-movflags", "+faststart",
-                "-c:a", "aac", "-b:a", f"{choice['audio']}k"]
+        tries = [("x264", [*h264_encoder_args(mbps, False), "-movflags", "+faststart", *audio])]
+        if not cpu and settings().get("gpu_encode", True) and nvenc_available(ffmpeg):
+            tries.insert(0, ("NVENC", [*h264_encoder_args(mbps, True), "-movflags", "+faststart", *audio]))
         suffix = ".mp4"
     out = Path(v["folder"]) / f".render-{secrets.token_hex(3)}{suffix}"
-    post_update(vid, f"Rendering now: {width} × {height}, {fps:g} fps" + (f", about {mbps} Mbps." if mbps else ", ProRes."), step="Render")
+    where = {"NVENC": " on the graphics card (NVENC)", "x264": " on the processor (x264)"}
+    post_update(vid, f"Rendering now: {width} × {height}, {fps:g} fps" + (f", about {mbps} Mbps" if mbps else ", ProRes")
+                + where.get(tries[0][0], "") + ".", step="Render")
     try:
-        r = subprocess.run([*cmd, str(out)], capture_output=True, text=True, encoding="utf-8", errors="replace")
-        if r.returncode or not out.exists():
-            raise StudioError("The render failed: " + (r.stderr or "").strip()[-400:])
+        for n, (encoder, args) in enumerate(tries):
+            started = time.time()
+            r = subprocess.run([*head, *args, str(out)], capture_output=True, text=True, encoding="utf-8", errors="replace")
+            if not r.returncode and out.exists() and probe_media(out):
+                break
+            out.unlink(missing_ok=True)
+            reason = (r.stderr or "").strip()[-400:]
+            if n + 1 < len(tries):
+                print(f"[render] {encoder} failed, using {tries[n + 1][0]} instead: {reason}", file=sys.stderr)
+                post_update(vid, f"The graphics card couldn't render this one, so it's rendering on the processor (x264) instead.")
+                continue
+            raise StudioError("The render failed: " + reason)
+        seconds = round(time.time() - started)
+        print(f"[render] encoder {encoder}, {seconds} s", file=sys.stderr)
         made = probe_media(out)
         size_mb = out.stat().st_size / 1e6
         render = {**choice, "width": made.get("width", width), "height": made.get("height", height),
-                  "fps": made.get("fps", fps), "mbps": mbps, "size_mb": round(size_mb, 1)}
+                  "fps": made.get("fps", fps), "mbps": mbps, "size_mb": round(size_mb, 1), "encoder": encoder,
+                  "encode_seconds": seconds}
         version = add_draft(vid, out, note, move=True, original=master.name, render=render)
     finally:
         out.unlink(missing_ok=True)
@@ -3514,7 +3565,8 @@ def finish_render(vid, master, note=""):
     made_draft = next((d for d in [*v["drafts"], v.get("incoming") or {}] if d.get("version") == version), None)  # still uploading: held in incoming
     final = Path(v["folder"]) / made_draft["file"] if made_draft else None
     post_update(vid, f"Draft {version} is ready to review: {render['width']} × {render['height']}, {render['fps']:g} fps, "
-                     f"{size_mb:.1f} MB.", final, (made.get("duration") or 0) / 2, version)
+                     f"{size_mb:.1f} MB, encoded with {encoder} in {seconds // 60} min {seconds % 60} s.",
+                final, (made.get("duration") or 0) / 2, version)
     return version, render
 
 
@@ -4880,7 +4932,7 @@ def install_skill(src):
     if tmp.exists():
         shutil.rmtree(tmp)
     shutil.copytree(src, tmp, ignore=shutil.ignore_patterns(*SKILL_JUNK))
-    for p in tmp.rglob("*.md"):  # the Editors.Hub skill needs to know where this copy of the studio lives
+    for p in [*tmp.rglob("*.md"), *tmp.rglob("*.py"), *tmp.rglob("*.sh")]:  # skills find this copy of the studio (its gpu tools)
         text = p.read_text(encoding="utf-8", errors="replace")
         if HUB_DIR_TOKEN in text:
             p.write_text(text.replace(HUB_DIR_TOKEN, ROOT.as_posix()), encoding="utf-8")
@@ -7310,7 +7362,7 @@ class Handler(BaseHTTPRequestHandler):
              "can_edit": can_edit_project(p, self.user)}
             for p in list_projects()]
         me = accounts().public(self.user)
-        visible = ("studio_name", "your_name", "library", "ready_share", "link_copies") if me["role"] == "owner" else ("studio_name",)
+        visible = ("studio_name", "your_name", "library", "ready_share", "link_copies", "gpu_encode") if me["role"] == "owner" else ("studio_name",)
         return {"can_effects": can_remove_effects(self.user), "me": me, "version": APP_VERSION, "approval": approval.status(DATA), "alone": not approval.open_to_others(DATA), "report": self.report_mode(), "updated": update_to_tell(me["email"]), "settings": {k: s[k] for k in visible},
                 "projects": projects, "styles": styles, "videos": videos, "statuses": STATUSES, "disk": library_space(),
                 "platform": "windows" if WINDOWS else "mac" if sys.platform == "darwin" else "linux"}
@@ -7840,6 +7892,7 @@ def main(argv=None):
     fr.add_argument("video")
     fr.add_argument("file")
     fr.add_argument("--note", default="")
+    fr.add_argument("--cpu", action="store_true", help="encode on the processor (x264), not the graphics card")
     ss = sub.add_parser("set-status")
     ss.add_argument("video")
     ss.add_argument("status")
@@ -8009,7 +8062,7 @@ def main(argv=None):
             else:
                 print(f"Render the edit at full quality, then run: studio.py finish-render {a.video} <file> --note \"what changed\"")
         elif a.cmd == "finish-render":
-            version, r = finish_render(a.video, a.file, a.note)
+            version, r = finish_render(a.video, a.file, a.note, cpu=a.cpu)
             print(f"v{version} is up for review ({r['width']}x{r['height']}, {r['fps']:g} fps, {r['size_mb']} MB): {home_url('/review/' + a.video)}")
         elif a.cmd == "add-draft":
             n = add_draft(a.video, a.file, a.note)

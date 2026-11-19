@@ -24,6 +24,16 @@ import json, subprocess, os, sys, re, argparse, glob
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
 HERE = os.path.dirname(os.path.abspath(__file__)); SKILL = os.path.dirname(HERE); sys.path.insert(0, HERE)
 import stt  # the creator profile is read through it (shared by every skill in the pack)
+
+_GPU_MATTE = "@@EDITORS_HUB_DIR@@/gpu/gpu_matte.py"  # Editors.Hub fills this in; it cuts out on the graphics card when it can
+
+
+def matte_cmd(src, out):
+    """The speaker cut-out: Editors.Hub's gpu_matte.py (card first, processor fallback), else HyperFrames on the processor."""
+    if os.path.isfile(_GPU_MATTE):
+        return [sys.executable, _GPU_MATTE, src, "-o", out, "--quality", "best"]
+    return ["npx", "hyperframes", "remove-background", src, "-o", out, "--quality", "best"]
+
 # the creator's answers for this skill (setup/SETUP.md). Change the answer and re-run setup/apply_profile.py, never this text.
 ACCENT = "@@ACCENT@@"; ON_ACCENT = "@@ON_ACCENT@@"
 SET = {"caption_size": "@@CAPTION_SIZE@@", "caption_y": "@@CAPTION_Y@@", "rim": "@@RIM@@", "hook_label": "@@HOOK_LABEL@@"}
@@ -39,7 +49,7 @@ MATTE = WK + '/matte.webm'
 def probe(f, e, s='v:0'): return subprocess.run(['ffprobe', '-v', 'error', '-select_streams', s, '-show_entries', e, '-of', 'csv=p=0', f], capture_output=True, text=True).stdout.strip().split('\n')[0].rstrip(',')
 if MODE == 'matte':
     if not A.video: raise SystemExit('matte needs --video')
-    r = subprocess.run(['npx', 'hyperframes', 'remove-background', os.path.abspath(A.video), '-o', MATTE, '--quality', 'best'], cwd=WK, stdout=subprocess.DEVNULL)
+    r = subprocess.run(matte_cmd(os.path.abspath(A.video), MATTE), cwd=WK, stdout=subprocess.DEVNULL)
     if r.returncode or not os.path.exists(MATTE): raise SystemExit('background removal failed')
     print(MATTE, '- now look at a few frames on a bright colour before building (see SKILL.md, "Check the matte")'); sys.exit()
 for a in ('plan', 'words'):
