@@ -83,11 +83,11 @@ cut = M.get("cut") or sys.exit("render the cut first (05_render_cut.py)")
 O = f"{M['out']}/hf-media"; os.makedirs(O, exist_ok=True)
 enc = ["-c:v", "libx264", "-crf", "15", "-preset", "medium", "-pix_fmt", "yuv420p", "-g", "24", "-keyint_min", "24", "-movflags", "+faststart"]      # a keyframe every second: the renderer seeks these files
 w, h, x, y = C["crop"]
-subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", cut, "-vf", f"crop={w}:{h}:{x}:{y},scale={out_w}:{out_h}:flags=lanczos,setsar=1", *enc, "-c:a", "aac", "-b:a", "320k", f"{O}/cam.mp4"], check=True)
+subprocess.run(["ffmpeg", "-nostdin", "-v", "error", "-y", "-i", cut, "-vf", f"crop={w}:{h}:{x}:{y},scale={out_w}:{out_h}:flags=lanczos,setsar=1", *enc, "-c:a", "aac", "-b:a", "320k", f"{O}/cam.mp4"], check=True)
 if "--no-matte" not in sys.argv:                          # about 0.1 s per frame
     r = subprocess.run(matte_cmd(f"{O}/cam.mp4", f"{O}/cam_fg.webm"), capture_output=True, text=True)
     if r.returncode: print("CUT-OUT FAILED (fix and re-run; without cam_fg.webm the build shows them in a rounded panel with their real background):\n", (r.stdout + r.stderr)[-600:])
 json.dump(C, open(f"{O}/cutout.json", "w"), indent=1); save(W, "cutout.json", C)
 print("wrote", O, sorted(os.listdir(O)))
 print("Next: check the cut-out edge BEFORE building. Three full-size stills (hair, a raised hand, a fast gesture):\n"
-      f"  ffmpeg -v error -y -ss <t> -c:v libvpx-vp9 -i \"{O}/cam_fg.webm\" -frames:v 1 -vf \"format=rgba\" <still>.png")
+      f"  ffmpeg -nostdin -v error -y -ss <t> -c:v libvpx-vp9 -i \"{O}/cam_fg.webm\" -frames:v 1 -vf \"format=rgba\" <still>.png")

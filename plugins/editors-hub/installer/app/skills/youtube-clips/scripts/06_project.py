@@ -38,7 +38,7 @@ json.dump(caps, open(f"{PJ}/captions.json", "w"))
 dur = float(subprocess.check_output(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", cut]))
 E = json.load(open(f"{W}/edl.json")); fps = E["fps"]
 json.dump({"title": title, "dur": round(dur, 3), "fps": fps, "fps_str": M.get("fps", str(fps)), "out": M["out"], "stem": M["stem"].replace(" - source", "")}, open(f"{PJ}/project.json", "w"))
-subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", cut, "-vf", "scale=1920:1080", "-c:v", "libx264", "-crf", "20", "-preset", "veryfast", "-an", f"{W}/proxy1080.mp4"], check=True)
+subprocess.run(["ffmpeg", "-nostdin", "-v", "error", "-y", "-i", cut, "-vf", "scale=1920:1080", "-c:v", "libx264", "-crf", "20", "-preset", "veryfast", "-an", f"{W}/proxy1080.mp4"], check=True)
 subprocess.run([sys.executable, f"{here}/04_faces.py", f"{W}/proxy1080.mp4", PJ], check=True)
 sj = next(iter(glob.glob(f"{M['out']}/*- source.json")), None)
 if sj:

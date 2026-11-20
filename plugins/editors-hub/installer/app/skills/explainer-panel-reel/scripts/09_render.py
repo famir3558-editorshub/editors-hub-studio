@@ -20,7 +20,7 @@ print("wrote", out)
 if not draft:
     D = P["dur"]; br = int(min(6000, 26 * 8000 / D - 170)); ph = out[:-4] + " (phone).mp4"; log = f"{PJ}/renders/pass"
     for n, extra in ((1, ["-an", "-f", "mp4", "/dev/null"]), (2, ["-c:a", "aac", "-b:a", "160k", "-movflags", "+faststart", ph])):
-        subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", out, "-c:v", "libx264", "-preset", "slow", "-b:v", f"{br}k", "-maxrate", f"{br * 5 // 4}k", "-bufsize", "8000k",
+        subprocess.run(["ffmpeg", "-nostdin", "-v", "error", "-y", "-i", out, "-c:v", "libx264", "-preset", "slow", "-b:v", f"{br}k", "-maxrate", f"{br * 5 // 4}k", "-bufsize", "8000k",
                         "-pass", str(n), "-passlogfile", log, *extra], check=True)
     print("phone copy", ph)
 print(f"next: python3 {os.path.dirname(os.path.abspath(__file__))}/10_review.py {slug} \"{out}\"")

@@ -45,7 +45,7 @@ for j in cuts:
     if j["big"] and not any(b["at"] <= j["t"] <= b["at"] + b["dur"] for b in B):
         pic += [(shot(j["t"] - 2 * F), f"cut {j['t']:.2f} before"), (shot(j["t"] + F), f"cut {j['t']:.2f} after")]
 pic.append((shot(TOT - 2 * F), "last frame")); sheets("picture", pic, 5, 380, 15)
-raw = subprocess.run(["ffmpeg", "-v", "error", "-i", f, "-vn", "-ac", "1", "-ar", "16000", "-f", "s16le", "-"], capture_output=True).stdout
+raw = subprocess.run(["ffmpeg", "-nostdin", "-v", "error", "-i", f, "-vn", "-ac", "1", "-ar", "16000", "-f", "s16le", "-"], capture_output=True).stdout
 a = np.frombuffer(raw, np.int16).astype(np.float32) / 32768; h = 160; m = len(a) // h
 r = 20 * np.log10(np.sqrt((a[:m * h].reshape(m, h) ** 2).mean(1)) + 1e-9); on = np.where(r > -40)[0]
 print(f"\n{os.path.basename(f)}: {P['w']}x{P['h']} {P['fps']} fps, {P['dur']:.2f}s (plan {TOT:.2f}s)" + ("" if abs(P["dur"] - TOT) < 0.15 else "  <-- LENGTH MISMATCH")

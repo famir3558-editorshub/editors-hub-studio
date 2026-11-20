@@ -86,7 +86,7 @@ def pieces(c):
 def extract(c):
     P = pieces(c); d = f"{M['out']}/{c['id']}"; os.makedirs(d, exist_ok=True)
     dst = f"{d}/{c['id']} - source.mov"
-    cmd = ["ffmpeg", "-v", "error", "-y"]
+    cmd = ["ffmpeg", "-nostdin", "-v", "error", "-y"]
     for p in P:
         cmd += ["-ss", f"{p['a']:.3f}", "-t", f"{p['b'] - p['a']:.3f}", "-i", M["src"]]
     fc = "".join(f"[{k}:v:0][{k}:a:0]" for k in range(len(P))) + f"concat=n={len(P)}:v=1:a=1[v][a]"

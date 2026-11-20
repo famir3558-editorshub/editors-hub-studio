@@ -119,7 +119,7 @@ if __name__ == "__main__":
     tmp = None
     if not src.lower().endswith((".wav", ".flac", ".mp3", ".m4a")):
         tmp = tempfile.mktemp(suffix=".flac")
-        subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", src, "-vn", "-ac", "1", "-ar", "16000", tmp], check=True)
+        subprocess.run(["ffmpeg", "-nostdin", "-v", "error", "-y", "-i", src, "-vn", "-ac", "1", "-ar", "16000", tmp], check=True)
     J = transcribe(tmp or src, diarize="--diarize" in sys.argv)
     out = args[1] if len(args) > 1 else os.path.splitext(src)[0] + ".words.json"
     json.dump(J, open(out, "w"))

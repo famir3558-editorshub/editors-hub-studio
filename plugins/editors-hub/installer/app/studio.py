@@ -272,7 +272,7 @@ def make_thumb(video, out):
         return
     for seek in ("1", "0"):
         try:
-            subprocess.run([ffmpeg, "-y", "-loglevel", "error", "-ss", seek, "-i", str(video), "-frames:v", "1",
+            subprocess.run([ffmpeg, "-nostdin", "-y", "-loglevel", "error", "-ss", seek, "-i", str(video), "-frames:v", "1",
                             "-vf", "scale=640:-2", str(out)], timeout=60, capture_output=True)
         except (OSError, subprocess.TimeoutExpired):
             return
@@ -576,7 +576,7 @@ def link_video_file(src, job):
     folder.mkdir()
     out = folder / f"{src.stem}.mp4"
     job["stage"] = "Making a copy every browser can play"
-    p = subprocess.Popen([ffmpeg, "-y", "-loglevel", "error", "-i", str(src), "-map", "0:v:0", "-map", "0:a:0?", "-c:v", "libx264", "-preset", "veryfast",
+    p = subprocess.Popen([ffmpeg, "-nostdin", "-y", "-loglevel", "error", "-i", str(src), "-map", "0:v:0", "-map", "0:a:0?", "-c:v", "libx264", "-preset", "veryfast",
                           "-crf", "20", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", str(out)],
                          stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
     while p.poll() is None:
@@ -617,7 +617,7 @@ def link_poster(src):
         return None
     for seek, q in (("1", "4"), ("1", "9"), ("0", "9")):
         try:
-            r = subprocess.run([ffmpeg, "-loglevel", "error", "-ss", seek, "-i", str(src), "-frames:v", "1", "-vf", "scale='min(540,iw)':-2",
+            r = subprocess.run([ffmpeg, "-nostdin", "-loglevel", "error", "-ss", seek, "-i", str(src), "-frames:v", "1", "-vf", "scale='min(540,iw)':-2",
                                 "-q:v", q, "-f", "image2", "-c:v", "mjpeg", "-"], capture_output=True, timeout=60)
         except (OSError, subprocess.TimeoutExpired):
             return None
@@ -1954,7 +1954,7 @@ def make_preview_frames(src, out, label):
         at = (i + 0.5) / PREVIEW_FRAMES * duration
         name = f"{i:02d}.jpg"
         try:
-            subprocess.run([ffmpeg, "-y", "-loglevel", "error", "-ss", f"{at:.2f}", "-i", str(src), "-frames:v", "1", "-vf", "scale=-2:540", str(out / name)],
+            subprocess.run([ffmpeg, "-nostdin", "-y", "-loglevel", "error", "-ss", f"{at:.2f}", "-i", str(src), "-frames:v", "1", "-vf", "scale=-2:540", str(out / name)],
                            timeout=60, capture_output=True)
         except (OSError, subprocess.TimeoutExpired):
             continue
@@ -2212,7 +2212,7 @@ def board_look(path):
     look = ""
     for share in (0.1, 0.5, 0.9):
         try:
-            r = subprocess.run([ffmpeg, "-v", "error", *([] if still else ["-ss", f"{duration * share:.2f}"]), "-i", str(path), "-frames:v", "1", "-vf", "scale=9:8,format=gray", "-f", "rawvideo", "-"],
+            r = subprocess.run([ffmpeg, "-nostdin", "-v", "error", *([] if still else ["-ss", f"{duration * share:.2f}"]), "-i", str(path), "-frames:v", "1", "-vf", "scale=9:8,format=gray", "-f", "rawvideo", "-"],
                                capture_output=True, timeout=60)
         except (OSError, subprocess.TimeoutExpired):
             return ""
@@ -2993,7 +2993,7 @@ def take_snapshot(folder, src, at=None):
         if not ffmpeg:
             raise StudioError("A snapshot from a video needs FFmpeg.")
         dest = out / f"{stamp}.jpg"
-        subprocess.run([ffmpeg, "-y", "-loglevel", "error", "-ss", str(at or 0), "-i", str(src), "-frames:v", "1",
+        subprocess.run([ffmpeg, "-nostdin", "-y", "-loglevel", "error", "-ss", str(at or 0), "-i", str(src), "-frames:v", "1",
                         "-vf", "scale=960:-2", str(dest)], capture_output=True, timeout=120)
         if not dest.exists():
             raise StudioError(f"Couldn't take a snapshot from {src.name}.")
@@ -3359,7 +3359,7 @@ def peek(path, what):
                       "-c:v", "libx264", "-preset", "veryfast", "-crf", "27", "-pix_fmt", "yuv420p", "-movflags", "+faststart"]]
         for args in tries:
             try:
-                subprocess.run([ffmpeg, "-y", "-loglevel", "error", *args, str(part)], capture_output=True, timeout=180)
+                subprocess.run([ffmpeg, "-nostdin", "-y", "-loglevel", "error", *args, str(part)], capture_output=True, timeout=180)
             except (OSError, subprocess.TimeoutExpired):
                 break
             if part.exists() and part.stat().st_size:
@@ -3399,7 +3399,7 @@ def nvenc_available(ffmpeg):
     if ffmpeg not in _NVENC:
         ok = False
         try:
-            r = subprocess.run([ffmpeg, "-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i", "color=black:s=256x256:d=0.1",
+            r = subprocess.run([ffmpeg, "-nostdin", "-hide_banner", "-loglevel", "error", "-f", "lavfi", "-i", "color=black:s=256x256:d=0.1",
                                 "-c:v", "h264_nvenc", "-f", "null", "-"], capture_output=True, timeout=30)
             ok = r.returncode == 0
         except (OSError, subprocess.SubprocessError):
@@ -3494,6 +3494,9 @@ def set_render_choice(vid, choice, by=""):
     return req
 
 
+RENDER_FREE_GB = 15  # a 4K draft is 3-4 GB; this keeps the drive from filling up halfway through
+
+
 def finish_render(vid, master, note="", cpu=False):
     """Encodes the edit with the settings chosen in the popup, and adds it as the next draft.
     H.264 goes on the graphics card (NVENC) when it can, and falls back to the processor (x264) if NVENC
@@ -3514,7 +3517,12 @@ def finish_render(vid, master, note="", cpu=False):
     width, height = render_size(info["width"], info["height"], choice["resolution"])
     fps = info["fps"] if choice["fps"] == "same" else int(choice["fps"])
     mbps = render_mbps(choice, width, height, fps)
-    head = [ffmpeg, "-y", "-loglevel", "error", "-i", str(master), "-vf", f"scale={width}:{height}:flags=lanczos"]
+    need_gb = max(RENDER_FREE_GB, 2 * (mbps or 400) * (info.get("duration") or 0) / 8000)  # ProRes: about 400 Mbps
+    free_gb = shutil.disk_usage(v["folder"]).free / 1e9
+    if free_gb < need_gb:
+        raise StudioError(f"The drive with this video has {free_gb:.1f} GB free; the render needs at least {need_gb:.0f} GB. "
+                          f"Free some space on it (or move old work to another drive), then run finish-render again. Nothing was rendered.")
+    head = [ffmpeg, "-nostdin", "-y", "-loglevel", "error", "-i", str(master), "-vf", f"scale={width}:{height}:flags=lanczos"]
     if choice["fps"] != "same":
         head += ["-r", str(fps)]
     audio = ["-c:a", "aac", "-b:a", f"{choice['audio']}k"]
@@ -3535,6 +3543,7 @@ def finish_render(vid, master, note="", cpu=False):
     where = {"NVENC": " on the graphics card (NVENC)", "x264": " on the processor (x264)"}
     post_update(vid, f"Rendering now: {width} × {height}, {fps:g} fps" + (f", about {mbps} Mbps" if mbps else ", ProRes")
                 + where.get(tries[0][0], "") + ".", step="Render")
+    fallback = ""
     try:
         for n, (encoder, args) in enumerate(tries):
             started = time.time()
@@ -3543,9 +3552,13 @@ def finish_render(vid, master, note="", cpu=False):
                 break
             out.unlink(missing_ok=True)
             reason = (r.stderr or "").strip()[-400:]
+            if "No space left" in reason or shutil.disk_usage(v["folder"]).free < 2e9:
+                raise StudioError("The drive with this video filled up during the render, so it stopped. Free some space on it, "
+                                  "then run finish-render again. Nothing was added.")
             if n + 1 < len(tries):
+                fallback = (reason.splitlines() or ["no message"])[-1][:200]
                 print(f"[render] {encoder} failed, using {tries[n + 1][0]} instead: {reason}", file=sys.stderr)
-                post_update(vid, f"The graphics card couldn't render this one, so it's rendering on the processor (x264) instead.")
+                post_update(vid, f"The graphics card couldn't render this one ({fallback}), so it's rendering on the processor (x264) instead.")
                 continue
             raise StudioError("The render failed: " + reason)
         seconds = round(time.time() - started)
@@ -3554,7 +3567,7 @@ def finish_render(vid, master, note="", cpu=False):
         size_mb = out.stat().st_size / 1e6
         render = {**choice, "width": made.get("width", width), "height": made.get("height", height),
                   "fps": made.get("fps", fps), "mbps": mbps, "size_mb": round(size_mb, 1), "encoder": encoder,
-                  "encode_seconds": seconds}
+                  "encode_seconds": seconds, **({"fallback_reason": fallback} if fallback else {})}
         version = add_draft(vid, out, note, move=True, original=master.name, render=render)
     finally:
         out.unlink(missing_ok=True)
@@ -4666,7 +4679,7 @@ def learn_clip(v, source, spec, section):
     folder = style_dir(v["style"]) / section / LEARN_PRIVATE
     folder.mkdir(parents=True, exist_ok=True)
     target = unique_path(folder, safe_filename(name) + ".mp4")
-    r = subprocess.run([ffmpeg, "-y", "-loglevel", "error", "-ss", f"{start}", "-to", f"{end}", "-i", str(source), "-vf", "scale='min(720,iw)':-2", "-c:v", "libx264", "-preset", "veryfast",
+    r = subprocess.run([ffmpeg, "-nostdin", "-y", "-loglevel", "error", "-ss", f"{start}", "-to", f"{end}", "-i", str(source), "-vf", "scale='min(720,iw)':-2", "-c:v", "libx264", "-preset", "veryfast",
                         "-crf", "23", "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", str(target)], capture_output=True, text=True, encoding="utf-8", errors="replace")
     if r.returncode or not target.exists() or target.stat().st_size < 1000:
         target.unlink(missing_ok=True)
@@ -5770,7 +5783,7 @@ def style_cover(sdir):
     joined = "".join(f"[c{n}]" for n in range(len(sources)))
     graph = ";".join(cells) + (f";{joined}hstack=inputs={len(sources)}[out]" if len(sources) > 1 else ";[c0]null[out]")
     try:
-        subprocess.run([ffmpeg, "-y", "-v", "error", *inputs, "-filter_complex", graph, "-map", "[out]", "-frames:v", "1", "-q:v", "6", str(out)],
+        subprocess.run([ffmpeg, "-nostdin", "-y", "-v", "error", *inputs, "-filter_complex", graph, "-map", "[out]", "-frames:v", "1", "-q:v", "6", str(out)],
                        capture_output=True, timeout=90, **claude_run_flags())
     except (OSError, subprocess.TimeoutExpired):
         return None
@@ -5787,7 +5800,7 @@ def style_preview(sdir):
     strip = next((p for p in (sdir / "library" / "preview-strip.jpg", sdir / "preview-strip.jpg") if p.is_file()), None)
     clips = [] if strip else [sdir / i["file"] for sec in ("references", "effects", "transitions", "graphics") for i in section_items(sdir, sec) if i["kind"] == "video"][:4]
     if strip:
-        cmd = [ffmpeg, "-y", "-v", "error", "-i", str(strip), "-vf", "scale='min(1440,iw)':-2", "-frames:v", "1", "-q:v", "5", str(out)]
+        cmd = [ffmpeg, "-nostdin", "-y", "-v", "error", "-i", str(strip), "-vf", "scale='min(1440,iw)':-2", "-frames:v", "1", "-q:v", "5", str(out)]
     elif clips:
         inputs, cells = [], []
         for n, clip in enumerate(clips):
@@ -5795,7 +5808,7 @@ def style_preview(sdir):
             cells.append(f"[{n}:v]scale=360:320:force_original_aspect_ratio=increase,crop=360:320,setsar=1[c{n}]")
         joined = "".join(f"[c{n}]" for n in range(len(clips)))
         graph = ";".join(cells) + (f";{joined}hstack=inputs={len(clips)}[out]" if len(clips) > 1 else ";[c0]null[out]")
-        cmd = [ffmpeg, "-y", "-v", "error", *inputs, "-filter_complex", graph, "-map", "[out]", "-frames:v", "1", "-q:v", "5", str(out)]
+        cmd = [ffmpeg, "-nostdin", "-y", "-v", "error", *inputs, "-filter_complex", graph, "-map", "[out]", "-frames:v", "1", "-q:v", "5", str(out)]
     else:
         return None
     for quality in ("5", "9", "14"):
@@ -6017,10 +6030,10 @@ def lighten_file(src, dest, step, job):
     if ext in LIGHT_VIDEO:
         if not can_lighten_video(src):
             return False
-        cmd = [ffmpeg, "-y", "-loglevel", "error", "-i", str(src), "-map", "0:v:0", "-map", "0:a?", "-vf", box(step["edge"]), "-c:v", "libx264", "-preset", "veryfast",
+        cmd = [ffmpeg, "-nostdin", "-y", "-loglevel", "error", "-i", str(src), "-map", "0:v:0", "-map", "0:a?", "-vf", box(step["edge"]), "-c:v", "libx264", "-preset", "veryfast",
                "-crf", str(step["crf"]), "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", f"{step['audio']}k", str(dest)]
     else:
-        cmd = [ffmpeg, "-y", "-loglevel", "error", "-i", str(src), "-vf", box(LIGHT_IMAGE_EDGE).replace(":force_divisible_by=2", ""), "-frames:v", "1"]
+        cmd = [ffmpeg, "-nostdin", "-y", "-loglevel", "error", "-i", str(src), "-vf", box(LIGHT_IMAGE_EDGE).replace(":force_divisible_by=2", ""), "-frames:v", "1"]
         cmd += ["-q:v", "3", "-update", "1", str(dest)] if ext != ".png" else ["-update", "1", str(dest)]
     dest.parent.mkdir(parents=True, exist_ok=True)
     try:

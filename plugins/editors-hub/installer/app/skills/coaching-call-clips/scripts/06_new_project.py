@@ -35,7 +35,7 @@ print(f"{PJ}: {d:.2f}s, {len(caps)} captions" + (" (swear words starred)" if STA
 # faces.json must be in the engine's 1920x1080 layout space: detect on a 1080p proxy when the cut is any other size
 if (M["w"], M["h"]) != (1920, 1080):
     proxy = f"{W}/proxy1080.mp4"
-    subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", cut, "-vf", "scale=1920:1080", "-c:v", "libx264", "-crf", "20", "-preset", "veryfast", "-an", proxy], check=True)
+    subprocess.run(["ffmpeg", "-nostdin", "-v", "error", "-y", "-i", cut, "-vf", "scale=1920:1080", "-c:v", "libx264", "-crf", "20", "-preset", "veryfast", "-an", proxy], check=True)
     print(f"({M['w']}x{M['h']} source: faces found on a 1920x1080 proxy; leave E.init's src at its default)")
 else:
     proxy = cut

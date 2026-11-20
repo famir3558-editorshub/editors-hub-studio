@@ -36,9 +36,9 @@ for c in ([] if "--no-sfx" in sys.argv else J["cues"]):
 
 
 def mix(src, out, bed=None):
-    cmd = ["ffmpeg", "-v", "error", "-y", "-i", src]; fc = []; labs = ["[0:a]"]; n = 1
+    cmd = ["ffmpeg", "-nostdin", "-v", "error", "-y", "-i", src]; fc = []; labs = ["[0:a]"]; n = 1
     if bed:
-        info = subprocess.run(["ffmpeg", "-v", "info", "-ss", str(mstart), "-t", str(J["dur"]), "-i", bed, "-af", "volumedetect", "-f", "null", "-"], capture_output=True, text=True).stderr
+        info = subprocess.run(["ffmpeg", "-nostdin", "-v", "info", "-ss", str(mstart), "-t", str(J["dur"]), "-i", bed, "-af", "volumedetect", "-f", "null", "-"], capture_output=True, text=True).stderr
         g = MUSIC_MEAN - float(re.search(r"mean_volume: (-?[\d.]+)", info).group(1)); cmd += ["-i", bed]
         fc.append(f"[{n}:a]atrim={mstart}:{mstart + J['dur']},asetpts=PTS-STARTPTS,aresample=48000,aformat=channel_layouts=stereo,volume={g:.1f}dB,afade=t=in:st=0:d=0.4,afade=t=out:st={J['dur'] - 1.5:.2f}:d=1.5[m]"); labs.append("[m]"); n += 1
     for k, (t, name, lv) in enumerate(cues):
@@ -60,7 +60,7 @@ else:
     for o in outs:
         ph = o[:-4] + " (phone).mp4"
         for n_, extra in ((1, ["-an", "-f", "mp4", "/dev/null"]), (2, ["-c:a", "aac", "-b:a", "160k", "-movflags", "+faststart", ph])):
-            subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", o, "-c:v", "libx264", "-preset", "slow", "-b:v", f"{br}k", "-maxrate", f"{br * 5 // 4}k", "-bufsize", "8000k",
+            subprocess.run(["ffmpeg", "-nostdin", "-v", "error", "-y", "-i", o, "-c:v", "libx264", "-preset", "slow", "-b:v", f"{br}k", "-maxrate", f"{br * 5 // 4}k", "-bufsize", "8000k",
                             "-pass", str(n_), "-passlogfile", log, *extra], check=True)
         print("phone copy", ph)
 print(f"next: python3 {os.path.dirname(os.path.abspath(__file__))}/10_review.py {slug} \"{final}\"")

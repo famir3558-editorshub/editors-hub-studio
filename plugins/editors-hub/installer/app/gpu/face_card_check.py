@@ -42,7 +42,7 @@ SAME = 0.36           # SFace cosine threshold for "same person"
 def fmt(t): return f"{int(t // 60)}:{t % 60:04.1f}"
 
 def frames(path, step, start, end):
-    cmd = ["ffmpeg", "-v", "error"] + (["-ss", str(start)] if start else []) + ["-i", path]
+    cmd = ["ffmpeg", "-nostdin", "-v", "error"] + (["-ss", str(start)] if start else []) + ["-i", path]
     if end: cmd += ["-t", str(end - start)]
     cmd += ["-vf", f"select='not(mod(n\\,{step}))',scale={W}:{H}", "-fps_mode", "passthrough",
             "-f", "rawvideo", "-pix_fmt", "rgb24", "-"]

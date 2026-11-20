@@ -8,7 +8,7 @@ reel, media, edl = sys.argv[1:4]; allow = {int(x) for x in sys.argv[4].split(","
 E = json.load(open(edl)); F = E["fps"]; acc = 0; C = []
 for s, e in E["keeps"]: acc += e - s; C.append(acc)
 C = C[:-1]
-def load(p, w, h): return np.frombuffer(subprocess.run(["ffmpeg", "-v", "error", "-i", p, "-vf", f"scale={w}:{h},format=gray", "-f", "rawvideo", "-"], capture_output=True).stdout, np.uint8).reshape(-1, h, w).astype(np.float32)
+def load(p, w, h): return np.frombuffer(subprocess.run(["ffmpeg", "-nostdin", "-v", "error", "-i", p, "-vf", f"scale={w}:{h},format=gray", "-f", "rawvideo", "-"], capture_output=True).stdout, np.uint8).reshape(-1, h, w).astype(np.float32)
 R = load(reel, 90, 160); T = load(media + "/cam_top.mp4", 90, 80); n = min(len(R), len(T))
 S = [np.abs(R[i][80:160] - T[i]).mean() < 8 for i in range(n)]; sw = [i for i in range(1, n) if S[i] != S[i - 1]]
 print("split switches:", len(sw)); print("split switches NOT on an edit cut:", [round(i / F, 3) for i in sw if i not in C])

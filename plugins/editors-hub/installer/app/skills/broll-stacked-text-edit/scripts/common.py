@@ -141,7 +141,7 @@ def label_font(size):
 def grab(path, t, out, box=None):
     """One frame at t seconds (fast seek)."""
     vf = ["-vf", f"scale={box[0]}:{box[1]}:force_original_aspect_ratio=decrease"] if box else []
-    subprocess.run(["ffmpeg", "-v", "error", "-y", "-ss", f"{max(0, t):.3f}", "-i", path, "-frames:v", "1", *vf, "-q:v", "3", out], check=True)
+    subprocess.run(["ffmpeg", "-nostdin", "-v", "error", "-y", "-ss", f"{max(0, t):.3f}", "-i", path, "-frames:v", "1", *vf, "-q:v", "3", out], check=True)
 
 
 CW, CH = 1080, 1920           # the finished video is always 9:16

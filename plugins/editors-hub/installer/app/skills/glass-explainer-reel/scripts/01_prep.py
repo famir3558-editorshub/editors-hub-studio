@@ -10,9 +10,9 @@ P = probe(src); P["audio"] or sys.exit("the video has no audio track")
 stem = os.path.splitext(os.path.basename(src))[0]
 out = os.path.expanduser(sys.argv[3]) if len(sys.argv) > 3 else f"{os.path.dirname(src)}/{stem} - Edit"
 os.makedirs(out, exist_ok=True)
-run(["ffmpeg", "-v", "error", "-y", "-i", src, "-vn", "-ac", "1", "-ar", "48000", f"{W}/a48.wav"])
-run(["ffmpeg", "-v", "error", "-y", "-i", f"{W}/a48.wav", "-ar", "16000", f"{W}/a16.wav"])
-run(["ffmpeg", "-v", "error", "-y", "-i", f"{W}/a16.wav", f"{W}/a16.flac"])
+run(["ffmpeg", "-nostdin", "-v", "error", "-y", "-i", src, "-vn", "-ac", "1", "-ar", "48000", f"{W}/a48.wav"])
+run(["ffmpeg", "-nostdin", "-v", "error", "-y", "-i", f"{W}/a48.wav", "-ar", "16000", f"{W}/a16.wav"])
+run(["ffmpeg", "-nostdin", "-v", "error", "-y", "-i", f"{W}/a16.wav", f"{W}/a16.flac"])
 save(W, "meta.json", {"src": src, "stem": stem, "out": out, **P})
 print(f"{stem}: {P['w']}x{P['h']} {P['fps']} fps, {P['dur']:.1f}s -> work {W} | out {out}")
 if P["fps"] != P["avg_fps"]:

@@ -21,7 +21,7 @@ for i, (lab, args) in enumerate(tiles):
     p = f"{tmp}/{i:04d}.jpg"; a = list(args)
     if "-vf" in a: a[a.index("-vf") + 1] += ",scale=-2:360"
     else: a += ["-vf", "scale=-2:360"]
-    subprocess.run(["ffmpeg", "-v", "error", "-y"] + a + [p]); paths.append((lab, p))
+    subprocess.run(["ffmpeg", "-nostdin", "-v", "error", "-y"] + a + [p]); paths.append((lab, p))
 try:
     from PIL import Image, ImageDraw
     ims = [(l, Image.open(p)) for l, p in paths if os.path.exists(p)]; w, h = ims[0][1].size; cols = 9 if mode == "frames" else max(1, min(8, 1800 // w)); rows = -(-len(ims) // cols)
@@ -30,7 +30,7 @@ try:
         x, y = (k % cols) * w, (k // cols) * h; S.paste(im, (x, y)); D.rectangle([x, y, x + 8 * len(l) + 8, y + 18], fill="black"); D.text((x + 4, y + 3), l, fill="yellow")
     S.save(out, quality=88)
 except ImportError:
-    n = len(paths); cols = 9 if mode == "frames" else 6; cmd = ["ffmpeg", "-v", "error", "-y"]
+    n = len(paths); cols = 9 if mode == "frames" else 6; cmd = ["ffmpeg", "-nostdin", "-v", "error", "-y"]
     for _, p in paths: cmd += ["-i", p]
     subprocess.run(cmd + ["-filter_complex", "".join(f"[{i}:v]" for i in range(n)) + f"xstack=inputs={n}:layout=" + "|".join(f"{(k % cols)}*w0_{(k // cols)}*h0" for k in range(n)), out])
 print(len(paths), "tiles ->", out)

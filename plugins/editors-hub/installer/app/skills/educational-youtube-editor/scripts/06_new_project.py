@@ -33,7 +33,7 @@ if not os.path.exists(cam) or os.path.getmtime(cam) < os.path.getmtime(M["cut"])
     big = master_4k() and max(M["w"], M["h"]) >= 3000; cw, ch = (3840, 2160) if big else (1920, 1080)   # the page is always 1920x1080; a 4K master renders it at 2x
     print(f"making the {ch}p working copy (dense keyframes so the renderer can seek anywhere) ...")
     if master_4k() and not big: print("NOTE a 4K master was asked for but the source is not 4K: the footage will be upscaled. A 1080p master is the honest choice for this video.")
-    subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", M["cut"], "-an", "-vf", f"scale={cw}:{ch}:force_original_aspect_ratio=increase,crop={cw}:{ch},setsar=1", "-r", fps,
+    subprocess.run(["ffmpeg", "-nostdin", "-v", "error", "-y", "-i", M["cut"], "-an", "-vf", f"scale={cw}:{ch}:force_original_aspect_ratio=increase,crop={cw}:{ch},setsar=1", "-r", fps,
                     "-c:v", "libx264", "-preset", "fast", "-crf", "16", "-g", "12", "-pix_fmt", "yuv420p", "-movflags", "+faststart", cam], check=True)
 if os.path.lexists(f"{PJ}/assets/cam.mp4"): os.remove(f"{PJ}/assets/cam.mp4")
 os.symlink(cam, f"{PJ}/assets/cam.mp4")

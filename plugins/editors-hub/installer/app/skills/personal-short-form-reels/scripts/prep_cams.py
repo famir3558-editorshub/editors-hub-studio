@@ -23,9 +23,9 @@ else:
     fw, fh, fx, fy = opt("--full", 4, [int(x) for x in "@@CROP_FULL@@".split()]); tw, th, tx, ty = opt("--top", 4, [int(x) for x in "@@CROP_TOP@@".split()])
     full = f"crop={fw}:{fh}:{fx}:{fy},scale=1080:1920:flags=lanczos,setsar=1"; top = f"crop={tw}:{th}:{tx}:{ty},scale=1080:960:flags=lanczos,setsar=1"
     print(f"horizontal source {w}x{h}: full crop {fw}x{fh}+{fx}+{fy}, top crop {tw}x{th}+{tx}+{ty}")
-subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", cut, "-an", "-vf", full, "-crf", "15"] + V + [f"{out}/cam_full.mp4"], check=True)
-subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", cut, "-vf", top, "-crf", "18", "-c:a", "aac", "-b:a", "320k"] + V + [f"{out}/cam_top.mp4"], check=True)
+subprocess.run(["ffmpeg", "-nostdin", "-v", "error", "-y", "-i", cut, "-an", "-vf", full, "-crf", "15"] + V + [f"{out}/cam_full.mp4"], check=True)
+subprocess.run(["ffmpeg", "-nostdin", "-v", "error", "-y", "-i", cut, "-vf", top, "-crf", "18", "-c:a", "aac", "-b:a", "320k"] + V + [f"{out}/cam_top.mp4"], check=True)
 for n in ("cam_full", "cam_top"):
-    subprocess.run(["ffmpeg", "-v", "error", "-y", "-ss", "2", "-i", f"{out}/{n}.mp4", "-frames:v", "1", f"{out}/{n}.jpg"], check=True)
+    subprocess.run(["ffmpeg", "-nostdin", "-v", "error", "-y", "-ss", "2", "-i", f"{out}/{n}.mp4", "-frames:v", "1", f"{out}/{n}.jpg"], check=True)
     print(n, subprocess.check_output(["ffprobe", "-v", "error", "-count_frames", "-select_streams", "v:0", "-show_entries", "stream=width,height,nb_read_frames", "-of", "csv=p=0", f"{out}/{n}.mp4"]).decode().strip())
 print("open", f"{out}/cam_full.jpg", "and cam_top.jpg and check the framing")

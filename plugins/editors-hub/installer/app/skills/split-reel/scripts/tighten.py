@@ -21,7 +21,7 @@ THR, PRE, POST = -52, 0.07, 0.14
 fr = subprocess.check_output(["ffprobe", "-v", "error", "-select_streams", "v", "-show_entries", "stream=r_frame_rate", "-of", "csv=p=0", src]).decode().strip()
 FPS = float(Fraction(fr))
 tmp = tempfile.mkdtemp(); wav = os.path.join(tmp, "a.wav")
-subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", src, "-vn", "-c:a", "pcm_s24le", wav], check=True)
+subprocess.run(["ffmpeg", "-nostdin", "-v", "error", "-y", "-i", src, "-vn", "-c:a", "pcm_s24le", wav], check=True)
 a, sr = sf.read(wav, always_2d=True); m = a.mean(1); h = sr // 100; n = len(m) // h
 db = 20 * np.log10(np.sqrt((m[: n * h].reshape(n, h) ** 2).mean(1)) + 1e-9)
 sp = np.convolve(db, np.ones(3) / 3, "same") > THR
@@ -55,9 +55,9 @@ chunks, lst = [keeps[i:i + 60] for i in range(0, len(keeps), 60)], os.path.join(
 with open(lst, "w") as L:
     for k, ch in enumerate(chunks):
         sel = "+".join(f"between(n,{s},{e - 1})" for s, e in ch); p = os.path.join(tmp, f"p{k}.mp4")
-        subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", src, "-an", "-vf", f"select='{sel}',setpts=N/({fr})/TB", "-r", fr,
+        subprocess.run(["ffmpeg", "-nostdin", "-v", "error", "-y", "-i", src, "-an", "-vf", f"select='{sel}',setpts=N/({fr})/TB", "-r", fr,
                         "-c:v", "hevc_videotoolbox", "-b:v", "40M", "-tag:v", "hvc1", p], check=True)
         L.write(f"file '{p}'\n")
-subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "concat", "-safe", "0", "-i", lst, "-i", aw, "-map", "0:v", "-map", "1:a",
+subprocess.run(["ffmpeg", "-nostdin", "-v", "error", "-y", "-f", "concat", "-safe", "0", "-i", lst, "-i", aw, "-map", "0:v", "-map", "1:a",
                 "-c:v", "copy", "-c:a", "aac", "-b:a", "320k", "-shortest", out], check=True)
 print("wrote", out)

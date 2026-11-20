@@ -38,7 +38,7 @@ missing = [f for f in files if not os.path.exists(f)]
 if missing: sys.exit(f"{len(missing)} chunk(s) not rendered yet (e.g. {os.path.basename(missing[0])}); run without --only to finish")
 lst = f"{parts}/list.txt"; open(lst, "w").write("".join("file '" + f.replace("'", "'\\''") + "'\n" for f in files))
 final = f"{PJ}/renders/draft.mp4" if draft else f"{P['out']}/{P['stem']} - YouTube Edit{tag}.mp4"; dry = final[:-4] + " (no SFX).mp4"
-subprocess.run(["ffmpeg", "-v", "error", "-y", "-f", "concat", "-safe", "0", "-i", lst, "-i", P["cut"], "-map", "0:v", "-map", "1:a", "-c:v", "copy", "-c:a", "copy", "-movflags", "+faststart", dry], check=True)
+subprocess.run(["ffmpeg", "-nostdin", "-v", "error", "-y", "-f", "concat", "-safe", "0", "-i", lst, "-i", P["cut"], "-map", "0:v", "-map", "1:a", "-c:v", "copy", "-c:a", "copy", "-movflags", "+faststart", dry], check=True)
 
 # ---- sound effects: one quiet track built here, then laid under the voice. TRIM keeps whooshes near -29.5 dBFS (a voice peaks near -3).
 TRIM = -8.5; MUSIC_MEAN = float(os.environ.get("MUSIC_MEAN", -39.0))
@@ -54,7 +54,7 @@ trk = np.zeros((int((D + 2) * SR), 2), np.float32); cache = {}
 for t, name, lv in kept:
     if name not in cache:
         tmpw = f"{PJ}/renders/_sfx_{name}.wav"          # any format in, 48 kHz stereo out
-        subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", S[name][0], "-t", str(S[name][2] + 0.2), "-ar", str(SR), "-ac", "2", "-c:a", "pcm_f32le", tmpw], check=True)
+        subprocess.run(["ffmpeg", "-nostdin", "-v", "error", "-y", "-i", S[name][0], "-t", str(S[name][2] + 0.2), "-ar", str(SR), "-ac", "2", "-c:a", "pcm_f32le", tmpw], check=True)
         x, sr = sf.read(tmpw, always_2d=True, dtype="float32"); os.remove(tmpw)
         n = max(1, min(len(x), int(S[name][2] * SR))); x = x[:n].copy(); f = min(n, int(0.12 * SR)); x[-f:] *= np.linspace(1, 0, f)[:, None]; cache[name] = x
     x = cache[name] * 10 ** ((lv - S[name][1] + TRIM) / 20); i0 = max(0, int(t * SR)); trk[i0:i0 + len(x)] += x[:len(trk) - i0]
@@ -62,9 +62,9 @@ sfxwav = f"{PJ}/renders/sfx.wav"; sf.write(sfxwav, trk, SR, subtype="PCM_16")
 
 
 def mix(out, bed=None):
-    cmd = ["ffmpeg", "-v", "error", "-y", "-i", dry, "-i", sfxwav]; fc = ["[0:a]aresample=48000,aformat=channel_layouts=stereo[v0]"]; labs = "[v0][1:a]"; n = 2
+    cmd = ["ffmpeg", "-nostdin", "-v", "error", "-y", "-i", dry, "-i", sfxwav]; fc = ["[0:a]aresample=48000,aformat=channel_layouts=stereo[v0]"]; labs = "[v0][1:a]"; n = 2
     if bed:
-        info = subprocess.run(["ffmpeg", "-v", "info", "-ss", str(mstart), "-t", str(min(D, 120)), "-i", bed, "-af", "volumedetect", "-f", "null", "-"], capture_output=True, text=True).stderr
+        info = subprocess.run(["ffmpeg", "-nostdin", "-v", "info", "-ss", str(mstart), "-t", str(min(D, 120)), "-i", bed, "-af", "volumedetect", "-f", "null", "-"], capture_output=True, text=True).stderr
         g = MUSIC_MEAN - float(re.search(r"mean_volume: (-?[\d.]+)", info).group(1)); cmd += ["-stream_loop", "-1", "-ss", str(mstart), "-i", bed]
         fc.append(f"[2:a]atrim=0:{D},asetpts=PTS-STARTPTS,aresample=48000,aformat=channel_layouts=stereo,volume={g:.1f}dB,afade=t=in:st=0:d=0.4,afade=t=out:st={D - 1.5:.2f}:d=1.5[m]"); labs += "[m]"; n = 3
     fc.append(f"{labs}amix=inputs={n}:normalize=0:duration=first[a]")

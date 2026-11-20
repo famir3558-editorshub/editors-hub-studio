@@ -20,7 +20,7 @@ num, den = map(int, v["r_frame_rate"].split("/")); ok(abs(num / den - P["fps"]) 
 ok(abs(dur - P["dur"]) < 0.1, f"length {dur:.2f}s (cut is {P['dur']:.2f}s)")
 ok(bool(au), "has an audio track")
 # ---- sound
-tmp = tempfile.mktemp(suffix=".wav"); subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", f, "-vn", "-ac", "1", "-ar", "48000", tmp], check=True)
+tmp = tempfile.mktemp(suffix=".wav"); subprocess.run(["ffmpeg", "-nostdin", "-v", "error", "-y", "-i", f, "-vn", "-ac", "1", "-ar", "48000", tmp], check=True)
 w = wave.open(tmp); a = np.frombuffer(w.readframes(w.getnframes()), np.int16).astype(np.float32) / 32768; os.remove(tmp)
 env = lambda x: np.sqrt((x[: len(x) // 480 * 480].reshape(-1, 480) ** 2).mean(1))
 e = env(a); loud = np.where(20 * np.log10(e + 1e-9) > -46)[0]
@@ -29,7 +29,7 @@ ok(head < 0.25, f"first sound {head:.2f}s after the start (the speaker should be
 ok(tail < 0.35, f"{tail:.2f}s after the last sound (should end right after the last word)")
 ok(tail > 0.02 or e[-1] < e.max() * 0.05, "last word is not cut off (the sound has died away at the end)")
 peak = 20 * np.log10(np.abs(a).max() + 1e-9); ok(peak < -0.3, f"peak {peak:.1f} dBFS (no clipping)")
-ln = subprocess.run(["ffmpeg", "-hide_banner", "-i", f, "-af", "loudnorm=print_format=json", "-f", "null", "-"], capture_output=True, text=True).stderr
+ln = subprocess.run(["ffmpeg", "-nostdin", "-hide_banner", "-i", f, "-af", "loudnorm=print_format=json", "-f", "null", "-"], capture_output=True, text=True).stderr
 try:
     import re; I = float(re.search(r'"input_i"\s*:\s*"(-?[\d.]+)"', ln).group(1)); print(f"INFO  loudness {I:.1f} LUFS (Instagram/TikTok normalise to about -14; -16 to -12 is fine. Outside that, tell the creator rather than changing their sound)")
 except Exception: print("INFO  could not read loudness")

@@ -13,7 +13,7 @@ import stt
 src, wd = sys.argv[1], sys.argv[2]
 os.makedirs(wd, exist_ok=True)
 audio = os.path.join(wd, "a16k.flac")
-subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", src, "-vn", "-ac", "1", "-ar", "16000", audio], check=True)
+subprocess.run(["ffmpeg", "-nostdin", "-v", "error", "-y", "-i", src, "-vn", "-ac", "1", "-ar", "16000", audio], check=True)
 J = stt.transcribe(audio, diarize=False)
 print("transcribed with", J.get("_engine", "?"))
 W = []

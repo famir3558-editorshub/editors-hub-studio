@@ -128,6 +128,48 @@ never get past a paywall or a sign-in, and no watermarks in the final edit. Trim
 you to accept terms or sign up, stop and ask the owner. If you can't find 3 real options for a part, tell the owner in the chat what you need rather than
 padding it with poor ones. The plan is refused with fewer than 3.
 
+## Zero-mistake edits (every client, every style)
+
+The owner wants no mistakes in anything a client sees. These rules come from real misses; follow them on every edit,
+on top of the style's own rules.
+
+**Checkpoints for long edits** (over about 3 minutes, or any 16:9 YouTube edit). Stop at each one until it's passed:
+1. **Voice:** when the voice cut passes its own checks (slice-listening, pauses, the repeat search below), send the
+   cut voice to the parent session (in a message to it, with the file's path) and stop until it answers "voice OK".
+   Post `studio.py pause <video> "Waiting for the voice check"` meanwhile. With no parent session, ask the owner instead.
+2. **First section:** build the section with the most cards and graphics first, render a check copy of it, send it the
+   same way, and stop until "section OK". The rest of the edit follows what that section settled.
+3. **Full review:** the parent session reviews the whole render (by watching and listening, not only frame sheets)
+   before the owner sees anything. Fix everything it finds, then render the draft.
+
+**Voice:**
+- Pick takes by slice-listening the RAW recording too, not only by checking the cut afterwards: a take Whisper
+  smoothed over can hide a false start or a retake.
+- Search the transcript for any 4-5 words said twice within 20 seconds (a repeated take left in); slice-listening lists
+  these as "line said twice". Listen to every pause over 0.4 s (it lists them under PAUSES): a breath is fine, a hole
+  or a clipped word isn't.
+- After ANY late change to the voice (a re-cut, a swapped take, a new mix), slice-listen the whole voice again and
+  check its length and sync against the picture. Never trust a mix made before the change.
+
+**Cards and graphics timing:**
+- A card ends exactly on the cut or transition it belongs to, or fades out on its own before it. Never a card that
+  pops off 1-2 frames before the cut, or runs 1-2 frames past it.
+- A graphic that starts on a B-roll shot starts on that shot's first frame.
+- Check this with a frame-exact scan: grab single frames (`ffmpeg -nostdin -ss <t> -i draft.mp4 -frames:v 1`) at each
+  cut, one frame either side. Don't trust tiled contact sheets for this; they can be off by a frame.
+
+**Text animations:** a highlight changes only the background or an underline, never the font's weight or size (the
+words around it would jump).
+
+**Pictures:** never show a picture larger than its real resolution (find a bigger one, or show it smaller). No blurred
+copies filling the sides of a picture: crop it to fit the shape, or use a bigger one. No text cut off inside a photo
+(crop round the text, or keep all of it in).
+
+**Cut-outs over cards:** when cards sit behind the speaker, sharpen the cut-out with
+`py "@@EDITORS_HUB_DIR@@/gpu/head_matte.py" <speaker clip> <its cut-out> <out.mov>`. Then check zoomed crops (about
+500 x 900 at 4K) of the hair and ears over EVERY card behind them, from the final render: no coloured rim, no specks,
+no hair or ear cut off.
+
 ## Use the graphics card (every edit, automatically)
 
 At the start of each edit run `py "@@EDITORS_HUB_DIR@@/gpu/check.py"` (`python3` on Mac) once. It says what this
@@ -141,15 +183,19 @@ these tools on every computer; without an NVIDIA card they simply run slower. Ru
   `--device cuda`: on Windows it silently runs on the processor.
 - **In-between video files** (base footage, section parts, joins, test renders): use the FFmpeg settings check.py prints:
   `-c:v h264_nvenc -preset p5 -rc vbr -cq 16 -b:v 0` on the card (add `-hwaccel cuda` before `-i`), instead of libx264.
+- **Hair-accurate cut-out** for cards behind the speaker: `gpu/head_matte.py` (see Zero-mistake edits).
 - **The draft render:** `studio.py finish-render` already encodes H.264 on the card when it can (Settings, "Render drafts
   on the graphics card"), keeps the bitrate chosen in the popup, and falls back to x264. `--cpu` forces the processor.
+- **Never run a card job (Whisper, cut-outs, the face check, NVENC encodes) while finish-render is encoding.** Wait for it.
 
 ## Before every render: slice-listening
 
 A transcript of the whole file smooths away false starts, "ahh"s, throat noises and repeated takes. Before you ask for
-the render settings, run `py "@@EDITORS_HUB_DIR@@/gpu/slice_listen.py" <the cut's voice or mix> -o slices.txt`. It
-re-transcribes the voice in 1.6 s windows, one every second, and lists what to listen to. Check every flagged moment by
-ear and fix what's real (a false start, a noise, a retake left in) before rendering. Say in Live what you fixed.
+the render settings, run `py "@@EDITORS_HUB_DIR@@/gpu/slice_listen.py" <the cut's voice, without music> -o slices.txt`.
+It re-transcribes the voice in 1.6 s windows, one every second, and lists what to listen to: fillers, noises, false
+starts, words or lines said twice, places it couldn't read (glitch?), and every pause over 0.4 s. Check every flagged
+moment by ear and fix what's real (a false start, a noise, a retake left in, a hole) before rendering. Say in Live what
+you fixed. Run it on the raw recording too when picking takes, and again after any late voice change.
 
 ## Before delivery: the face check
 
@@ -174,8 +220,16 @@ replaces the export step in any video skill. Low-quality previews for your own c
 2. Render the edit at full quality at its own size. If a frame rate was chosen, render at that rate
    (`npx hyperframes render --fps <N> --quality delivery`).
 3. `studio.py finish-render <video> <file> --note "what changed"` applies the chosen resolution, bitrate, format and audio,
-   adds the draft and posts it to Live. It refuses if no settings were chosen. Don't use `add-draft` for your own renders.
+   adds the draft and posts it to Live. It refuses if no settings were chosen, or if the video's drive has less than
+   15 GB free (free space, or move old work to another drive, then run it again). Don't use `add-draft` for your own renders.
+   Run it on its own, not piped through `tail` or `head`: a pipe hides its exit code and its messages. A client's draft
+   shows on the review page only once its upload finishes; until then it waits in `incoming`, which is normal.
 4. Check the draft it made (size, sound, a few frames), then carry on with the review round.
+
+Render safety for every FFmpeg command you run in an edit: always pass `-nostdin` (without it, FFmpeg in the
+background can stop and wait for keyboard input). Never time an overlay with `enable=`: while it's off, FFmpeg stops
+reading the overlaid input, which can stall the render or fill the memory. Shift the overlaid clip to its start instead
+(`setpts=PTS-STARTPTS+<start>/TB`) and let it end by itself (`overlay=eof_action=pass`).
 
 If the owner picks a different style for a client's video, use `studio.py set-style <video> <style>` and re-read
 `studio.py context <video>` before the next draft. They can also change it on the review page.

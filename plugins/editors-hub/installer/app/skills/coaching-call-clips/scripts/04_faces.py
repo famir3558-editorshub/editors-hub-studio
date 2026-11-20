@@ -8,7 +8,7 @@ import json, os, subprocess, sys, tempfile
 cut, pj = sys.argv[1], sys.argv[2]; step = float(sys.argv[3]) if len(sys.argv) > 3 else 0.25
 here = os.path.dirname(os.path.abspath(__file__)); tmp = tempfile.mkdtemp()
 dur = float(subprocess.check_output(["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", cut]))
-subprocess.run(["ffmpeg", "-v", "error", "-i", cut, "-vf", f"fps={1 / step}", "-q:v", "3", f"{tmp}/f%04d.jpg"], check=True)
+subprocess.run(["ffmpeg", "-nostdin", "-v", "error", "-i", cut, "-vf", f"fps={1 / step}", "-q:v", "3", f"{tmp}/f%04d.jpg"], check=True)
 files = sorted(f for f in os.listdir(tmp) if f.endswith(".jpg"))
 exe = f"{tmp}/fb"
 subprocess.run(["swiftc", "-O", f"{here}/face_boxes.swift", "-o", exe], check=True, stderr=subprocess.DEVNULL)
@@ -28,6 +28,6 @@ pick = faces[:: max(1, len(faces) // 12)][:12]
 for n, f in enumerate(pick):
     hx, hy, hw, hh = f["x"] - 0.5 * f["w"], f["y"] - 0.65 * f["h"], 2.0 * f["w"], 1.95 * f["h"]
     src = f"{tmp}/f{int(round(f['t'] / step)) + 1:04d}.jpg"
-    subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", src, "-vf", f"drawbox={f['x']}:{f['y']}:{f['w']}:{f['h']}:yellow:4,drawbox={hx:.0f}:{hy:.0f}:{hw:.0f}:{hh:.0f}:red:4,scale=640:-1", f"{tmp}/s{n:02d}.jpg"], check=True)
-subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", f"{tmp}/s%02d.jpg", "-frames:v", "1", "-vf", "tile=4x3", "-q:v", "4", f"{pj}/faces.jpg"], check=True)
+    subprocess.run(["ffmpeg", "-nostdin", "-v", "error", "-y", "-i", src, "-vf", f"drawbox={f['x']}:{f['y']}:{f['w']}:{f['h']}:yellow:4,drawbox={hx:.0f}:{hy:.0f}:{hw:.0f}:{hh:.0f}:red:4,scale=640:-1", f"{tmp}/s{n:02d}.jpg"], check=True)
+subprocess.run(["ffmpeg", "-nostdin", "-v", "error", "-y", "-i", f"{tmp}/s%02d.jpg", "-frames:v", "1", "-vf", "tile=4x3", "-q:v", "4", f"{pj}/faces.jpg"], check=True)
 print(f"check sheet: {pj}/faces.jpg (yellow = detected face, red = protected head box)")

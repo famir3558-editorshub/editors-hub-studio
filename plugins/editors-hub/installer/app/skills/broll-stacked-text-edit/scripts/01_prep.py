@@ -13,9 +13,9 @@ rule = os.path.expanduser(output_rule())
 base = rule if rule.startswith(("/", "~")) else os.path.dirname(src)      # anything else (e.g. "beside the raw file") = next to the video
 out = os.path.expanduser(sys.argv[3]) if len(sys.argv) > 3 else f"{base}/{stem} - Edit"
 os.makedirs(out, exist_ok=True)
-run(["ffmpeg", "-v", "error", "-y", "-i", src, "-vn", "-ac", "1", "-ar", "48000", f"{W}/a48.wav"])
-run(["ffmpeg", "-v", "error", "-y", "-i", f"{W}/a48.wav", "-ar", "16000", f"{W}/a16.wav"])
-run(["ffmpeg", "-v", "error", "-y", "-i", f"{W}/a16.wav", f"{W}/a16.flac"])
+run(["ffmpeg", "-nostdin", "-v", "error", "-y", "-i", src, "-vn", "-ac", "1", "-ar", "48000", f"{W}/a48.wav"])
+run(["ffmpeg", "-nostdin", "-v", "error", "-y", "-i", f"{W}/a48.wav", "-ar", "16000", f"{W}/a16.wav"])
+run(["ffmpeg", "-nostdin", "-v", "error", "-y", "-i", f"{W}/a16.wav", f"{W}/a16.flac"])
 save(W, "meta.json", {"src": src, "stem": stem, "out": out, **P})
 print(f"{stem}: {P['w']}x{P['h']} {P['fps']} fps, {P['dur']:.1f}s -> work {W} | out {out}")
 if P["fps"] != P["avg_fps"]:

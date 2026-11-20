@@ -11,7 +11,7 @@ P = probe(src); P["audio"] or sys.exit("the recording has no audio track")
 stem = os.path.splitext(os.path.basename(src))[0]
 out = os.path.expanduser(sys.argv[3]) if len(sys.argv) > 3 else f"{os.path.dirname(src)}/{stem} - Clips"
 os.makedirs(out, exist_ok=True)
-run(["ffmpeg", "-v", "error", "-y", "-i", src, "-vn", "-ac", "1", "-ar", "16000", f"{W}/a16.flac"])
+run(["ffmpeg", "-nostdin", "-v", "error", "-y", "-i", src, "-vn", "-ac", "1", "-ar", "16000", f"{W}/a16.flac"])
 save(W, "meta.json", {"src": src, "stem": stem, "out": out, **P})
 
 # 48 frames spread over the call, 24 per sheet, each labelled by its position in the file name list printed below
@@ -21,7 +21,7 @@ times = [P["dur"] * (i + 0.5) / N for i in range(N)]
 for i, t in enumerate(times):
     grab(src, t, f"{W}/sheet/f{i:02d}.jpg", box=(640, 360))
 for s in range(N // per):
-    subprocess.run(["ffmpeg", "-v", "error", "-y", "-start_number", str(s * per), "-i", f"{W}/sheet/f%02d.jpg",
+    subprocess.run(["ffmpeg", "-nostdin", "-v", "error", "-y", "-start_number", str(s * per), "-i", f"{W}/sheet/f%02d.jpg",
                     "-frames:v", "1", "-vf", f"scale=640:360:force_original_aspect_ratio=decrease,pad=640:360:(ow-iw)/2:(oh-ih)/2,tile=6x4",
                     "-q:v", "4", f"{W}/call-sheet-{s + 1}.jpg"], check=True)
 print(f"{stem}: {P['w']}x{P['h']} {P['fps']} fps, {mmss(P['dur'])} ({P['dur'] / 60:.0f} min) -> work {W} | out {out}")

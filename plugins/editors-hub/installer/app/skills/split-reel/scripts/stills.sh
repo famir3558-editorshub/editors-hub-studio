@@ -15,6 +15,6 @@ print(tw,th,(W-tw)//2,min(round(H*0.09),H-th),fw,H,(W-fw)//2,0)")
 fi
 D=$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$V"); source ~/.claude/skills/split-reel/scripts/kit_env.sh
 T=$(mktemp -d "$WORK/frame.XXXX"); ins=()
-for k in 1 2 3 4; do t=$(python3 -c "print($D*$k/5)"); ffmpeg -v error -y -ss $t -i "$V" -frames:v 1 \
+for k in 1 2 3 4; do t=$(python3 -c "print($D*$k/5)"); ffmpeg -nostdin -v error -y -ss $t -i "$V" -frames:v 1 \
   -vf "drawbox=$TX:$TY:$TW:$TH:color=orange@0.9:t=12,drawbox=$FX:$FY:$FW:$FH:color=cyan@0.8:t=8,scale=960:-2" "$T/$k.jpg"; ins+=(-i "$T/$k.jpg"); done
-ffmpeg -v error -y "${ins[@]}" -filter_complex "[0][1]hstack[a];[2][3]hstack[b];[a][b]vstack" "$O" && echo "$O  (orange = top half, cyan = full screen)"
+ffmpeg -nostdin -v error -y "${ins[@]}" -filter_complex "[0][1]hstack[a];[2][3]hstack[b];[a][b]vstack" "$O" && echo "$O  (orange = top half, cyan = full screen)"

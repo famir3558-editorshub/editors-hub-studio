@@ -231,7 +231,7 @@ def probe(path):
 def audio_profile(path, dur):
     """Cheap loudness / activity read. Claude confirms speech visually."""
     window = min(dur or 300, 300)
-    r = run(["ffmpeg", "-hide_banner", "-nostats", "-t", "300", "-i", str(path), "-vn",
+    r = run(["ffmpeg", "-nostdin", "-hide_banner", "-nostats", "-t", "300", "-i", str(path), "-vn",
              "-af", "silencedetect=n=-38dB:d=0.5,volumedetect", "-f", "null", "-"], timeout=400)
     err = r.stderr
     mean = re.search(r"mean_volume:\s*(-?[\d.]+|-inf)", err)
@@ -460,7 +460,7 @@ def pick_times(dur, n=None):
 
 def grab_frame(src, t, dest):
     vf = "scale=640:640:force_original_aspect_ratio=decrease,scale=trunc(iw/2)*2:trunc(ih/2)*2"
-    r = run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-ss", f"{t:.3f}", "-i", str(src),
+    r = run(["ffmpeg", "-nostdin", "-hide_banner", "-loglevel", "error", "-y", "-ss", f"{t:.3f}", "-i", str(src),
              "-frames:v", "1", "-vf", vf, "-q:v", "4", str(dest)], timeout=120)
     return r.returncode == 0 and dest.exists() and dest.stat().st_size > 0
 
@@ -513,7 +513,7 @@ def build_sheets(frames, clip, outdir, per_sheet=12):
             lst = outdir / "_list.txt"
             lst.write_text("".join(f"file '{fp}'\n" for _, fp in chunk))
             rows = (len(chunk) + cols - 1) // cols
-            run(["ffmpeg", "-hide_banner", "-loglevel", "error", "-y", "-f", "concat", "-safe", "0", "-i", str(lst),
+            run(["ffmpeg", "-nostdin", "-hide_banner", "-loglevel", "error", "-y", "-f", "concat", "-safe", "0", "-i", str(lst),
                  "-vf", f"scale=420:-2,tile={cols}x{rows}:padding=6", "-frames:v", "1", str(dest)])
             lst.unlink(missing_ok=True)
         if dest.exists():

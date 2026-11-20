@@ -31,9 +31,9 @@ OUT, TITLE, STEM = sys.argv[1:4]; MUSIC = sys.argv[4] if len(sys.argv) > 4 else 
 J = json.load(open("sfx.json")); DUR = J["dur"]
 EV = [(t, ["woosh", "swish", "swoosh"][i % 3], -21) for i, t in enumerate(J["glides"]) if t > 0.05] + [tuple(x) for x in J["accents"]]
 def mix(src, events, out):
-    cmd = ["ffmpeg", "-v", "error", "-y", "-i", src]; fc = []; labs = ["[0:a]"]
+    cmd = ["ffmpeg", "-nostdin", "-v", "error", "-y", "-i", src]; fc = []; labs = ["[0:a]"]
     events = [(t, role(n), lv) for t, n, lv in sorted(events) if role(n)]
-    if not events: subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", src, "-c", "copy", "-movflags", "+faststart", out], check=True); print("0 sounds ->", out); return
+    if not events: subprocess.run(["ffmpeg", "-nostdin", "-v", "error", "-y", "-i", src, "-c", "copy", "-movflags", "+faststart", out], check=True); print("0 sounds ->", out); return
     for k, (t, n, lv) in enumerate(events):
         path, peak, mx = S[n]; cmd += ["-i", path]; ms = int(round(t * 1000))
         fc.append(f"[{k + 1}:a]atrim=0:{mx},afade=t=out:st={max(0, mx - 0.12):.2f}:d=0.12,aresample=48000,aformat=channel_layouts=stereo,volume={lv - peak + TRIM:.1f}dB,adelay={ms}|{ms}[s{k}]"); labs.append(f"[s{k}]")
@@ -41,9 +41,9 @@ def mix(src, events, out):
     cmd += ["-filter_complex", ";".join(fc), "-map", "0:v", "-map", "[a]", "-c:v", "copy", "-c:a", "aac", "-b:a", "256k", "-movflags", "+faststart", out]
     subprocess.run(cmd, check=True); print(len(events), "sounds ->", out)
 def bed(src, out):
-    r = subprocess.run(["ffmpeg", "-v", "info", "-ss", str(MSTART), "-t", str(DUR), "-i", MUSIC, "-af", "volumedetect", "-f", "null", "-"], capture_output=True, text=True).stderr
+    r = subprocess.run(["ffmpeg", "-nostdin", "-v", "info", "-ss", str(MSTART), "-t", str(DUR), "-i", MUSIC, "-af", "volumedetect", "-f", "null", "-"], capture_output=True, text=True).stderr
     g = MUSIC_MEAN - float(re.search(r"mean_volume: (-?[\d.]+)", r).group(1))
-    subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", src, "-i", MUSIC, "-filter_complex",
+    subprocess.run(["ffmpeg", "-nostdin", "-v", "error", "-y", "-i", src, "-i", MUSIC, "-filter_complex",
         f"[1:a]atrim={MSTART}:{MSTART + DUR},asetpts=PTS-STARTPTS,aresample=48000,aformat=channel_layouts=stereo,volume={g:.1f}dB,afade=t=in:st=0:d=0.4,afade=t=out:st={DUR - 1.5}:d=1.5[m];[0:a][m]amix=inputs=2:normalize=0:duration=first[a]",
         "-map", "0:v", "-map", "[a]", "-c:v", "copy", "-c:a", "aac", "-b:a", "256k", out], check=True)
 os.makedirs("renders", exist_ok=True)

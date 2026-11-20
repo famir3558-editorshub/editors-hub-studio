@@ -7,4 +7,4 @@ DIR=$1; PREFIX=$2; OUTJ=$3; shift 3
 Q=$(mktemp -d "$WORK/qa.XXXX")
 cd "$KIT" && npx remotion bundle src/index.ts --out-dir "$WORK/bundle" >"$WORK/bundle.log" 2>&1 || { echo "bundle failed:"; tail -30 "$WORK/bundle.log"; exit 1; }
 for spec in "$@"; do id=${spec%%:*}; f=${spec##*:}; npx remotion still "$WORK/bundle" "${PREFIX}-${id}" "$Q/${id}_$(printf %04d $f).png" --frame=$f >/dev/null 2>&1 & done; wait
-ffmpeg -v error -y -pattern_type glob -i "$Q/*.png" -vf "scale=540:480,tile=4x4:padding=6:color=gray" "$OUTJ" && echo "$OUTJ"
+ffmpeg -nostdin -v error -y -pattern_type glob -i "$Q/*.png" -vf "scale=540:480,tile=4x4:padding=6:color=gray" "$OUTJ" && echo "$OUTJ"

@@ -20,7 +20,7 @@ for f in glob.glob(F + "/*.jpg"): os.remove(f)
 cam = os.path.join(P, "assets", "cam_full.mp4"); rng = []
 if opt("--from"): rng += ["-ss", opt("--from")]
 if opt("--to"): rng += ["-to", opt("--to")]
-subprocess.run(["ffmpeg", "-v", "error", "-y", *rng, "-i", cam, "-vf", "fps=1,scale=1080:1920", "-q:v", "3", F + "/f_%04d.jpg"], check=True)
+subprocess.run(["ffmpeg", "-nostdin", "-v", "error", "-y", *rng, "-i", cam, "-vf", "fps=1,scale=1080:1920", "-q:v", "3", F + "/f_%04d.jpg"], check=True)
 frames = sorted(glob.glob(F + "/*.jpg"))
 bin_ = os.path.join(W, "face_boxes")
 if not os.path.exists(bin_): subprocess.run(["swiftc", "-O", os.path.join(K, "face_boxes.swift"), "-o", bin_], check=True)

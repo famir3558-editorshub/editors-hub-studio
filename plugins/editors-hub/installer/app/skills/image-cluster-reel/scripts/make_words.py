@@ -14,7 +14,7 @@ if len(sys.argv) < 3:
 clip, out = sys.argv[1], sys.argv[2]
 with tempfile.TemporaryDirectory() as d:
     wav = os.path.join(d, "a.flac")
-    subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", clip, "-vn", "-ac", "1", "-ar", "16000", wav], check=True)
+    subprocess.run(["ffmpeg", "-nostdin", "-v", "error", "-y", "-i", clip, "-vn", "-ac", "1", "-ar", "16000", wav], check=True)
     J = stt.transcribe(wav)
 words = [[round(float(w["start"]), 3), round(float(w["end"]), 3), w["text"]]
          for w in J.get("words", []) if w.get("type", "word") == "word"]

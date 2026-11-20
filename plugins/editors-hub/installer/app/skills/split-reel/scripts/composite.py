@@ -33,7 +33,7 @@ for s in scenes:
 preview = "--preview" in sys.argv
 out = os.path.join(out_dir, f"{c['title']} - 9x16 Reel{' - PREVIEW' if preview else ''}.mp4")
 
-args = ["ffmpeg", "-v", "error", "-y", "-i", c["source"]]
+args = ["ffmpeg", "-nostdin", "-v", "error", "-y", "-i", c["source"]]
 for s in scenes: args += ["-i", s["file"]]
 g = ["[0:v]split=2[srcA][srcB]",
      f"[srcA]crop={tw}:{th}:{tx}:{ty},scale=1080:960:flags=lanczos,setsar=1[top]",

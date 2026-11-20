@@ -2,6 +2,18 @@
 
 Shown in the studio after it updates. Each version: `## 1.2.3`, then `### New`, `### Better` or `### Fixed`, with one plain line per change.
 
+## 1.39.1
+### New
+- Computers without an NVIDIA card get the listening check and the face check too: setup downloads their processor versions once (about 1 GB).
+- Every edit now follows the zero-mistake checks: the voice and the busiest section are checked before the rest is built, takes are picked by listening to the raw recording, every pause over 0.4 s and every repeated line is listened to, cards end exactly on their cut, and pictures are never stretched, blurred at the sides or cut through their text.
+- A sharper cut-out round the hair, ears and glasses for edits with cards behind the speaker.
+### Better
+- The listening check lists every pause over 0.4 s and every line said twice, and groups the places it couldn't hear clearly, so there's less to go through.
+- If the graphics card can't render a draft, Live says why.
+### Fixed
+- A render no longer starts on a nearly full drive: it says how much space is free and what it needs (at least 15 GB), and a drive that fills up mid-render is reported as that, not as a graphics card problem.
+- With an NVIDIA card, setup's download of the card's tools could fail at Whisper and wait 3 days; it now installs.
+
 ## 1.39.0
 ### New
 - Drafts render on your NVIDIA graphics card: about 4-5x faster at the same bitrate and quality. Settings has a switch to keep them on the processor; if the card can't do one, it renders on the processor by itself. Live says which was used.

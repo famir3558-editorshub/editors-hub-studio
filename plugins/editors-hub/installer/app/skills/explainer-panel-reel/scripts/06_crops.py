@@ -82,8 +82,8 @@ if "--preview" in sys.argv:
 
 cut = M.get("cut") or sys.exit("render the cut first (05_render_cut.py)")
 O = f"{M['out']}/hf-media"; os.makedirs(O, exist_ok=True); enc = ["-c:v", "libx264", "-crf", "15", "-preset", "medium", "-pix_fmt", "yuv420p", "-g", "24", "-keyint_min", "24", "-movflags", "+faststart"]      # a keyframe every second: the renderer seeks these files
-w, h, x, y = C["full"]; subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", cut, "-vf", f"crop={w}:{h}:{x}:{y},scale=1080:1920:flags=lanczos,setsar=1", *enc, "-c:a", "aac", "-b:a", "320k", f"{O}/cam_full.mp4"], check=True)
-w, h, x, y = C["panel"]; subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", cut, "-an", "-vf", f"crop={w}:{h}:{x}:{y},scale={PN['w']}:{ph // 2 * 2}:flags=lanczos,setsar=1", *enc, f"{O}/cam_panel.mp4"], check=True)
+w, h, x, y = C["full"]; subprocess.run(["ffmpeg", "-nostdin", "-v", "error", "-y", "-i", cut, "-vf", f"crop={w}:{h}:{x}:{y},scale=1080:1920:flags=lanczos,setsar=1", *enc, "-c:a", "aac", "-b:a", "320k", f"{O}/cam_full.mp4"], check=True)
+w, h, x, y = C["panel"]; subprocess.run(["ffmpeg", "-nostdin", "-v", "error", "-y", "-i", cut, "-an", "-vf", f"crop={w}:{h}:{x}:{y},scale={PN['w']}:{ph // 2 * 2}:flags=lanczos,setsar=1", *enc, f"{O}/cam_panel.mp4"], check=True)
 if pop and "--no-matte" not in sys.argv:            # the speaker's cut-out for the pop-out above the panel edge (~0.1 s per frame)
     r = subprocess.run(matte_cmd(f"{O}/cam_panel.mp4", f"{O}/cam_panel_fg.webm"), capture_output=True, text=True)
     if r.returncode: print("MATTE FAILED (set \"popout\": false in layout.json, or fix and re-run):\n", (r.stdout + r.stderr)[-600:])

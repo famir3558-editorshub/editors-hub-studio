@@ -109,7 +109,7 @@ def extract_local_audio(path, workdir):
     audio = Path(workdir) / "audio.mp3"
     # Mono, 44.1kHz, high bitrate: small upload, no loss of speech clarity.
     subprocess.run(
-        ["ffmpeg", "-y", "-i", str(p), "-vn", "-ac", "1", "-ar", "44100", "-b:a", "192k", str(audio)],
+        ["ffmpeg", "-nostdin", "-y", "-i", str(p), "-vn", "-ac", "1", "-ar", "44100", "-b:a", "192k", str(audio)],
         check=True, capture_output=True,
     )
     return audio, {"title": p.stem, "source_file": str(p)}

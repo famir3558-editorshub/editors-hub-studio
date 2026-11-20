@@ -30,6 +30,6 @@ for c in spec:
     else:
         vf = f"{pre}scale=1080:-2:flags=lanczos,pad=1080:1920:0:(oh-ih)/2:black,setsar=1"
     dst = f"{out}/{c['name']}.mp4"; n = int(c["frames"]) + 2
-    r = subprocess.run(["ffmpeg", "-v", "error", "-y", "-ss", str(c["in"]), "-i", src, "-an", "-vf", vf, "-r", "24000/1001", "-frames:v", str(n), "-c:v", "libx264", "-crf", "16", "-preset", "medium", "-g", "12", "-pix_fmt", "yuv420p", "-movflags", "+faststart", dst], capture_output=True, text=True)
+    r = subprocess.run(["ffmpeg", "-nostdin", "-v", "error", "-y", "-ss", str(c["in"]), "-i", src, "-an", "-vf", vf, "-r", "24000/1001", "-frames:v", str(n), "-c:v", "libx264", "-crf", "16", "-preset", "medium", "-g", "12", "-pix_fmt", "yuv420p", "-movflags", "+faststart", dst], capture_output=True, text=True)
     info = subprocess.run(["ffprobe", "-v", "error", "-count_frames", "-select_streams", "v:0", "-show_entries", "stream=width,height,nb_read_frames", "-of", "csv=p=0", dst], capture_output=True, text=True).stdout.strip()
     print(f"{c['name']:8s} {info:18s} {'letterboxed' if (fit == 'auto' and w > h) else fit:11s} <- {os.path.basename(src)} @ {c['in']}s", "" if int(info.split(",")[-1] or 0) >= int(c["frames"]) else "  SHORT: the source ran out, pick an earlier in-point")

@@ -8,8 +8,8 @@
 set -e; C=$1; O=$2; mkdir -p "$O"
 DT=(@@CROP_TOP@@); DF=(@@CROP_FULL@@)
 TW=${3:-$DT[1]} TH=${4:-$DT[2]} TX=${5:-$DT[3]} TY=${6:-$DT[4]}; FW=${7:-$DF[1]} FH=${8:-$DF[2]} FX=${9:-$DF[3]} FY=${10:-$DF[4]}
-ffmpeg -v error -y -i "$C" -vf "crop=$TW:$TH:$TX:$TY,scale=1080:960:flags=lanczos" -c:v libx264 -crf 15 -preset medium -pix_fmt yuv420p -c:a aac -b:a 320k -movflags +faststart "$O/cam_top.mp4"
-ffmpeg -v error -y -i "$C" -an -vf "crop=$FW:$FH:$FX:$FY,scale=1080:1920:flags=lanczos" -c:v libx264 -crf 15 -preset medium -pix_fmt yuv420p -movflags +faststart "$O/cam_full.mp4"
+ffmpeg -nostdin -v error -y -i "$C" -vf "crop=$TW:$TH:$TX:$TY,scale=1080:960:flags=lanczos" -c:v libx264 -crf 15 -preset medium -pix_fmt yuv420p -c:a aac -b:a 320k -movflags +faststart "$O/cam_top.mp4"
+ffmpeg -nostdin -v error -y -i "$C" -an -vf "crop=$FW:$FH:$FX:$FY,scale=1080:1920:flags=lanczos" -c:v libx264 -crf 15 -preset medium -pix_fmt yuv420p -movflags +faststart "$O/cam_full.mp4"
 # cam_fg.webm = the creator cut out of cam_full (transparent). Lets FACE-window graphics sit BEHIND the head.
 # ~0.13 s per frame (a 60 s reel takes ~3 min). Skip with NO_MATTE=1 when the reel has no behind-the-head graphics.
 GPU_MATTE="@@EDITORS_HUB_DIR@@/gpu/gpu_matte.py"  # Editors.Hub's cut-out: on the graphics card when it can

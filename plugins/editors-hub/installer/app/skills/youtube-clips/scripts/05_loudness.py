@@ -8,14 +8,14 @@ src, dst = sys.argv[1], sys.argv[2]; I = float(sys.argv[3]) if len(sys.argv) > 3
 
 
 def measure(path, extra=""):
-    r = subprocess.run(["ffmpeg", "-hide_banner", "-i", path, "-vn", "-af", f"loudnorm=I={I}:TP={TP}:LRA={LRA}{extra}:print_format=json", "-f", "null", "-"], capture_output=True, text=True)
+    r = subprocess.run(["ffmpeg", "-nostdin", "-hide_banner", "-i", path, "-vn", "-af", f"loudnorm=I={I}:TP={TP}:LRA={LRA}{extra}:print_format=json", "-f", "null", "-"], capture_output=True, text=True)
     return json.loads(re.findall(r"\{[^{}]+\}", r.stderr)[-1])
 
 
 m = measure(src)
 af = (f"loudnorm=I={I}:TP={TP}:LRA={LRA}:measured_I={m['input_i']}:measured_TP={m['input_tp']}:measured_LRA={m['input_lra']}:"
       f"measured_thresh={m['input_thresh']}:offset={m['target_offset']}:linear=true")
-subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", src, "-c:v", "copy", "-af", af, "-ar", "48000", "-c:a", "aac", "-b:a", "320k", "-movflags", "+faststart", dst], check=True)
+subprocess.run(["ffmpeg", "-nostdin", "-v", "error", "-y", "-i", src, "-c:v", "copy", "-af", af, "-ar", "48000", "-c:a", "aac", "-b:a", "320k", "-movflags", "+faststart", dst], check=True)
 o = measure(dst)
 print(f"{dst.split('/')[-1]}: {m['input_i']} LUFS, peak {m['input_tp']} dBTP  ->  {o['input_i']} LUFS, peak {o['input_tp']} dBTP")
 if float(o["input_tp"]) > -1.0: print("WARNING peak is above -1 dBTP: lower the target and run again")

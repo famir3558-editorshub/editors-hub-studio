@@ -4,7 +4,7 @@
 # (top 270 px, bottom 420 px; the orange strip y 1500-1585 is the ~20% overrun is allowed at the bottom); yellow box = button rail; dashed yellow line (y 1250) = captions must end above it.
 # Nothing the creator needs the viewer to read or watch may sit in red; no caption may cross the dashed line.
 set -e; F=$1; O=$2; shift 2; G=${0:A:h:h}/assets/safe-zone.png; T=$(mktemp -d)
-i=0; for t in "$@"; do i=$((i+1)); ffmpeg -v error -y -ss $t -i "$F" -i "$G" -filter_complex "[0:v]scale=1080:1920[v];[v][1:v]overlay,scale=432:-1" -frames:v 1 -update 1 "$T/$(printf %03d $i).jpg"; done
+i=0; for t in "$@"; do i=$((i+1)); ffmpeg -nostdin -v error -y -ss $t -i "$F" -i "$G" -filter_complex "[0:v]scale=1080:1920[v];[v][1:v]overlay,scale=432:-1" -frames:v 1 -update 1 "$T/$(printf %03d $i).jpg"; done
 python3 - "$T" "$O" <<'P'
 import sys, glob
 from PIL import Image

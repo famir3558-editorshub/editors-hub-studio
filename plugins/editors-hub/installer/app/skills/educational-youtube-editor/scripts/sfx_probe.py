@@ -18,7 +18,7 @@ for d, _, files in os.walk(root):
     for f in sorted(files):
         if not f.lower().endswith((".wav", ".mp3", ".aif", ".aiff", ".m4a", ".flac", ".ogg")): continue
         p = os.path.join(d, f)
-        e = subprocess.run(["ffmpeg", "-v", "info", "-i", p, "-af", "volumedetect", "-f", "null", "-"], capture_output=True, text=True).stderr
+        e = subprocess.run(["ffmpeg", "-nostdin", "-v", "info", "-i", p, "-af", "volumedetect", "-f", "null", "-"], capture_output=True, text=True).stderr
         pk = re.search(r"max_volume: (-?[\d.]+)", e); du = re.search(r"Duration: (\d+):(\d+):([\d.]+)", e)
         if not pk or not du: continue
         dur = int(du.group(1)) * 3600 + int(du.group(2)) * 60 + float(du.group(3))

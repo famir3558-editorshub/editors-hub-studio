@@ -7,7 +7,7 @@ import json, subprocess, sys, numpy as np
 E = json.load(open(sys.argv[1])); F = E["fps"]; acc = 0; C = []
 for s, e in E["keeps"]: acc += e - s; C.append(acc)
 C = C[:-1]; W, H = 135, 240
-a = np.frombuffer(subprocess.run(["ffmpeg", "-v", "error", "-i", sys.argv[2], "-vf", f"scale={W}:{H},format=gray", "-f", "rawvideo", "-"], capture_output=True).stdout, np.uint8).reshape(-1, H, W).astype(np.float32)
+a = np.frombuffer(subprocess.run(["ffmpeg", "-nostdin", "-v", "error", "-i", sys.argv[2], "-vf", f"scale={W}:{H},format=gray", "-f", "rawvideo", "-"], capture_output=True).stdout, np.uint8).reshape(-1, H, W).astype(np.float32)
 d = np.abs(a[1:] - a[:-1]).mean((1, 2)); prev = 0
 for c in C:
     print(f"frame {c:5d}  t={c / F:7.3f}  switch={c / F - 0.002:8.4f}  jump={d[c - 1]:5.1f}  ({'small' if d[c - 1] < 7.5 else 'MUST switch or hide'})  block since last cut {(c - prev) / F:4.1f}s"); prev = c

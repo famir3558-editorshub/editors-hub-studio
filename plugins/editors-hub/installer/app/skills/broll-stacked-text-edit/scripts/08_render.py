@@ -111,12 +111,12 @@ if mode == "--draft":
     ch.append(f"[{cur}]scale=720:1280,format=yuv420p[vo]"); out = f"{out_dir}/{stem} - DRAFT{tag}.mp4"; enc = ["-c:v", "h264_videotoolbox", "-b:v", "5M"]
 else:
     ch.append(f"[{cur}]format=yuv420p[vo]"); out = f"{out_dir}/{stem} - EDIT{tag}.mp4"; enc = ["-c:v", "hevc_videotoolbox", "-b:v", "20M", "-tag:v", "hvc1"]
-subprocess.run(["ffmpeg", "-v", "error", "-stats", "-y", *inp, "-filter_complex", ";".join(ch), "-map", "[vo]", "-map", "0:a",
+subprocess.run(["ffmpeg", "-nostdin", "-v", "error", "-stats", "-y", *inp, "-filter_complex", ";".join(ch), "-map", "[vo]", "-map", "0:a",
                 *enc, "-r", FR, "-c:a", "copy", "-t", f"{TOT:.3f}", "-movflags", "+faststart", out], check=True)
 M["last"] = out; print("wrote", out)
 if mode == "--final":
     ph = f"{out_dir}/{stem} - EDIT{tag} (phone).mp4"; rate = int(min(8e6, 26e6 * 8 / TOT - 192e3))
-    subprocess.run(["ffmpeg", "-v", "error", "-y", "-i", out, "-c:v", "h264_videotoolbox", "-b:v", str(rate),
+    subprocess.run(["ffmpeg", "-nostdin", "-v", "error", "-y", "-i", out, "-c:v", "h264_videotoolbox", "-b:v", str(rate),
                     "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", ph], check=True)
     M["phone"] = ph; print("wrote", ph)
 save(W, "meta.json", M)

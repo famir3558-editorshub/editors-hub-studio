@@ -62,9 +62,9 @@ def on_card(a, torch):
     mean = torch.tensor([0.485, 0.456, 0.406]).view(1, 3, 1, 1).to(dev)
     std = torch.tensor([0.229, 0.224, 0.225]).view(1, 3, 1, 1).to(dev)
     w, h, rate = probe(a.input)
-    dec = subprocess.Popen(["ffmpeg", "-v", "error", "-i", a.input, "-f", "rawvideo", "-pix_fmt", "rgb24", "-"],
+    dec = subprocess.Popen(["ffmpeg", "-nostdin", "-v", "error", "-i", a.input, "-f", "rawvideo", "-pix_fmt", "rgb24", "-"],
                            stdout=subprocess.PIPE)
-    enc = subprocess.Popen(["ffmpeg", "-v", "error", "-y", "-f", "rawvideo", "-pix_fmt", "rgba", "-s", f"{w}x{h}",
+    enc = subprocess.Popen(["ffmpeg", "-nostdin", "-v", "error", "-y", "-f", "rawvideo", "-pix_fmt", "rgba", "-s", f"{w}x{h}",
                             "-r", rate, "-i", "-", "-vf", "scale=out_color_matrix=bt709:out_range=tv:flags=neighbor",
                             "-c:v", "libvpx-vp9", "-b:v", "0", "-crf", str(CRF[a.quality]), "-deadline", "good",
                             "-row-mt", "1", "-cpu-used", "4", "-auto-alt-ref", "0", "-pix_fmt", "yuva420p",

@@ -19,7 +19,7 @@ for s, e in E["keeps"]:
     parts.append(c)
 x = np.concatenate(parts).astype(np.int16)
 o = wave.open(f"{W}/edit.wav", "wb"); o.setnchannels(1); o.setsampwidth(2); o.setframerate(48000); o.writeframes(x.tobytes()); o.close()
-run(["ffmpeg", "-v", "error", "-y", "-i", f"{W}/edit.wav", "-ar", "16000", f"{W}/edit16.flac"])
+run(["ffmpeg", "-nostdin", "-v", "error", "-y", "-i", f"{W}/edit.wav", "-ar", "16000", f"{W}/edit16.flac"])
 V = el_words(scribe(f"{W}/edit16.flac")); save(W, "verify_words.json", V)
 A, B = [norm(x[0]) for x in cw], [norm(x[0]) for x in V]; issues = 0
 ctx = lambda L, i, j: " ".join(y[0] for y in L[max(0, i - 3): j + 3])
