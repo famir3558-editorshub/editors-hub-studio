@@ -70,19 +70,34 @@ async function chatPoll(force) {
     const rkey = JSON.stringify(r.reactions || {});
     const changed = force || r.messages.length || r.seen !== c.seen || rkey !== c.rkey || r.typing !== c.typing;
     c.messages.push(...r.messages.filter((m) => !c.messages.some((x) => x.id === m.id))); c.seen = r.seen;
+    const edited = chatApplyChanges(c, r.changes);
     for (const k of Object.keys(c.reactions || {})) if (+k >= r.reactFrom) delete c.reactions[k];
     c.reactions = { ...(c.reactions || {}), ...(r.reactions || {}) }; c.rkey = rkey; c.typing = r.typing;
-    if (changed) drawChatMsgs(r.messages.length > 0);
+    if (changed || edited) drawChatMsgs(r.messages.length > 0);
   } catch (e) { /* tries again in a moment */ }
 }
 
 function chatBubble(m) {
   const cls = `chat-bub ${m.mine ? "me" : "them"}`, mid = `data-cmsg="${m.id}"`;
+  if (m.deleted) return `<div class="${cls} gone" ${mid}>🚫 ${m.mine ? "You deleted this message" : "This message was deleted"}</div>`;
   if (m.call) return `<div class="chat-day">📞 ${m.call.state === "ended" ? `Voice call · ${Math.floor(m.call.secs / 60)}:${String(m.call.secs % 60).padStart(2, "0")}` : m.call.state === "declined" ? "Call declined" : "Missed call"} · ${chatTime(m.at)}</div>`;
   if (m.voice) return `<div class="${cls} voice" ${mid}>🎤 <audio controls preload="none" src="${esc(chatMedia(m.voice))}"></audio></div>`;
   if (m.photo) return `<div class="${cls} ph" ${mid}><a href="${esc(chatMedia(m.photo))}" target="_blank" rel="noopener"><img src="${esc(chatMedia(m.photo))}" alt="Photo" loading="lazy"></a></div>`;
   if (m.video) return `<a class="${cls} vid" ${mid} href="${esc(m.video.url)}" target="_blank" rel="noopener"><span class="chat-pl">▶</span><span><b>${esc(m.video.name)}</b><small>${esc(m.video.client ? m.video.client + " · " : "")}Open the review link</small></span></a>`;
-  return `<div class="${cls}" ${mid}>${esc(m.text)}</div>`;
+  return `<div class="${cls}" ${mid}>${esc(m.text)}${m.edited ? `<small class="chat-ed">edited</small>` : ""}</div>`;
+}
+
+function chatApplyChanges(c, ch) {
+  let any = false;
+  const n0 = c.messages.length;
+  c.messages = c.messages.filter((m) => !((ch || {})[m.id] && ch[m.id].hidden));
+  if (c.messages.length !== n0) any = true;
+  for (const m of c.messages) {
+    const x = (ch || {})[m.id]; if (!x) continue;
+    if (x.deleted && !m.deleted) { for (const k of ["text", "photo", "voice", "video"]) delete m[k]; m.deleted = true; any = true; }
+    else if (x.edited && (m.text !== x.text || !m.edited)) { m.text = x.text; m.edited = true; any = true; }
+  }
+  return any;
 }
 
 function drawChatMsgs(toEnd) {
@@ -184,9 +199,41 @@ async function chatReact(id) {
   const at = document.querySelector(`[data-cmsg="${id}"]`); if (!at) return;
   const p = document.createElement("div");
   p.className = "chat-picker";
-  p.innerHTML = CHAT_EMOJI.map((e) => `<button class="${mine && mine.emoji === e ? "on" : ""}" data-cemo="${e}">${e}</button>`).join("") + (mine ? `<button data-cemo="" title="Remove">✕</button>` : "");
+  const msg = c.messages.find((m) => m.id === id);
+  if (!msg) return;
+  p.innerHTML = CHAT_EMOJI.map((e) => `<button class="${mine && mine.emoji === e ? "on" : ""}" data-cemo="${e}">${e}</button>`).join("") + (mine ? `<button data-cemo="" title="Remove">✕</button>` : "") +
+    (msg.mine && msg.text != null ? `<button data-cact="edit" title="Edit">✏️ Edit</button>` : "") + `<button data-cact="del" title="Delete">🗑 Delete</button>`;
   at.after(p);
   p.onclick = async (e) => {
+    const a = e.target.closest("[data-cact]");
+    if (a && a.dataset.cact === "del") {
+      p.innerHTML = (msg.mine && !msg.deleted ? `<button data-cact="all">Delete for everyone</button>` : "") + `<button data-cact="me">Delete for me</button><button data-cact="no">Cancel</button>`;
+      return;
+    }
+    if (a && a.dataset.cact === "no") { p.remove(); return; }
+    if (a && a.dataset.cact === "all") {
+      p.remove();
+      try { await chatApi("unsend", { pid: c.pid, id }); for (const k of ["text", "photo", "voice", "video"]) delete msg[k]; msg.deleted = true; drawChatMsgs(false); } catch (x) { toast(x.message, true); }
+      return;
+    }
+    if (a && a.dataset.cact === "me") {
+      p.remove();
+      try { await chatApi("hide", { pid: c.pid, id }); c.messages = c.messages.filter((m) => m !== msg); drawChatMsgs(false); } catch (x) { toast(x.message, true); }
+      return;
+    }
+    if (a && a.dataset.cact === "edit") {
+      p.remove();
+      const box = document.querySelector(`[data-cmsg="${id}"]`); if (!box) return;
+      box.innerHTML = `<textarea class="chat-edit" rows="2" maxlength="4000">${esc(msg.text)}</textarea><span class="chat-edit-acts"><button class="btn small ghost" data-ecancel>Cancel</button><button class="btn small primary" data-esave>Save</button></span>`;
+      const ta = box.querySelector("textarea"); ta.focus();
+      box.querySelector("[data-ecancel]").onclick = (ev) => { ev.stopPropagation(); drawChatMsgs(false); };
+      box.querySelector("[data-esave]").onclick = async (ev) => {
+        ev.stopPropagation();
+        const text = ta.value.trim(); if (!text) { toast("Write something, or delete the message", true); return; }
+        try { await chatApi("edit", { pid: c.pid, id, text }); msg.text = text; msg.edited = true; drawChatMsgs(false); } catch (x) { toast(x.message, true); }
+      };
+      return;
+    }
     const b = e.target.closest("[data-cemo]"); if (!b) return;
     p.remove();
     try { await chatApi("react", { pid: c.pid, id, emoji: b.dataset.cemo }); c.reactFrom = 0; await chatPoll(true); } catch (x) { toast(x.message, true); }

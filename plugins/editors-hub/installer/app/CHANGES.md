@@ -2,6 +2,19 @@
 
 Shown in the studio after it updates. Each version: `## 1.2.3`, then `### New`, `### Better` or `### Fixed`, with one plain line per change.
 
+## 1.40.0
+### New
+- The phone app opens with the Editors.Hub logo on the Aurora sky, and never flashes white.
+- The phone's Live tab shows each edit's updates as you'd see them in the studio: what's being done, the step, and the snapshot pictures.
+- Share from the phone with the same choices as on the PC: pick the draft, the number your client sees, downloading and commenting, and copy or open the link.
+- Choose the render settings from the phone. The notification asking for them opens them straight away.
+- Edit and delete chat messages, on the phone and in the studio. Your own messages can be deleted for everyone or just for you; anyone's can be deleted from your side.
+- Select several messages at once on the phone and delete them together.
+### Better
+- The phone app opens in well under a second: it shows what it had last time at once, then refreshes.
+- Chats open with their messages straight away, and a message you send shows at once.
+- Taps respond instantly, scrolling is smooth, and the chat no longer jumps while you scroll.
+
 ## 1.39.1
 ### New
 - Computers without an NVIDIA card get the listening check and the face check too: setup downloads their processor versions once (about 1 GB).

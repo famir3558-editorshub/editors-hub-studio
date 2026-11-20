@@ -4155,6 +4155,8 @@ def phone_draft(item):
     parts = str(item.get("id", "")).split(":")
     if parts[0] == "draft" and len(parts) == 3 and parts[2].isdigit():
         return {"video": parts[1], "version": int(parts[2])}
+    if parts[0] == "render" and len(parts) == 2:
+        return {"video": parts[1]}
     return {}
 
 
@@ -4300,7 +4302,8 @@ def phone_commands():
                 done(c, True, f"{name} is set to Changes")
             elif op == "share":
                 version = int(args.get("version") or latest_version(v))
-                job = share_video(vid, owner, version)
+                flags = {k: bool(args[k]) for k in ("download", "comments") if args.get(k) is not None}
+                job = share_video(vid, owner, version, client_draft=int(args["client_draft"]) if args.get("client_draft") else None, **flags)
 
                 def wait(c=c, job=job, vid=vid, name=name, version=version):
                     while job["state"] in ("running", "resuming"):
@@ -4311,6 +4314,9 @@ def phone_commands():
                     else:
                         done(c, False, f"Sharing {name} didn't finish: {job.get('message') or job['state']}")
                 threading.Thread(target=wait, daemon=True).start()
+            elif op == "render":
+                set_render_choice(vid, args.get("choice") or {}, by=f"{owner.get('username') or 'Owner'} (phone)")
+                done(c, True, f"Render settings chosen for {name}: the draft is being made")
             elif op == "retry":
                 if not v.get("ready_failed"):
                     raise StudioError(f"{name} has no failed upload to try again.")
@@ -4379,6 +4385,7 @@ PHONE_SNAP_BEAT = 900      # seconds: sent again unchanged this often while some
 PHONE_SNAP_IDLE = 1800     # and this often when nothing does, so the phone can tell the studio is on
 PHONE_SNAP_CLIENTS = 40
 PHONE_SNAP_VIDEOS = 15     # per client, newest first
+PHONE_SNAP_VERSIONS = 15   # drafts listed per video, for the phone's Share window
 _phone_snap = {"sig": None, "at": 0}
 
 
@@ -4398,7 +4405,14 @@ def phone_snapshot():
                 "open_notes": sum(1 for n in v["notes"] if not n["done"] and n["version"] == latest),
                 "updated": v.get("updated", v["created"]), "link": bool(v.get("link")),
                 "approved": (v.get("approved") or {}).get("version"), "ready_failed": bool(v.get("ready_failed")),
-                **({"link_key": v["link"].get("key"), "watch": v["link"].get("url"), "link_version": v["link"].get("version")} if v.get("link") else {})}
+                **({"link_key": v["link"].get("key"), "watch": v["link"].get("url"), "link_version": v["link"].get("version"),
+                    "link_download": bool(v["link"].get("download")), "link_comments": bool(v["link"].get("comments")),
+                    "link_client_draft": v["link"].get("client_draft"), "link_client_count": v["link"].get("client_count")} if v.get("link") else {}),
+                "versions": [d["version"] for d in v["drafts"]][-PHONE_SNAP_VERSIONS:]}
+        req = v.get("render_request") or {}
+        if req.get("status") == "waiting":
+            item["render"] = {"draft": req.get("draft"), "note": str(req.get("note") or "")[:300], "source": req.get("source") or {},
+                              "defaults": req.get("defaults") or v.get("last_render_choice") or RENDER_DEFAULTS}
         item["_style"] = v.get("style", "")
         groups.setdefault(v.get("project", ""), []).append(item)
         p = v.get("progress") or {}
@@ -4429,7 +4443,7 @@ def phone_snapshot():
     clients.sort(key=lambda c: c["updated"], reverse=True)
     s = settings()
     styles = [{"id": m["id"], "name": m.get("name") or m["id"]} for m in list_styles() if not m.get("shared_from")][:60]
-    return {"clients": clients[:PHONE_SNAP_CLIENTS], "live": live, "statuses": STATUSES, "styles": styles,
+    return {"clients": clients[:PHONE_SNAP_CLIENTS], "live": live, "statuses": STATUSES, "styles": styles, "render_options": RENDER_OPTIONS,
             "reply_name": str(s.get("your_name") or s.get("studio_name") or "").strip()[:60]}
 
 
@@ -4451,7 +4465,79 @@ def phone_snapshot_send(force=False):
     return True
 
 
-CHAT_OPS = {"home", "request", "answer", "cancel", "unfriend", "block", "unblock", "messages", "send", "react", "typing",
+PHONE_LIVE_SENT = "phone-live-sent.json"
+PHONE_LIVE_BATCH = 10      # updates per call
+PHONE_LIVE_FIRST = 20      # the first time an edit is seen, only its newest updates go
+PHONE_LIVE_HOURS = 24      # an edit with no update for this long isn't followed any more
+PHONE_PIC_WIDTH = 480
+
+
+def phone_pic(folder, rel):
+    """A small JPEG of an update's snapshot, as base64, or None."""
+    ffmpeg = shutil.which("ffmpeg")
+    src = Path(folder) / str(rel or "")
+    if not ffmpeg or not rel or not src.is_file():
+        return None
+    try:
+        r = subprocess.run([ffmpeg, "-nostdin", "-loglevel", "error", "-i", str(src), "-frames:v", "1", "-vf", f"scale='min({PHONE_PIC_WIDTH},iw)':-2",
+                            "-q:v", "7", "-f", "image2", "-c:v", "mjpeg", "-"], capture_output=True, timeout=30)
+    except (OSError, subprocess.SubprocessError):
+        return None
+    return base64.b64encode(r.stdout).decode() if r.returncode == 0 and 0 < len(r.stdout) <= 110000 else None
+
+
+def phone_live_send():
+    """Sends each edit's new Live updates to the phone. Only video.json files that changed are read."""
+    s = settings()
+    if not s.get("phone") or not approval.config():
+        return 0
+    path = DATA / PHONE_LIVE_SENT
+    sent = read_json(path, {}) or {}
+    n, dirty = 0, False
+    for vid, d in video_dirs(None).items():
+        f = d / "video.json"
+        try:
+            mtime = f.stat().st_mtime
+        except OSError:
+            continue
+        mark = sent.get(vid) or {}
+        if mark.get("m") == mtime:
+            continue
+        try:
+            v = load_video(vid)
+        except StudioError:
+            continue
+        ups = [u for u in v.get("updates", []) if u.get("text") or u.get("image")]
+        last = int(mark.get("id") or 0)
+        fresh = [u for u in ups if int(u["id"]) > last]
+        p = v.get("progress") or {}
+        recent = time.time() - (p.get("last") or 0) < PHONE_LIVE_HOURS * 3600
+        if not fresh or not p or not recent:
+            sent[vid] = {"id": max([last] + [int(u["id"]) for u in ups]), "m": mtime}
+            dirty = True
+            continue
+        if not mark:
+            fresh = fresh[-PHONE_LIVE_FIRST:]
+        ok = True
+        for i in range(0, len(fresh), PHONE_LIVE_BATCH):
+            part = fresh[i:i + PHONE_LIVE_BATCH]
+            items = [{"id": u["id"], "at": u.get("at", ""), "text": u.get("text", ""), "step": u.get("step", ""), "draft": u.get("draft") or 0,
+                      "pic": phone_pic(v["folder"], u.get("image"))} for u in part]
+            try:
+                approval.shared_call(DATA, "/app/live-push", video=vid, items=items)
+            except approval.ApprovalError:
+                ok = False
+                break
+            last = int(part[-1]["id"])
+            n += len(part)
+        sent[vid] = {"id": last, "m": mtime if ok else None}
+        dirty = True
+    if dirty:
+        write_json(path, sent)
+    return n
+
+
+CHAT_OPS = {"home", "request", "answer", "cancel", "unfriend", "block", "unblock", "messages", "send", "react", "typing", "edit", "unsend", "hide",
             "ice", "ring", "call-start", "call-answer", "call-signal", "call-poll", "call-end"}
 PHONE_COMMANDS_EVERY = 10  # seconds: how soon a tap on the phone is done here
 
@@ -4461,6 +4547,10 @@ def phone_watch():
     while True:
         try:
             phone_commands()
+        except Exception:
+            pass
+        try:
+            phone_live_send()
         except Exception:
             pass
         if time.time() - last >= PHONE_EVERY:
