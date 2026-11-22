@@ -186,6 +186,17 @@
       <label class="row toggle-row"><span><b>Sounds</b><br><small class="muted">A soft tick for updates, a chime when the studio asks you something (render settings, b-roll), and a party popper with a celebration sound when a draft is ready or a video is approved.</small></span><span class="spacer"></span><span class="switch"><input type="checkbox" name="sounds" id="soundsOn"><span></span></span></label>
       <div class="row"><button class="btn" type="button" id="revealLib">Open library folder</button><div class="spacer"></div><button class="btn primary">Save</button></div>
     </form>
+    <div class="panel settings" data-owner hidden id="storagePanel">
+      <div class="row"><h3>Storage</h3><div class="spacer"></div><span class="pill" id="storageDisk"></span><button class="btn small" type="button" id="storageLook">Look again</button></div>
+      <p class="muted">What each video takes on the drive, and what can go safely. Raw footage, exports, the latest draft and the approved draft are never touched, and nothing a render or upload is using.</p>
+      <div class="store-kinds" id="storageKinds"></div>
+      <div class="skills" id="storageList"><p class="faint">Looking…</p></div>
+    </div>
+    <div class="panel settings" data-owner hidden id="healthPanel">
+      <div class="row"><h3>Weekly check</h3><div class="spacer"></div><span class="pill" id="healthWhen"></span><button class="btn small" type="button" id="healthNow">Check now</button></div>
+      <p class="muted">Once a week the studio checks what your edits depend on: room on the drives, FFmpeg, Node for HyperFrames, the graphics card's driver and encoder, and Whisper for the listening checks. A problem shows in the bell.</p>
+      <div class="skills" id="healthList"><p class="faint">Not checked yet.</p></div>
+    </div>
     <div class="panel settings" data-owner hidden id="keysPanel">
       <div class="row"><h3>API keys</h3><div class="spacer"></div><button class="btn small" type="button" id="openSetup">See setup</button></div>
       <p class="muted">The services your edits can use. Paste a key yourself here (never into a chat). Keys stay on this computer, in a file only you can read, outside the studio's folder, so copying the studio never carries them.</p>

@@ -1358,6 +1358,168 @@ def pull_link_notes(vid):
     return len(added)
 
 
+STORAGE_KINDS = {
+    "leftovers": "Leftovers: unfinished renders and uploads",
+    "checks": "Check reports of drafts already made",
+    "old_drafts": "Old drafts of approved videos",
+}
+
+
+def folder_bytes(p):
+    if p.is_file():
+        return p.stat().st_size
+    total = 0
+    for root, _, files in os.walk(p):
+        for f in files:
+            try:
+                total += os.path.getsize(os.path.join(root, f))
+            except OSError:
+                pass
+    return total
+
+
+def storage_leftovers(v):
+    """What can go from one video, by kind: [(path, kind)]. Never the raw footage, exports, the latest or approved draft,
+    or anything a render or upload is using right now."""
+    folder = Path(v["folder"])
+    found = []
+    busy = render_busy()
+    old = time.time() - 86400
+    for p in folder.glob(".render-*"):
+        if not busy and p.stat().st_mtime < time.time() - 600:
+            found.append((p, "leftovers"))
+    for p in folder.rglob(".upload-*"):
+        if p.is_file() and p.stat().st_mtime < old:
+            found.append((p, "leftovers"))
+    latest = latest_version(v) or 0
+    checks = folder / "checks"
+    if checks.is_dir():
+        for p in checks.glob("draft-*"):
+            m = re.fullmatch(r"draft-(\d+)", p.name)
+            if m and int(m.group(1)) <= latest:
+                found.append((p, "checks"))
+    approved = (v.get("approved") or {}).get("version")
+    if approved and v.get("status") in ("approved", "delivered"):
+        keep = {approved, latest, (v.get("link") or {}).get("version")}
+        for d in v.get("drafts") or []:
+            f = folder / d["file"]
+            if d["version"] not in keep and f.is_file():
+                found.append((f, "old_drafts"))
+    return found
+
+
+def render_busy():
+    lock = DATA / RENDER_TURN
+    try:
+        return lock.exists() and not lockfile_stale(lock, longest=12 * 3600)
+    except FileNotFoundError:
+        return False
+
+
+def storage_report():
+    vids = []
+    for vid, d in video_dirs().items():
+        try:
+            v = load_video(vid)
+        except StudioError:
+            continue
+        kinds = {k: {"bytes": 0, "items": 0} for k in STORAGE_KINDS}
+        for p, k in storage_leftovers(v):
+            kinds[k]["bytes"] += folder_bytes(p)
+            kinds[k]["items"] += 1
+        vids.append({"id": vid, "name": v["name"], "status": v.get("status"), "bytes": folder_bytes(d), "kinds": kinds})
+    vids.sort(key=lambda x: x["bytes"], reverse=True)
+    totals = {k: sum(x["kinds"][k]["bytes"] for x in vids) for k in STORAGE_KINDS}
+    return {"videos": vids, "totals": totals, "labels": STORAGE_KINDS, "disk": library_space()}
+
+
+def storage_clean(kinds, vid=None):
+    """Deletes the chosen kinds of leftovers (from one video, or all). Returns the bytes freed."""
+    kinds = [k for k in kinds if k in STORAGE_KINDS]
+    if not kinds:
+        raise StudioError("Choose what to clear.")
+    freed = 0
+    for one in ([vid] if vid else list(video_dirs())):
+        with vlock(one):
+            v = load_video(one)
+            for p, k in storage_leftovers(v):
+                if k not in kinds:
+                    continue
+                size = folder_bytes(p)
+                try:
+                    shutil.rmtree(p) if p.is_dir() else p.unlink()
+                    freed += size
+                except OSError:
+                    pass
+    return freed
+
+
+# ================================================================ the weekly health check
+HEALTH = "health.json"
+HEALTH_EVERY = 7 * 86400
+HEALTH_LOW_GB = 30
+
+
+def health_check():
+    """Looks at what the edits depend on: room on the drives, FFmpeg, Node (HyperFrames), the graphics card's driver and
+    encoder, and Whisper. Saves the answer in data/health.json and returns it."""
+    items = []
+
+    def add(name, ok, detail):
+        items.append({"name": name, "ok": bool(ok), "detail": detail})
+    for label, where in (("Library drive", library()), ("Studio drive", ROOT)):
+        try:
+            free = shutil.disk_usage(where).free / 1e9
+            add(f"{label} space", free >= HEALTH_LOW_GB, f"{free:.0f} GB free" + ("" if free >= HEALTH_LOW_GB else f"; under {HEALTH_LOW_GB} GB, so a 4K render may not fit. Clear some in Settings → Storage."))
+        except OSError as e:
+            add(f"{label} space", False, f"can't be read ({e})")
+    for tool in ("ffmpeg", "ffprobe", "node"):
+        path = shutil.which(tool)
+        ver = ""
+        if path:
+            try:
+                out = subprocess.run([path, "-version" if tool != "node" else "--version"], capture_output=True, text=True, timeout=30, stdin=subprocess.DEVNULL).stdout
+                ver = (out.splitlines() or [""])[0][:80]
+            except (OSError, subprocess.SubprocessError):
+                ver = "doesn't answer"
+        add(tool if tool != "node" else "Node (for HyperFrames)", bool(path) and ver != "doesn't answer", ver or "not installed")
+    smi = shutil.which("nvidia-smi")
+    if smi:
+        try:
+            out = subprocess.run([smi, "--query-gpu=name,driver_version", "--format=csv,noheader"], capture_output=True, text=True, timeout=30, stdin=subprocess.DEVNULL).stdout.strip()
+            add("Graphics card driver", bool(out), out or "doesn't answer")
+        except (OSError, subprocess.SubprocessError) as e:
+            add("Graphics card driver", False, f"doesn't answer ({e})")
+        ff = shutil.which("ffmpeg")
+        if ff:
+            _NVENC.pop(ff, None)
+            add("Graphics card encoder (NVENC)", nvenc_available(ff), "works" if nvenc_available(ff) else "can't open: drafts render on the processor, slower")
+    try:
+        r = subprocess.run([sys.executable, "-c", "import whisper, torch; print('cuda' if torch.cuda.is_available() else 'cpu')"],
+                           capture_output=True, text=True, timeout=180, stdin=subprocess.DEVNULL)
+        dev = (r.stdout or "").strip()
+        add("Whisper (listening checks)", r.returncode == 0, f"runs on the {'graphics card' if dev == 'cuda' else 'processor'}" if r.returncode == 0
+            else "can't load: the checks before a render can't listen. Open Home's setup to reinstall it.")
+    except (OSError, subprocess.SubprocessError) as e:
+        add("Whisper (listening checks)", False, f"can't load ({e})")
+    result = {"at": now(), "ts": time.time(), "items": items, "problems": sum(not x["ok"] for x in items)}
+    write_json(DATA / HEALTH, result)
+    return result
+
+
+def health_watch():
+    """Once a week (and soon after the studio starts, if the last check is older than that)."""
+    time.sleep(300)
+    while True:
+        try:
+            last = read_json(DATA / HEALTH, {}) or {}
+            if time.time() - (last.get("ts") or 0) > HEALTH_EVERY:
+                health_check()
+        except Exception as e:  # never stops the studio
+            print(f"[health] {e}", file=sys.stderr)
+        time.sleep(3600)
+
+
 def pull_link_notes_soon(vid):
     """When someone opens the video's page: a quick look, at most every 10 seconds, without making the page wait."""
     if time.time() - _link_pulled.get(vid, 0) > 10:
@@ -3559,6 +3721,62 @@ def set_render_choice(vid, choice, by=""):
 RENDER_FREE_GB = 15  # a 4K draft is 3-4 GB; this keeps the drive from filling up halfway through
 RENDER_SYNC_GAP = 0.3  # seconds: more than this between the sound and the picture is a stale mix or a sync slip
 RENDER_TURN = "render-turn.lock"
+RENDER_PIECES_FROM = 240  # seconds: a longer draft is encoded a minute at a time, so a render that stopped carries on
+RENDER_PIECE = 60
+
+
+def time_left(seconds):
+    m = round(seconds / 60)
+    return "under a minute" if m < 1 else f"about {m} min" if m < 90 else f"about {m / 60:.1f} hours"
+
+
+def render_in_pieces(vid, master, out, info, head, vf, vargs, aargs, tail, encoder, choice):
+    """Encodes the picture a minute at a time into a folder beside the video, then joins the pieces and adds the sound in one go.
+    Pieces already made by an earlier try of this same render (same file, settings and encoder) are kept, so a render that
+    stopped (a crash, a restart) carries on. Returns (True, "") or (False, why); "join:" means the pieces didn't add up."""
+    st = master.stat()
+    key = hashlib.sha1(json.dumps([str(master.resolve()), st.st_size, int(st.st_mtime), choice, encoder, vargs]).encode()).hexdigest()[:10]
+    parts = out.parent / f".render-parts-{key}"
+    parts.mkdir(exist_ok=True)
+    fps, total = info["fps"], info["duration"]
+    per = max(1, round(RENDER_PIECE * fps))  # frames in a piece
+    n = max(1, -(-int(round(total * fps)) // per))
+    have = [i for i in range(n) if (parts / f"{i:04d}.mp4").is_file()]
+    if have:
+        post_update(vid, f"Carrying on the render where it stopped: {len(have)} of {n} pieces were already done.")
+    started, made, posted = time.time(), 0, time.time()
+    for i in range(n):
+        piece = parts / f"{i:04d}.mp4"
+        if piece.is_file():
+            continue
+        tmp = parts / f"{i:04d}.part.mp4"
+        seek = ["-ss", f"{(i * per - 0.5) / fps:.6f}"] if i else []  # half a frame early: the first frame kept is exactly frame i*per
+        limit = ["-frames:v", str(per)] if i < n - 1 else []
+        r = subprocess.run([*head, *seek, "-i", str(master), *vf, *vargs, *limit, "-an", str(tmp)],
+                           capture_output=True, text=True, encoding="utf-8", errors="replace")
+        if r.returncode or not tmp.is_file():
+            tmp.unlink(missing_ok=True)
+            return False, (r.stderr or "").strip()[-400:]
+        os.replace(tmp, piece)
+        made += 1
+        if time.time() - posted > 60 and i < n - 1:
+            left = (time.time() - started) / made * (n - 1 - i)
+            post_update(vid, f"Rendering: {i + 1} of {n} pieces done, {time_left(left)} left.")
+            posted = time.time()
+    listing = parts / "pieces.txt"
+    listing.write_text("".join(f"file '{(parts / f'{i:04d}.mp4').as_posix()}'\n" for i in range(n)), encoding="utf-8")
+    r = subprocess.run([*head, "-f", "concat", "-safe", "0", "-i", str(listing), "-i", str(master), "-map", "0:v:0", "-map", "1:a:0?",
+                        "-c:v", "copy", *aargs, *tail, str(out)], capture_output=True, text=True, encoding="utf-8", errors="replace")
+    if r.returncode or not out.is_file():
+        out.unlink(missing_ok=True)
+        return False, (r.stderr or "").strip()[-400:]
+    joined, source = stream_lengths(out)["video"] or 0, stream_lengths(master)["video"] or total
+    if abs(joined - source) > 1.5 / fps:  # a piece came out a frame long or short: never let that reach a draft
+        out.unlink(missing_ok=True)
+        shutil.rmtree(parts, ignore_errors=True)
+        return False, f"join: the pieces came to {joined:.3f} s, the edit is {source:.3f} s"
+    shutil.rmtree(parts, ignore_errors=True)
+    return True, ""
 
 
 def stream_lengths(path):
@@ -3802,36 +4020,46 @@ def finish_render(vid, master, note="", cpu=False, skip_checks=False):
         if free_gb < need_gb:
             raise StudioError(f"The drive with this video has {free_gb:.1f} GB free; the render needs at least {need_gb:.0f} GB. "
                               f"Free some space on it (or move old work to another drive), then run finish-render again. Nothing was rendered.")
-        head = [ffmpeg, "-nostdin", "-y", "-loglevel", "error", "-i", str(master), "-vf", f"scale={width}:{height}:flags=lanczos"]
-        if choice["fps"] != "same":
-            head += ["-r", str(fps)]
+        head = [ffmpeg, "-nostdin", "-y", "-loglevel", "error"]
+        vf = ["-vf", f"scale={width}:{height}:flags=lanczos"] + (["-r", str(fps)] if choice["fps"] != "same" else [])
         audio = ["-c:a", "aac", "-b:a", f"{choice['audio']}k"]
         if choice["format"] == "prores":
-            tries = [("prores", ["-c:v", "prores_ks", "-profile:v", "3", "-pix_fmt", "yuv422p10le", "-c:a", "pcm_s16le"])]
+            tries = [("prores", ["-c:v", "prores_ks", "-profile:v", "3", "-pix_fmt", "yuv422p10le"], ["-c:a", "pcm_s16le"])]
             suffix = ".mov"
         elif choice["format"] == "h265":
             tries = [("x265", ["-c:v", "libx265", "-tag:v", "hvc1", "-preset", "medium", "-b:v", f"{mbps}M",
-                               "-maxrate", f"{round(mbps * 1.5, 1)}M", "-bufsize", f"{round(mbps * 2, 1)}M",
-                               "-pix_fmt", "yuv420p", "-movflags", "+faststart", *audio])]
+                               "-maxrate", f"{round(mbps * 1.5, 1)}M", "-bufsize", f"{round(mbps * 2, 1)}M", "-pix_fmt", "yuv420p"], audio)]
             suffix = ".mp4"
         else:
-            tries = [("x264", [*h264_encoder_args(mbps, False), "-movflags", "+faststart", *audio])]
+            tries = [("x264", h264_encoder_args(mbps, False), audio)]
             if not cpu and settings().get("gpu_encode", True) and nvenc_available(ffmpeg):
-                tries.insert(0, ("NVENC", [*h264_encoder_args(mbps, True), "-movflags", "+faststart", *audio]))
+                tries.insert(0, ("NVENC", h264_encoder_args(mbps, True), audio))
             suffix = ".mp4"
+        tail = ["-movflags", "+faststart"] if suffix == ".mp4" else []
         out = Path(v["folder"]) / f".render-{secrets.token_hex(3)}{suffix}"
+        pieces = choice["fps"] == "same" and suffix == ".mp4" and (info.get("duration") or 0) > RENDER_PIECES_FROM
         where = {"NVENC": " on the graphics card (NVENC)", "x264": " on the processor (x264)"}
         post_update(vid, f"Rendering now: {width} × {height}, {fps:g} fps" + (f", about {mbps} Mbps" if mbps else ", ProRes")
                     + where.get(tries[0][0], "") + ".", step="Render")
         fallback = ""
         try:
-            for n, (encoder, args) in enumerate(tries):
+            for n, (encoder, vargs, aargs) in enumerate(tries):
                 started = time.time()
-                r = subprocess.run([*head, *args, str(out)], capture_output=True, text=True, encoding="utf-8", errors="replace")
-                if not r.returncode and out.exists() and probe_media(out):
+                ok, reason = False, ""
+                if pieces:
+                    ok, reason = render_in_pieces(vid, master, out, info, head, vf, vargs, aargs, tail, encoder, choice)
+                    if not ok and reason.startswith("join:"):
+                        print(f"[render] {reason}; rendering in one go", file=sys.stderr)
+                        post_update(vid, "The render's pieces didn't join exactly, so it's rendering in one go instead (nothing is lost).")
+                        pieces = False
+                if not pieces and not ok:
+                    r = subprocess.run([*head, "-i", str(master), *vf, *vargs, *aargs, *tail, str(out)],
+                                       capture_output=True, text=True, encoding="utf-8", errors="replace")
+                    ok = not r.returncode and out.exists() and bool(probe_media(out))
+                    reason = (r.stderr or "").strip()[-400:]
+                if ok and out.exists() and probe_media(out):
                     break
                 out.unlink(missing_ok=True)
-                reason = (r.stderr or "").strip()[-400:]
                 if "No space left" in reason or shutil.disk_usage(v["folder"]).free < 2e9:
                     raise StudioError("The drive with this video filled up during the render, so it stopped. Free some space on it, "
                                       "then run finish-render again. Nothing was added.")
@@ -4939,6 +5167,12 @@ def notifications(user=None):
         recent.append({"id": f"studio:{version_file.read_text(encoding='utf-8').strip()}", "icon": "studio", "text": f"The studio updated to {version_file.read_text(encoding='utf-8').strip()}", "at": time.strftime("%Y-%m-%dT%H:%M:%S", time.localtime(version_file.stat().st_mtime))})
     except OSError:
         pass
+    if owner:
+        health = read_json(DATA / HEALTH, {}) or {}
+        bad = [x for x in health.get("items") or [] if not x["ok"]]
+        if bad:
+            needs.append({"id": f"health:{health.get('at')}", "icon": "warn", "text": f"The weekly check found {len(bad)} problem{'s' if len(bad) > 1 else ''}: {bad[0]['name']}",
+                          "sub": bad[0]["detail"][:120], "url": "/#settings"})
     if can_remove_effects(user) and approval.config():  # the real owner, not someone else's copy of the studio
         notify_refresh_reports()
         recent += notify_report_items()
@@ -6124,6 +6358,18 @@ ONLINE_MARK = "editors-hub-style:"
 ONLINE_REPO_NAME = "editors-hub-styles"
 DRIVE_PIECE = 32 * 256 * 1024  # Google takes pieces in multiples of 256 KB
 DRIVE_TRIES = 8
+INTERNET_WAIT = 12 * 3600  # how long an upload waits for the internet to come back
+
+
+def internet_up():
+    """True when Google answers at all (any HTTP answer counts); False when the connection itself fails."""
+    try:
+        urllib.request.urlopen(urllib.request.Request("https://www.googleapis.com/generate_204", headers={"User-Agent": "Editors.Hub"}), timeout=10).close()
+        return True
+    except urllib.error.HTTPError:
+        return True
+    except (urllib.error.URLError, OSError):
+        return False
 SHARE_LIMIT = {"short": 3_000_000_000, "long": 7_000_000_000}  # the service holds to these too
 SHARE_LEAVE_OUT = ("videos/", "library/approved/", "library/previews/", "previews/", "brief/session/", f"effects/{LEARN_PRIVATE}/", f"transitions/{LEARN_PRIVATE}/")  # raw footage and finished client edits
 SHARE_JUNK = {".us-bg-remover", ".transcode-cache", "__pycache__", "node_modules"}
@@ -6370,6 +6616,15 @@ def drive_upload_file(url, path, job, sent=0):
                 problem = e
             except (urllib.error.URLError, OSError) as e:
                 problem = e
+            if not internet_up():  # the internet is down: wait for it (hours if need be) instead of using up the tries
+                waited = time.time()
+                while not internet_up():
+                    check_stop(job)
+                    job["stage"] = f"Waiting for the internet (off for {max(1, int((time.time() - waited) // 60))} min); carries on by itself"
+                    if time.time() - waited > INTERNET_WAIT:
+                        raise StudioError("The internet has been off for hours, so the upload stopped. It carries on from where it got to next time.")
+                    time.sleep(20)
+                tries = 0
             tries += 1
             if tries > DRIVE_TRIES:
                 raise StudioError(f"The upload kept failing ({problem}). Check the internet and try again.")
@@ -7116,11 +7371,11 @@ class Handler(BaseHTTPRequestHandler):
 
     # -- replies
 
-    def send_body(self, body, ctype, status=200, extra=()):
+    def send_body(self, body, ctype, status=200, extra=(), cache="no-store"):
         self.send_response(status)
         self.send_header("Content-Type", ctype)
         self.send_header("Content-Length", str(len(body)))
-        self.send_header("Cache-Control", "no-store")
+        self.send_header("Cache-Control", cache)
         for k, v in extra:
             self.send_header(k, v)
         self.end_headers()
@@ -7128,7 +7383,18 @@ class Handler(BaseHTTPRequestHandler):
             self.wfile.write(body)
 
     def send_json(self, data, status=200):
-        self.send_body(json.dumps(data).encode(), "application/json", status)
+        body = json.dumps(data).encode()
+        if self.command == "GET" and status == 200:
+            # the pages ask every few seconds: an answer that hasn't changed goes back as a tiny "same as before"
+            tag = '"' + hashlib.sha1(body).hexdigest()[:24] + '"'
+            if self.headers.get("If-None-Match") == tag:
+                self.send_response(304)
+                self.send_header("ETag", tag)
+                self.send_header("Cache-Control", "private, no-cache")
+                self.end_headers()
+                return
+            return self.send_body(body, "application/json", status, cache="private, no-cache", extra=(("ETag", tag),))
+        self.send_body(body, "application/json", status)
 
     def send_media(self, target, query):
         what = query.get("peek", [""])[0]
@@ -7473,6 +7739,10 @@ class Handler(BaseHTTPRequestHandler):
                         view.pop(private, None)
                 return self.send_json(view)
             self.need("owner")
+            if parts == ["api", "storage"]:
+                return self.send_json(storage_report())
+            if parts == ["api", "health"]:
+                return self.send_json(read_json(DATA / HEALTH, {}) or {})
             if parts == ["api", "skills"]:
                 return self.send_json({"skills": list_skills(), "folder": str(CLAUDE_SKILLS),
                                        "profile": profile_summary(PROFILE_PACK)})
@@ -7672,6 +7942,11 @@ class Handler(BaseHTTPRequestHandler):
 
         # the owner only: admin
         self.need("owner")
+        if method == "POST" and parts == ["api", "storage", "clean"]:
+            freed = storage_clean(body.get("kinds") or [], body.get("video") or None)
+            return self.send_json({"freed": freed, **storage_report()})
+        if method == "POST" and parts == ["api", "health", "check"]:
+            return self.send_json(health_check())
         if method == "POST" and parts == ["api", "settings"]:
             update_settings(body)
             return self.send_json(self.state())
@@ -8077,6 +8352,7 @@ def serve(port):
     threading.Thread(target=link_watch, daemon=True).start()
     threading.Thread(target=live_watch, daemon=True).start()
     threading.Thread(target=phone_watch, daemon=True).start()
+    threading.Thread(target=health_watch, daemon=True).start()
     try:
         httpd.serve_forever()
     except KeyboardInterrupt:

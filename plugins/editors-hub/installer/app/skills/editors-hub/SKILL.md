@@ -235,6 +235,8 @@ replaces the export step in any video skill. Low-quality previews for your own c
    must match the picture's length and be newer than any `*cut*.json` / `*edl*.json` there. Fix what it says (rebuild the
    mix for this cut) and run it again; `--skip-checks` only when you have checked the file yourself and it is right
    (a picture-only video). If another video is rendering, it waits its turn (Live says so) and starts on its own.
+   A draft over 4 minutes is encoded a minute at a time: if finish-render stops (a crash, a restart, a closed window),
+   run the same command again and it carries on from the last finished minute. Live shows the time left as it goes.
    Run it on its own, not piped through `tail` or `head`: a pipe hides its exit code and its messages. A client's draft
    shows on the review page only once its upload finishes; until then it waits in `incoming`, which is normal.
 4. Check the draft it made (size, sound, a few frames), then carry on with the review round. The mistakes were found and

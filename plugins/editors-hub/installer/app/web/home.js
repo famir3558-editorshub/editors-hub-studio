@@ -1,10 +1,14 @@
 const S = { state: null, tab: "videos", kind: "client", status: "all", style: "", project: "", q: "", client: "" };
 const $ = (id) => document.getElementById(id);
 
-async function load() {
+async function load(poll) {
   try {
     const had = S.state?.version;
-    S.state = await api("GET", "/api/state");
+    const next = await api("GET", "/api/state");
+    const raw = JSON.stringify(next);
+    if (poll && raw === S.raw) return;  // the timer's look found nothing new: no redraw
+    S.raw = raw;
+    S.state = next;
     // the studio updated itself and restarted: pick up the new pages, unless someone's in the middle of a form
     if (had && S.state.version !== had && !document.querySelector("dialog[open]")) return location.reload();
   } catch (e) {
@@ -244,6 +248,57 @@ function renderSkills(data) {
     : "No creator profile packed (run: studio.py profile pack).");
   $("installSkills").disabled = !data.skills.some((s) => s.state === "missing" || s.state === "update");
 }
+
+// ---- Settings → Storage and the weekly check
+async function loadStorage() {
+  try { renderStorage(await api("GET", "/api/storage")); } catch (e) { toast(e.message, true); }
+}
+
+function renderStorage(r) {
+  $("storageDisk").textContent = r.disk?.free != null ? `${fmtBytes(r.disk.free)} free` : "";
+  $("storageKinds").innerHTML = Object.entries(r.labels).map(([k, label]) =>
+    `<div class="store-kind"><span><b>${esc(label)}</b><br><small class="muted">${fmtBytes(r.totals[k] || 0)} in all</small></span>` +
+    `<button class="btn small${k === "old_drafts" ? "" : " primary"}" type="button" data-clean="${k}" ${r.totals[k] ? "" : "disabled"}>Clear</button></div>`).join("");
+  const rows = r.videos.filter((v) => v.bytes > 0).slice(0, 60);
+  $("storageList").innerHTML = rows.map((v) => {
+    const can = Object.entries(v.kinds).filter(([, x]) => x.bytes > 0).map(([k, x]) => `${esc(r.labels[k].split(":")[0].toLowerCase())} ${fmtBytes(x.bytes)}`);
+    return `<div class="skill"><b>${esc(v.name)}</b><span class="pill">${fmtBytes(v.bytes)}</span><small>${can.length ? "Can go: " + can.join(", ") : "Nothing to clear"}</small></div>`;
+  }).join("") || `<p class="faint">No videos yet.</p>`;
+}
+
+$("storageLook").onclick = () => { $("storageList").innerHTML = `<p class="faint">Looking…</p>`; loadStorage(); };
+$("storageKinds").onclick = async (e) => {
+  const b = e.target.closest("[data-clean]");
+  if (!b) return;
+  const k = b.dataset.clean;
+  if (k === "old_drafts" && !confirm("Delete the old drafts of approved videos from this computer? The approved and latest drafts stay. The old ones won't play on their review pages any more, and this can't be undone.")) return;
+  b.disabled = true;
+  try {
+    const r = await api("POST", "/api/storage/clean", { kinds: [k] });
+    renderStorage(r);
+    toast(`Cleared ${fmtBytes(r.freed)}`);
+  } catch (err) {
+    b.disabled = false;
+    toast(err.message, true);
+  }
+};
+
+function renderHealth(h) {
+  $("healthWhen").textContent = h.at ? `Last: ${new Date(h.at).toLocaleDateString()}` + (h.problems ? ` · ${h.problems} problem${h.problems > 1 ? "s" : ""}` : " · all good") : "";
+  $("healthList").innerHTML = (h.items || []).map((x) => `<div class="skill"><b>${esc(x.name)}</b><span class="pill ${x.ok ? "k-installed" : "k-missing"}">${x.ok ? "OK" : "Problem"}</span><small>${esc(x.detail || "")}</small></div>`).join("")
+    || `<p class="faint">Not checked yet. It runs by itself once a week, or press Check now.</p>`;
+}
+
+async function loadHealth() {
+  try { renderHealth(await api("GET", "/api/health")); } catch (e) { toast(e.message, true); }
+}
+
+$("healthNow").onclick = async () => {
+  $("healthNow").disabled = true;
+  $("healthList").innerHTML = `<p class="faint">Checking (up to a minute)…</p>`;
+  try { renderHealth(await api("POST", "/api/health/check")); } catch (e) { toast(e.message, true); }
+  $("healthNow").disabled = false;
+};
 
 async function loadSkills() {
   try {
@@ -691,7 +746,7 @@ function setTab(tab, allow) {
     toast("Finish setting up first");
     tab = "setup";
   }
-  if (tab === "settings" && owner) { loadSkills(); loadKeys(); }
+  if (tab === "settings" && owner) { loadSkills(); loadKeys(); loadStorage(); loadHealth(); }
   if (tab === "team") { loadTeam(); loadApproved(); }
   if (tab === "report") openReports();
   if (tab === "deleted") loadTrash();
@@ -1320,7 +1375,7 @@ load().then(() => {
   if (S.state?.me.role !== "reviewer") loadTrash();
   tellIfUpdated();
 });
-setInterval(() => document.visibilityState === "visible" && !document.querySelector("dialog[open]") && load(), 5000);
+setInterval(() => document.visibilityState === "visible" && !document.querySelector("dialog[open]") && load(true), 5000);
 
 
 // ---- By client: each client's finished videos together, and one link for the client to see them all

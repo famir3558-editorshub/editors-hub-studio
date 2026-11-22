@@ -2,6 +2,16 @@
 
 Shown in the studio after it updates. Each version: `## 1.2.3`, then `### New`, `### Better` or `### Fixed`, with one plain line per change.
 
+## 1.42.0
+### New
+- Settings → Storage: what each video takes on the drive, and one click to clear what's safe to go: unfinished renders and uploads, check reports of drafts already made, and (only if you choose, after asking) old drafts of approved videos. Raw footage, exports, the latest and the approved draft are never touched.
+- A weekly check of what your edits depend on (room on the drives, FFmpeg, Node, the graphics card's driver and encoder, Whisper). A problem shows in the bell; Settings → Weekly check shows the last result and checks again on request.
+- A long render that stops (a crash, a restart) carries on from the last finished minute when it's run again, instead of starting over. Live shows how long it has left.
+### Better
+- An upload waits for the internet to come back, for hours if need be, and carries on by itself, instead of giving up after a few minutes offline.
+- Home and the review page check for changes more lightly: an answer that hasn't changed isn't sent again, and Home doesn't redraw for nothing.
+- The phone app's busiest records (your inbox, the studio's snapshot, phone commands and devices) moved to the service's database, well clear of the daily write limit, so the phone keeps updating on busy days.
+
 ## 1.41.0
 ### New
 - Mistakes are found and fixed before the final render, not after it: an edit is first checked on a quick preview (every line listened to, every card checked against the speaker, the sound against the picture), the mistakes are fixed, and only then is the final rendered, once. A final render of an edit that wasn't checked, or changed since, is refused. Live shows what the check found and what was fixed.
