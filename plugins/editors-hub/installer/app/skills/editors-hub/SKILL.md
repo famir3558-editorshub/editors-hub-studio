@@ -186,27 +186,35 @@ these tools on every computer; without an NVIDIA card they simply run slower. Ru
 - **Hair-accurate cut-out** for cards behind the speaker: `gpu/head_matte.py` (see Zero-mistake edits).
 - **The draft render:** `studio.py finish-render` already encodes H.264 on the card when it can (Settings, "Render drafts
   on the graphics card"), keeps the bitrate chosen in the popup, and falls back to x264. `--cpu` forces the processor.
-- **Never run a card job (Whisper, cut-outs, the face check, NVENC encodes) while finish-render is encoding.** Wait for it.
+- **Never run a card job (Whisper, cut-outs, the face check, NVENC encodes) while finish-render is encoding.** Wait for it. (`precheck` waits by itself.)
 
-## Before every render: slice-listening
+## Before the final render: check a preview, fix, then render once
 
-A transcript of the whole file smooths away false starts, "ahh"s, throat noises and repeated takes. Before you ask for
-the render settings, run `py "@@EDITORS_HUB_DIR@@/gpu/slice_listen.py" <the cut's voice, without music> -o slices.txt`.
-It re-transcribes the voice in 1.6 s windows, one every second, and lists what to listen to: fillers, noises, false
-starts, words or lines said twice, places it couldn't read (glitch?), and every pause over 0.4 s. Check every flagged
-moment by ear and fix what's real (a false start, a noise, a retake left in, a hole) before rendering. Say in Live what
-you fixed. Run it on the raw recording too when picking takes, and again after any late voice change.
+The owner's rule: find and fix the mistakes BEFORE the final render, so a draft goes to review once, already checked.
+Never render the full-quality file first and check it afterwards.
 
-## Before delivery: the face check
+1. Render a quick preview of the whole edit: low quality is fine (`npx hyperframes render --quality draft`), but at the
+   edit's real length, with its final sound. Export the voice alone too (without music) for listening.
+2. `studio.py precheck <video> <preview> --voice <voice.wav>` (run it on its own; a few minutes: about 30 s plus the
+   video's length on the card). It slice-listens to every line (fillers, noises, false starts, words or lines said twice,
+   places it couldn't read, and every pause over 0.4 s in slices.txt), runs the face/card check on every 3rd frame (ON HIM,
+   NEAR HEAD, TOO LOW, with face-check.jpg), and checks the file (sound, sound and picture the same length). Reports go in
+   `<video folder>/checks/draft-<N>/`, and Live shows what it found. `--no-face` only for a video with no speaker on screen.
+3. Go through every spot: listen to each flagged moment and pause, look at every card spot on the sheet. Fix every real
+   one in the edit (cut the false start, move the card behind the speaker or clear of them, close the hole), render a
+   new preview and run `precheck` again, until it prints PRECHECK CLEAN. Say in Live what you fixed.
+4. A spot that is fine as it is (a breath you want, a card behind the speaker, which is allowed): when every remaining spot
+   is like that, `studio.py precheck-ok <video> "spot by spot, what you checked"`. Never sign off a spot you haven't
+   listened to or looked at.
+5. Only then the render popup and the final render below. `finish-render` refuses a draft whose edit wasn't checked, whose
+   check still has open spots, or whose length differs from the checked preview by over 0.5 s (the edit changed since:
+   check again). The checks use the graphics card, so `precheck` waits while another video's final render is encoding.
 
-After `finish-render`, and before you tell the owner a draft is ready, run
-`py "@@EDITORS_HUB_DIR@@/gpu/face_card_check.py" <the draft> --sheet <video folder>/face-check.jpg` (about a minute per
-minute of 4K on the card; slower on the processor). The owner's rule: no card, picture or text on the speaker's face or
-over their body; cards go behind them or clear of them, and never run into the bottom edge. It prints spots as ON HIM,
-NEAR HEAD or TOO LOW. Look at every spot on the sheet: fix the real ones and render again; say in Live what you fixed.
-Limits: NEAR HEAD only looks within one face width of the head (`--margin`); a card behind the speaker that they overlap
-is allowed; it samples every 3rd frame, so use `--step 1` for a last pass on a tight spot. If it can't run (no PyTorch
-or OpenCV), check the cards against the speaker by eye at every card.
+Limits: NEAR HEAD only looks within one face width of the head; a card behind the speaker that they overlap is allowed;
+use `py "@@EDITORS_HUB_DIR@@/gpu/face_card_check.py" <file> --step 1 --start <s> --end <s>` for a last look at a tight
+spot. Slice-listening also runs on its own (`py "@@EDITORS_HUB_DIR@@/gpu/slice_listen.py" <voice> -o slices.txt`): use
+it on the RAW recording when picking takes, and on the voice after any late voice change. If the tools can't run
+(no PyTorch or OpenCV), check by ear and by eye at every line and card, then sign off with what you checked.
 
 ## Before every render: the render popup
 
@@ -217,14 +225,20 @@ replaces the export step in any video skill. Low-quality previews for your own c
    `studio.py ask-render <video> --note "<what this draft has, in plain words>" --size <W>x<H> --fps <N> --duration <S>`
    using the edit's own frame size, frame rate and length. The popup opens on the review page. Tell the owner in the chat
    too, and show the review page. Don't render until it prints the settings.
-2. Render the edit at full quality at its own size. If a frame rate was chosen, render at that rate
+2. Only after a clean (or signed-off) precheck of this cut (see above): render the edit at full quality at its own size. If a frame rate was chosen, render at that rate
    (`npx hyperframes render --fps <N> --quality delivery`).
 3. `studio.py finish-render <video> <file> --note "what changed"` applies the chosen resolution, bitrate, format and audio,
    adds the draft and posts it to Live. It refuses if no settings were chosen, or if the video's drive has less than
    15 GB free (free space, or move old work to another drive, then run it again). Don't use `add-draft` for your own renders.
+   First it checks the file and stops, rendering nothing, if it is still being written, has no sound track, or its sound and
+   picture differ by more than 0.3 s (a mix from before the last cut change, or slipped sound); a `mix*.wav` beside the file
+   must match the picture's length and be newer than any `*cut*.json` / `*edl*.json` there. Fix what it says (rebuild the
+   mix for this cut) and run it again; `--skip-checks` only when you have checked the file yourself and it is right
+   (a picture-only video). If another video is rendering, it waits its turn (Live says so) and starts on its own.
    Run it on its own, not piped through `tail` or `head`: a pipe hides its exit code and its messages. A client's draft
    shows on the review page only once its upload finishes; until then it waits in `incoming`, which is normal.
-4. Check the draft it made (size, sound, a few frames), then carry on with the review round.
+4. Check the draft it made (size, sound, a few frames), then carry on with the review round. The mistakes were found and
+   fixed in the precheck: don't make a second draft for things a check would have caught.
 
 Render safety for every FFmpeg command you run in an edit: always pass `-nostdin` (without it, FFmpeg in the
 background can stop and wait for keyboard input). Never time an overlay with `enable=`: while it's off, FFmpeg stops
@@ -259,7 +273,7 @@ lives in the style and shows under Style videos, with no client brand. Save what
    rule>"` goes into their BRAND.md. About the editing, for every client in this style: `--lesson "<the rule>"` goes into
    the style's STYLE.md. If it isn't clear which, ask. In a client's BRAND.md, a section called "In <style>" holds only for videos in that style: follow it only when this video uses that style. The note shows "Saved to <name>". Read "Lessons from reviews" in
    both files before every edit.
-5. Post your progress to Live as you work, ask for the render settings, render, `finish-render`, and `wait` again. `studio.py notes <video>` lists open notes any time.
+5. Post your progress to Live as you work, render a preview, `precheck` and fix until clean, ask for the render settings, render, `finish-render`, and `wait` again. `studio.py notes <video>` lists open notes any time.
 6. The owner approves on the page. If you're part way through a draft when that happens, finish it. After that, no new draft can start and no notes can be added: the commands that edit are refused until the owner presses Undo approve on the page. Never try to get round this. When the final is exported to `exports/`, `studio.py set-status <video> delivered`.
 7. Then do "After approval" below. `wait` tells you with LEARN FROM THE APPROVED VIDEO, or run `studio.py learn <video>`.
 

@@ -2,6 +2,17 @@
 
 Shown in the studio after it updates. Each version: `## 1.2.3`, then `### New`, `### Better` or `### Fixed`, with one plain line per change.
 
+## 1.41.0
+### New
+- Mistakes are found and fixed before the final render, not after it: an edit is first checked on a quick preview (every line listened to, every card checked against the speaker, the sound against the picture), the mistakes are fixed, and only then is the final rendered, once. A final render of an edit that wasn't checked, or changed since, is refused. Live shows what the check found and what was fixed.
+- Checks before every render: the studio looks at the finished file first and stops, before a long render, if it's still being written, has no sound, or its sound and picture are different lengths (an old mix after a re-cut). Live says what it found.
+- One render at a time: if two edits are ready together, the second waits its turn and Live says so, instead of both fighting over the drive and the graphics card.
+- The phone app tells you when a newer version has arrived: tap "New version ready" to reload, instead of opening it twice.
+### Fixed
+- A slow save could have its lock on a video taken over after 30 seconds while it was still working. Now a lock is only taken over once the program holding it has ended.
+- Shared style pictures: several saved at the same moment could lose each other's mark, so a card showed no picture.
+- The phone app's sounds now also play on your first tap when the phone held them back, like on the PC.
+
 ## 1.40.3
 ### Better
 - The popups that ask you something chime as they open: what's new after an update, render settings and the b-roll picker. A sound that comes before you've clicked anywhere on the page (browsers block those) now plays on your first click instead of being lost.

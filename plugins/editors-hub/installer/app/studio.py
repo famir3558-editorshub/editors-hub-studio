@@ -27,7 +27,9 @@ Everything is plain Python (3.9+, no packages to install). ffmpeg is optional (u
     studio.py pause <video> ["why"] / resume <video>   the edit stops for a while: the clock freezes, the pages say Paused
     studio.py beat <video> ["Rendering part 3"]   every few minutes while a long render runs: the Live clock keeps counting
     studio.py ask-render <video> [--note "..."] [--size WxH] [--fps N] [--duration S]   open the render popup, wait for the choice
-    studio.py finish-render <video> <file> [--note "..."] [--cpu]   encode with the chosen settings and add it as the next draft
+    studio.py precheck <video> <preview> [--voice voice.wav] [--no-face]   check a quick preview before the final render
+    studio.py precheck-ok <video> "what you checked"   the last check's spots were looked at and are fine
+    studio.py finish-render <video> <file> [--note "..."] [--cpu] [--skip-checks]   check the file, wait its turn, encode with the chosen settings and add it as the next draft
     studio.py broll-ask <video>                 when an edit or next draft starts: opens the b-roll popup if needed, waits, says what to do
     studio.py broll-plan <video> <plan.json> [--change]   opens the picker with 3 or 4 options per part, waits for the picks
     studio.py broll-record <video> <plan.json> [--change]   notes the clips you chose by yourself, so they can be changed later
@@ -1858,6 +1860,66 @@ def save_video(v):
 _held = threading.local()
 
 
+def pid_alive(pid):
+    """True while that process is running (Windows and Mac)."""
+    try:
+        pid = int(pid)
+    except (TypeError, ValueError):
+        return False
+    if pid <= 0:
+        return False
+    if pid == os.getpid():
+        return True
+    if os.name == "nt":
+        import ctypes
+        k = ctypes.WinDLL("kernel32", use_last_error=True)
+        h = k.OpenProcess(0x1000, False, pid)  # PROCESS_QUERY_LIMITED_INFORMATION
+        if not h:
+            return ctypes.get_last_error() == 5  # access denied: it exists, it's someone else's
+        try:
+            code = ctypes.c_ulong()
+            return not k.GetExitCodeProcess(h, ctypes.byref(code)) or code.value == 259  # STILL_ACTIVE
+        finally:
+            k.CloseHandle(h)
+    try:
+        os.kill(pid, 0)
+        return True
+    except ProcessLookupError:
+        return False
+    except PermissionError:
+        return True
+
+
+def take_lockfile(lock, owner):
+    """Makes the lock file with who holds it. False when someone else already has it."""
+    try:
+        fd = os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY)
+    except FileExistsError:
+        return False
+    try:
+        os.write(fd, json.dumps(owner).encode("utf-8"))
+    finally:
+        os.close(fd)
+    return True
+
+
+def lockfile_owner(lock):
+    try:
+        data = json.loads(lock.read_text(encoding="utf-8") or "null")
+    except (OSError, ValueError):
+        return None
+    return data if isinstance(data, dict) else {"pid": data} if isinstance(data, int) else None
+
+
+def lockfile_stale(lock, longest=1800):
+    """Left behind: its process has ended, or (an old lock with no owner written) it is over 30 s old."""
+    age = time.time() - lock.stat().st_mtime
+    owner = lockfile_owner(lock)
+    if owner and owner.get("pid"):
+        return not pid_alive(owner["pid"]) or age > longest
+    return age > 30
+
+
 @contextlib.contextmanager
 def vlock(vid):
     """One writer at a time for a video: the page and Claude's commands (another process) both change video.json."""
@@ -1874,19 +1936,17 @@ def vlock(vid):
         lock = d / ".video.lock"
         deadline = time.time() + 15
         while True:
-            try:
-                os.close(os.open(lock, os.O_CREAT | os.O_EXCL | os.O_WRONLY))
+            if take_lockfile(lock, {"pid": os.getpid()}):
                 break
-            except FileExistsError:
-                try:
-                    if time.time() - lock.stat().st_mtime > 30:  # left behind by a process that died
-                        lock.unlink()
-                        continue
-                except FileNotFoundError:
+            try:
+                if lockfile_stale(lock):  # left behind by a process that ended
+                    lock.unlink()
                     continue
-                if time.time() > deadline:
-                    raise StudioError("the video is busy; try again")
-                time.sleep(0.05)
+            except FileNotFoundError:
+                continue
+            if time.time() > deadline:
+                raise StudioError("the video is busy; try again")
+            time.sleep(0.05)
         held.add(vid)
         try:
             yield
@@ -3497,12 +3557,220 @@ def set_render_choice(vid, choice, by=""):
 
 
 RENDER_FREE_GB = 15  # a 4K draft is 3-4 GB; this keeps the drive from filling up halfway through
+RENDER_SYNC_GAP = 0.3  # seconds: more than this between the sound and the picture is a stale mix or a sync slip
+RENDER_TURN = "render-turn.lock"
 
 
-def finish_render(vid, master, note="", cpu=False):
+def stream_lengths(path):
+    """The picture's and the sound's lengths in seconds (None when there's no such stream, or it doesn't say)."""
+    ffprobe = shutil.which("ffprobe")
+    out = {"video": None, "audio": None, "format": None}
+    if not ffprobe:
+        return out
+    try:
+        r = subprocess.run([ffprobe, "-v", "error", "-show_entries", "stream=codec_type,duration:format=duration", "-of", "json", str(path)],
+                           capture_output=True, text=True, timeout=60)
+        data = json.loads(r.stdout or "{}")
+    except (OSError, ValueError, subprocess.TimeoutExpired):
+        return out
+    num = lambda x: float(x) if x not in (None, "N/A") else None
+    out["format"] = num((data.get("format") or {}).get("duration"))
+    for s in data.get("streams") or []:
+        kind = s.get("codec_type")
+        if kind in ("video", "audio") and out[kind] is None:
+            out[kind] = num(s.get("duration")) or 0.0
+    for kind in ("video", "audio"):  # some containers (mkv) only give the whole file's length
+        if out[kind] == 0.0:
+            out[kind] = out["format"]
+    return out
+
+
+def render_checks(master):
+    """What's wrong with the finished file before it's rendered: still being written, no sound,
+    sound and picture of different lengths (an old mix after a re-cut), or a mix next to it that doesn't fit the cut."""
+    problems = []
+    first = master.stat()
+    time.sleep(1.5)
+    second = master.stat()
+    if (first.st_size, first.st_mtime) != (second.st_size, second.st_mtime) or time.time() - second.st_mtime < 3:
+        problems.append(f"{master.name} is still being written (it changed in the last few seconds). Wait for its render to finish.")
+    lengths = stream_lengths(master)
+    pic, snd = lengths["video"], lengths["audio"]
+    if snd is None:
+        problems.append(f"{master.name} has no sound track.")
+    elif pic and abs(pic - snd) > RENDER_SYNC_GAP:
+        problems.append(f"The sound and the picture are different lengths (picture {pic:.2f} s, sound {snd:.2f} s): "
+                        "the mix is probably from before the last cut change, or the sound has slipped. Rebuild the mix for this cut.")
+    cuts = [p for pattern in ("*cut*.json", "*edl*.json") for p in master.parent.glob(pattern)]
+    for mix in sorted(master.parent.glob("mix*.wav")):
+        mix_len = stream_lengths(mix)["audio"]
+        if mix_len and pic and abs(mix_len - pic) > 2 * RENDER_SYNC_GAP:
+            problems.append(f"{mix.name} is {mix_len:.2f} s but the picture is {pic:.2f} s: that mix doesn't fit this cut.")
+        newer = sorted(p.name for p in cuts if p.stat().st_mtime > mix.stat().st_mtime + 1)
+        if newer:
+            problems.append(f"{mix.name} is older than {newer[0]}: the cut changed after the mix was made. Rebuild the mix.")
+    return problems
+
+
+PRECHECK_GAP = 0.5  # seconds: the final file must be this close to the checked preview's length, or the edit changed since
+FACE_KINDS = ("ON HIM", "NEAR HEAD", "TOO LOW")
+
+
+def precheck_tools(path, folder, voice=None, face=True):
+    """Slice-listening (on the voice when given, else the file's own sound) and the face/card check, both from gpu/.
+    Returns what they found; a tool that couldn't run is listed in "skipped" with why."""
+    gpu = Path(__file__).resolve().parent / "gpu"
+    found = {"listen": [], "pauses": 0, "face": [], "skipped": []}
+    report = folder / "slices.txt"
+    report.unlink(missing_ok=True)
+    try:
+        r = subprocess.run([sys.executable, str(gpu / "slice_listen.py"), str(voice or path), "-o", str(report)],
+                           capture_output=True, text=True, encoding="utf-8", errors="replace", stdin=subprocess.DEVNULL)
+        why = ((r.stderr or r.stdout or "").strip().splitlines() or ["no message"])[-1][:200]
+    except OSError as e:
+        r, why = None, str(e)[:200]
+    if not r or r.returncode or not report.is_file():
+        found["skipped"].append(f"slice-listening couldn't run ({why})")
+    else:
+        part = None
+        for line in report.read_text(encoding="utf-8").splitlines():
+            if line.startswith("LISTEN TO THESE"):
+                part = "listen"
+            elif line.startswith("PAUSES OVER"):
+                part = "pauses"
+            elif not line.strip():
+                part = None if part == "listen" else part
+            elif part == "listen":
+                found["listen"].append(line.strip())
+            elif part == "pauses":
+                found["pauses"] += 1
+    if face:
+        sheet = folder / "face-check.jpg"
+        sheet.unlink(missing_ok=True)
+        try:
+            r = subprocess.run([sys.executable, str(gpu / "face_card_check.py"), str(path), "--sheet", str(sheet)],
+                               capture_output=True, text=True, encoding="utf-8", errors="replace", stdin=subprocess.DEVNULL)
+            out = r.stdout or ""
+            why = ((r.stderr or out).strip().splitlines() or ["no message"])[-1][:200]
+        except OSError as e:
+            r, out, why = None, "", str(e)[:200]
+        if not r or r.returncode or "FACE-CHECK" not in out:
+            found["skipped"].append(f"the face/card check couldn't run ({why})")
+        else:
+            found["face"] = [line.strip() for line in out.splitlines() if any(k in line for k in FACE_KINDS) and not line.startswith("FACE-CHECK")]
+    return found
+
+
+def precheck(vid, path, voice=None, face=True):
+    """Checks a quick preview of the edit before the final render: the file itself (render_checks), every word
+    (slice-listening) and every card against the speaker (the face/card check). The result goes in video.json "precheck"
+    and on Live. finish-render needs a clean one, or one whose findings were all looked at (precheck_ok), of this cut."""
+    check_edit(load_video(vid))
+    path = Path(path)
+    if not path.is_file():
+        raise StudioError(f"no file at {path}")
+    if voice and not Path(voice).is_file():
+        raise StudioError(f"no voice file at {voice}")
+    v = load_video(vid)
+    draft = (latest_version(v) or 0) + 1
+    folder = Path(v["folder"]) / "checks" / f"draft-{draft}"
+    folder.mkdir(parents=True, exist_ok=True)
+    post_update(vid, "Checking the edit before the final render: listening to every line and checking every card against the speaker.")
+    basic = [p for p in render_checks(path) if "still being written" not in p]
+    with render_turn(vid):  # the checks use the graphics card: never while a render is encoding
+        found = precheck_tools(path, folder, voice, face)
+    length = stream_lengths(path)
+    record = {"at": now(), "file": path.name, "draft": draft, "duration": length["video"] or length["format"] or 0,
+              "basic": basic, **found, "folder": str(folder.relative_to(v["folder"])), "accepted": None}
+    record["clean"] = not (basic or found["listen"] or found["face"] or found["skipped"])
+    with vlock(vid):
+        v = load_video(vid)
+        v["precheck"] = record
+        save_video(v)
+    items = basic + found["face"] + found["listen"] + found["skipped"]
+    if record["clean"]:
+        post_update(vid, "The check before the final render is clean: nothing to fix.")
+    else:
+        post_update(vid, f"The check before the final render found {len(items)} thing{'s' if len(items) != 1 else ''} to look at; "
+                         "fixing them before the final render: " + "; ".join(items[:6]) + (" …" if len(items) > 6 else ""))
+    return record
+
+
+def precheck_ok(vid, note):
+    """Every finding of the last check was looked at and is fine (or the tools couldn't run and it was checked by eye)."""
+    note = str(note or "").strip()
+    if len(note) < 10:
+        raise StudioError("Say what you checked, spot by spot (at least a sentence).")
+    with vlock(vid):
+        v = load_video(vid)
+        pc = v.get("precheck")
+        if not pc:
+            raise StudioError("There's no check to sign off yet. Run: studio.py precheck " + vid + " <preview>")
+        if pc["clean"]:
+            return pc
+        pc.update(accepted=note, accepted_at=now())
+        save_video(v)
+    post_update(vid, "Looked at every spot the check found: " + note)
+    return pc
+
+
+def precheck_problem(v, master):
+    """Why the final render can't start yet (None when the edit was checked)."""
+    pc = v.get("precheck") or {}
+    draft = (latest_version(v) or 0) + 1
+    how = (f"Render a quick preview of the edit, run studio.py precheck {v['id']} <preview> [--voice <the voice without music>], "
+           "fix what it finds and check again until it's clean (or run studio.py precheck-ok with what you checked), then finish-render.")
+    if not pc or pc.get("draft") != draft:
+        return f"This edit hasn't been checked before its final render. {how}"
+    if not (pc.get("clean") or pc.get("accepted")):
+        return (f"The last check found things to fix ({len(pc['basic']) + len(pc['listen']) + len(pc['face']) + len(pc['skipped'])}). "
+                f"Fix them and run precheck again, or precheck-ok if each one is fine. {how}")
+    length = stream_lengths(master)
+    final = length["video"] or length["format"] or 0
+    if abs(final - (pc.get("duration") or 0)) > PRECHECK_GAP:
+        return (f"The edit changed since it was checked (checked {pc.get('duration', 0):.2f} s, this file {final:.2f} s). "
+                f"Check this cut again. {how}")
+    return None
+
+
+@contextlib.contextmanager
+def render_turn(vid):
+    """One final render at a time on this computer: a second one waits here (and says so on Live) until the first ends."""
+    lock = DATA / RENDER_TURN
+    DATA.mkdir(parents=True, exist_ok=True)
+    told = False
+    while not take_lockfile(lock, {"pid": os.getpid(), "video": vid, "since": now()}):
+        try:
+            if lockfile_stale(lock, longest=12 * 3600):
+                lock.unlink()
+                continue
+        except FileNotFoundError:
+            continue
+        if not told:
+            other = (lockfile_owner(lock) or {}).get("video")
+            try:
+                other = load_video(other)["name"] if other else "another video"
+            except StudioError:
+                other = "another video"
+            post_update(vid, f"Waiting its turn: {other} is rendering right now. This render starts on its own as soon as that one ends.")
+            told = True
+        check_edit(load_video(vid))
+        time.sleep(3)
+    try:
+        yield
+    finally:
+        try:
+            if (lockfile_owner(lock) or {}).get("pid") == os.getpid():
+                lock.unlink()
+        except FileNotFoundError:
+            pass
+
+
+def finish_render(vid, master, note="", cpu=False, skip_checks=False):
     """Encodes the edit with the settings chosen in the popup, and adds it as the next draft.
     H.264 goes on the graphics card (NVENC) when it can, and falls back to the processor (x264) if NVENC
-    is missing or fails; cpu=True, or the gpu_encode setting off, always uses the processor."""
+    is missing or fails; cpu=True, or the gpu_encode setting off, always uses the processor.
+    First it checks the file (render_checks), then waits its turn if another render is running (render_turn)."""
     check_edit(load_video(vid))
     master = Path(master)
     if not master.is_file():
@@ -3515,64 +3783,74 @@ def finish_render(vid, master, note="", cpu=False):
     info = probe_media(master)
     if not ffmpeg or not info:
         raise StudioError("Rendering needs FFmpeg and a readable video file.")
+    if not skip_checks:
+        problems = render_checks(master)
+        if problems:
+            post_update(vid, "The checks before the render stopped it: " + " ".join(problems))
+            raise StudioError("The checks before the render found problems, so nothing was rendered:\n- " + "\n- ".join(problems)
+                              + "\nFix them and run finish-render again (or add --skip-checks if you're sure the file is right).")
+        problem = precheck_problem(v, master)
+        if problem:
+            raise StudioError(problem + " Nothing was rendered.")
     choice = req["choice"]
     width, height = render_size(info["width"], info["height"], choice["resolution"])
     fps = info["fps"] if choice["fps"] == "same" else int(choice["fps"])
     mbps = render_mbps(choice, width, height, fps)
-    need_gb = max(RENDER_FREE_GB, 2 * (mbps or 400) * (info.get("duration") or 0) / 8000)  # ProRes: about 400 Mbps
-    free_gb = shutil.disk_usage(v["folder"]).free / 1e9
-    if free_gb < need_gb:
-        raise StudioError(f"The drive with this video has {free_gb:.1f} GB free; the render needs at least {need_gb:.0f} GB. "
-                          f"Free some space on it (or move old work to another drive), then run finish-render again. Nothing was rendered.")
-    head = [ffmpeg, "-nostdin", "-y", "-loglevel", "error", "-i", str(master), "-vf", f"scale={width}:{height}:flags=lanczos"]
-    if choice["fps"] != "same":
-        head += ["-r", str(fps)]
-    audio = ["-c:a", "aac", "-b:a", f"{choice['audio']}k"]
-    if choice["format"] == "prores":
-        tries = [("prores", ["-c:v", "prores_ks", "-profile:v", "3", "-pix_fmt", "yuv422p10le", "-c:a", "pcm_s16le"])]
-        suffix = ".mov"
-    elif choice["format"] == "h265":
-        tries = [("x265", ["-c:v", "libx265", "-tag:v", "hvc1", "-preset", "medium", "-b:v", f"{mbps}M",
-                           "-maxrate", f"{round(mbps * 1.5, 1)}M", "-bufsize", f"{round(mbps * 2, 1)}M",
-                           "-pix_fmt", "yuv420p", "-movflags", "+faststart", *audio])]
-        suffix = ".mp4"
-    else:
-        tries = [("x264", [*h264_encoder_args(mbps, False), "-movflags", "+faststart", *audio])]
-        if not cpu and settings().get("gpu_encode", True) and nvenc_available(ffmpeg):
-            tries.insert(0, ("NVENC", [*h264_encoder_args(mbps, True), "-movflags", "+faststart", *audio]))
-        suffix = ".mp4"
-    out = Path(v["folder"]) / f".render-{secrets.token_hex(3)}{suffix}"
-    where = {"NVENC": " on the graphics card (NVENC)", "x264": " on the processor (x264)"}
-    post_update(vid, f"Rendering now: {width} × {height}, {fps:g} fps" + (f", about {mbps} Mbps" if mbps else ", ProRes")
-                + where.get(tries[0][0], "") + ".", step="Render")
-    fallback = ""
-    try:
-        for n, (encoder, args) in enumerate(tries):
-            started = time.time()
-            r = subprocess.run([*head, *args, str(out)], capture_output=True, text=True, encoding="utf-8", errors="replace")
-            if not r.returncode and out.exists() and probe_media(out):
-                break
+    with render_turn(vid):
+        need_gb = max(RENDER_FREE_GB, 2 * (mbps or 400) * (info.get("duration") or 0) / 8000)  # ProRes: about 400 Mbps
+        free_gb = shutil.disk_usage(v["folder"]).free / 1e9
+        if free_gb < need_gb:
+            raise StudioError(f"The drive with this video has {free_gb:.1f} GB free; the render needs at least {need_gb:.0f} GB. "
+                              f"Free some space on it (or move old work to another drive), then run finish-render again. Nothing was rendered.")
+        head = [ffmpeg, "-nostdin", "-y", "-loglevel", "error", "-i", str(master), "-vf", f"scale={width}:{height}:flags=lanczos"]
+        if choice["fps"] != "same":
+            head += ["-r", str(fps)]
+        audio = ["-c:a", "aac", "-b:a", f"{choice['audio']}k"]
+        if choice["format"] == "prores":
+            tries = [("prores", ["-c:v", "prores_ks", "-profile:v", "3", "-pix_fmt", "yuv422p10le", "-c:a", "pcm_s16le"])]
+            suffix = ".mov"
+        elif choice["format"] == "h265":
+            tries = [("x265", ["-c:v", "libx265", "-tag:v", "hvc1", "-preset", "medium", "-b:v", f"{mbps}M",
+                               "-maxrate", f"{round(mbps * 1.5, 1)}M", "-bufsize", f"{round(mbps * 2, 1)}M",
+                               "-pix_fmt", "yuv420p", "-movflags", "+faststart", *audio])]
+            suffix = ".mp4"
+        else:
+            tries = [("x264", [*h264_encoder_args(mbps, False), "-movflags", "+faststart", *audio])]
+            if not cpu and settings().get("gpu_encode", True) and nvenc_available(ffmpeg):
+                tries.insert(0, ("NVENC", [*h264_encoder_args(mbps, True), "-movflags", "+faststart", *audio]))
+            suffix = ".mp4"
+        out = Path(v["folder"]) / f".render-{secrets.token_hex(3)}{suffix}"
+        where = {"NVENC": " on the graphics card (NVENC)", "x264": " on the processor (x264)"}
+        post_update(vid, f"Rendering now: {width} × {height}, {fps:g} fps" + (f", about {mbps} Mbps" if mbps else ", ProRes")
+                    + where.get(tries[0][0], "") + ".", step="Render")
+        fallback = ""
+        try:
+            for n, (encoder, args) in enumerate(tries):
+                started = time.time()
+                r = subprocess.run([*head, *args, str(out)], capture_output=True, text=True, encoding="utf-8", errors="replace")
+                if not r.returncode and out.exists() and probe_media(out):
+                    break
+                out.unlink(missing_ok=True)
+                reason = (r.stderr or "").strip()[-400:]
+                if "No space left" in reason or shutil.disk_usage(v["folder"]).free < 2e9:
+                    raise StudioError("The drive with this video filled up during the render, so it stopped. Free some space on it, "
+                                      "then run finish-render again. Nothing was added.")
+                if n + 1 < len(tries):
+                    fallback = (reason.splitlines() or ["no message"])[-1][:200]
+                    print(f"[render] {encoder} failed, using {tries[n + 1][0]} instead: {reason}", file=sys.stderr)
+                    post_update(vid, f"The graphics card couldn't render this one ({fallback}), so it's rendering on the processor (x264) instead.")
+                    continue
+                raise StudioError("The render failed: " + reason)
+            seconds = round(time.time() - started)
+            print(f"[render] encoder {encoder}, {seconds} s", file=sys.stderr)
+            made = probe_media(out)
+            size_mb = out.stat().st_size / 1e6
+            render = {**choice, "width": made.get("width", width), "height": made.get("height", height),
+                      "fps": made.get("fps", fps), "mbps": mbps, "size_mb": round(size_mb, 1), "encoder": encoder,
+                      "encode_seconds": seconds, **({"fallback_reason": fallback} if fallback else {})}
+            version = add_draft(vid, out, note, move=True, original=master.name, render=render)
+        finally:
             out.unlink(missing_ok=True)
-            reason = (r.stderr or "").strip()[-400:]
-            if "No space left" in reason or shutil.disk_usage(v["folder"]).free < 2e9:
-                raise StudioError("The drive with this video filled up during the render, so it stopped. Free some space on it, "
-                                  "then run finish-render again. Nothing was added.")
-            if n + 1 < len(tries):
-                fallback = (reason.splitlines() or ["no message"])[-1][:200]
-                print(f"[render] {encoder} failed, using {tries[n + 1][0]} instead: {reason}", file=sys.stderr)
-                post_update(vid, f"The graphics card couldn't render this one ({fallback}), so it's rendering on the processor (x264) instead.")
-                continue
-            raise StudioError("The render failed: " + reason)
-        seconds = round(time.time() - started)
-        print(f"[render] encoder {encoder}, {seconds} s", file=sys.stderr)
-        made = probe_media(out)
-        size_mb = out.stat().st_size / 1e6
-        render = {**choice, "width": made.get("width", width), "height": made.get("height", height),
-                  "fps": made.get("fps", fps), "mbps": mbps, "size_mb": round(size_mb, 1), "encoder": encoder,
-                  "encode_seconds": seconds, **({"fallback_reason": fallback} if fallback else {})}
-        version = add_draft(vid, out, note, move=True, original=master.name, render=render)
-    finally:
-        out.unlink(missing_ok=True)
     with vlock(vid):
         v = load_video(vid)
         v["render_request"].update(status="used", used_in=version)
@@ -8021,6 +8299,14 @@ def main(argv=None):
     bt = sub.add_parser("beat")
     bt.add_argument("video")
     bt.add_argument("text", nargs="?", default="")
+    pc = sub.add_parser("precheck", help="check a quick preview of the edit before the final render")
+    pc.add_argument("video")
+    pc.add_argument("file")
+    pc.add_argument("--voice", default=None, help="the voice without music, for slice-listening (default: the file's own sound)")
+    pc.add_argument("--no-face", action="store_true", help="skip the face/card check (a video with no speaker on screen)")
+    pk = sub.add_parser("precheck-ok", help="every spot the last check found was looked at and is fine")
+    pk.add_argument("video")
+    pk.add_argument("note")
     ar = sub.add_parser("ask-render")
     ar.add_argument("video")
     ar.add_argument("--note", default="")
@@ -8033,6 +8319,7 @@ def main(argv=None):
     fr.add_argument("file")
     fr.add_argument("--note", default="")
     fr.add_argument("--cpu", action="store_true", help="encode on the processor (x264), not the graphics card")
+    fr.add_argument("--skip-checks", action="store_true", help="render even if the checks before the render find a problem")
     ss = sub.add_parser("set-status")
     ss.add_argument("video")
     ss.add_argument("status")
@@ -8189,6 +8476,24 @@ def main(argv=None):
         elif a.cmd == "beat":
             p = beat_video(a.video, a.text)
             print("The Live clock keeps counting." if p and p.get("since") else "Nothing to keep going: this draft's edit isn't on the clock.")
+        elif a.cmd == "precheck":
+            print("Checking the edit: slice-listening and the face/card check (a few minutes)...", flush=True)
+            r = precheck(a.video, a.file, a.voice, not a.no_face)
+            where = Path(load_video(a.video)["folder"]) / r["folder"]
+            if r["clean"]:
+                print(f"PRECHECK CLEAN. Reports in {where}. Ask for the render settings and render the final.")
+            else:
+                print(f"PRECHECK: {len(r['basic']) + len(r['listen']) + len(r['face']) + len(r['skipped'])} to look at (reports in {where}):")
+                for group, items in (("file", r["basic"]), ("cards", r["face"]), ("listen", r["listen"]), ("couldn't run", r["skipped"])):
+                    for x in items:
+                        print(f"  [{group}] {x}")
+                print(f"  ({r['pauses']} pauses over 0.4 s are listed in slices.txt: listen to each.)")
+                print("Fix the real ones in the edit, render a new preview and run precheck again. If a spot is fine as it is, "
+                      f"say so with: studio.py precheck-ok {a.video} \"what you checked\"")
+                raise SystemExit(1)
+        elif a.cmd == "precheck-ok":
+            precheck_ok(a.video, a.note)
+            print("Signed off: the final render can go ahead.")
         elif a.cmd == "ask-render":
             req = ask_render(a.video, a.note, a.size, a.fps, a.duration)
             print(f"The render popup is open: {home_url('/review/' + a.video)}\nWaiting for the settings...", flush=True)
@@ -8202,7 +8507,7 @@ def main(argv=None):
             else:
                 print(f"Render the edit at full quality, then run: studio.py finish-render {a.video} <file> --note \"what changed\"")
         elif a.cmd == "finish-render":
-            version, r = finish_render(a.video, a.file, a.note, cpu=a.cpu)
+            version, r = finish_render(a.video, a.file, a.note, cpu=a.cpu, skip_checks=a.skip_checks)
             print(f"v{version} is up for review ({r['width']}x{r['height']}, {r['fps']:g} fps, {r['size_mb']} MB): {home_url('/review/' + a.video)}")
         elif a.cmd == "add-draft":
             n = add_draft(a.video, a.file, a.note)
