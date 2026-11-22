@@ -461,11 +461,26 @@ function bellDraw() {
   if (panel.dataset.html !== html) { panel.innerHTML = html; panel.dataset.html = html; }
 }
 
+function bellFx() {
+  const d = Bell.data; if (!d) return;
+  const ids = [...d.needs, ...d.recent].map((x) => String(x.id));
+  if (!Bell.seenIds) { Bell.seenIds = new Set(ids); return; }  // what was already there when the page opened stays quiet
+  const fresh = [...d.needs, ...d.recent].filter((x) => !Bell.seenIds.has(String(x.id)));
+  ids.forEach((i) => Bell.seenIds.add(i));
+  if (!fresh.length || !window.EHFX) return;
+  const kind = (x) => String(x.id).split(":")[0];
+  const approved = fresh.find((x) => kind(x) === "approved"), draft = fresh.find((x) => kind(x) === "draft");
+  if (approved) EHFX.celebrate("approved", approved.text + " 🎉");
+  else if (draft) EHFX.celebrate("draft", draft.text + " 🎉");
+  else if (fresh.some((x) => ["render", "broll", "start"].includes(kind(x)) || x.icon === "warn")) EHFX.play("ask");
+  else EHFX.play("update");
+}
+
 async function bellLoad() {
   if (document.visibilityState === "visible") {
     try {
       const res = await fetch("/api/notifications");
-      if (res.ok) { Bell.data = await res.json(); bellDraw(); }
+      if (res.ok) { Bell.data = await res.json(); if (window.EHFX && typeof Bell.data.sounds === "boolean" && EHFX.on() !== Bell.data.sounds) EHFX.set(Bell.data.sounds); bellDraw(); bellFx(); }
     } catch (e) { /* the next look is soon enough */ }
   }
   clearTimeout(Bell.timer);

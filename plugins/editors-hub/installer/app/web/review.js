@@ -52,14 +52,7 @@ function fxChanges(prev, v) {
   if (lastId(v) > lastId(prev)) EHFX.play("update");
 }
 
-{  // the sound switch in the top bar
-  const b = $("soundBtn");
-  if (b && window.EHFX) {
-    const show = () => { b.textContent = EHFX.on() ? "🔊" : "🔇"; b.title = EHFX.on() ? "Sounds are on" : "Sounds are off"; };
-    b.onclick = () => { EHFX.set(!EHFX.on()); show(); if (EHFX.on()) EHFX.play("update"); };
-    show();
-  }
-}
+
 
 const draft = () => R.v.drafts.find((d) => d.version === R.version);
 

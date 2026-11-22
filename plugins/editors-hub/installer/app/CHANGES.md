@@ -2,10 +2,14 @@
 
 Shown in the studio after it updates. Each version: `## 1.2.3`, then `### New`, `### Better` or `### Fixed`, with one plain line per change.
 
+## 1.40.2
+### Better
+- Sounds on every studio page, not just the review page: each new notification in the bell plays a sound, and a new draft or an approval gets the party popper, wherever you are in the studio. Switch them off or on in Settings → Sounds.
+
 ## 1.40.1
 ### Better
 - The phone's Live tab shows the edit's moving preview like the PC: pictures one after another, the timeline's tracks, and the red line at each picture's place. Until an edit has its own snapshots, frames from the raw clip or the last draft fill in.
-- Sounds: a soft tick for Live updates, a chime when the studio asks for render settings or b-roll, and a party popper with a celebration sound when a draft is ready or a video is approved, on the review page and in the phone app. Switch them off with the speaker button on the review page or in the phone app's Settings.
+- Sounds: a soft tick for Live updates, a chime when the studio asks for render settings or b-roll, and a party popper with a celebration sound when a draft is ready or a video is approved, on the review page and in the phone app. On the phone they can be switched off in Settings.
 ### Fixed
 - Lock-screen notifications on iPhone: the app now reconnects them by itself, including when the service still held the address of an earlier install.
 

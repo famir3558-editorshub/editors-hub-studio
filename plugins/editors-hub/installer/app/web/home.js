@@ -82,6 +82,7 @@ function render() {
     f.elements.ready_share.checked = settings.ready_share !== false;
     f.elements.link_copies.checked = !!settings.link_copies;
     f.elements.gpu_encode.checked = settings.gpu_encode !== false;
+    f.elements.sounds.checked = settings.sounds !== false;
   }
   const py = S.state.platform === "windows" ? "py" : "python3";
   const script = S.state.platform === "windows" ? "%USERPROFILE%\\editors-hub\\studio.py" : "~/editors-hub/studio.py";
@@ -869,6 +870,12 @@ $("linkCopies").addEventListener("change", async (e) => {
   }
 });
 
+$("soundsOn").addEventListener("change", async (e) => {
+  const on = e.target.checked;
+  if (window.EHFX) { EHFX.set(on); if (on) EHFX.play("update"); }
+  try { S.state = await api("POST", "/api/settings", { sounds: on }); toast(on ? "Sounds on" : "Sounds off"); }
+  catch (x) { e.target.checked = !on; if (window.EHFX) EHFX.set(!on); toast(x.message, true); }
+});
 $("gpuEncode").addEventListener("change", async (e) => {
   try {
     S.state = await api("POST", "/api/settings", { gpu_encode: e.target.checked });

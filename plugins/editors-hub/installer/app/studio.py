@@ -197,7 +197,7 @@ def settings():
     with LOCK:
         s = read_json(SETTINGS, {}) or {}
         defaults = {"studio_name": "Editors.Hub", "your_name": "", "library": str(ROOT / "library"),
-                    "port": DEFAULT_PORT, "owner_email": OWNER_EMAIL, "lan": False, "ready_share": True, "ready_since": now(), "link_copies": False, "gpu_encode": True}
+                    "port": DEFAULT_PORT, "owner_email": OWNER_EMAIL, "lan": False, "ready_share": True, "ready_since": now(), "link_copies": False, "gpu_encode": True, "sounds": True}
         if any(k not in s for k in defaults) or not s.get("token"):
             s = {**defaults, **s, "token": s.get("token") or secrets.token_urlsafe(24)}
             write_json(SETTINGS, s)
@@ -223,6 +223,8 @@ def update_settings(changes):
             s["link_copies"] = bool(changes["link_copies"])
         if "gpu_encode" in changes:
             s["gpu_encode"] = bool(changes["gpu_encode"])
+        if "sounds" in changes:
+            s["sounds"] = bool(changes["sounds"])
         if "library_confirmed" in changes:
             s["library_confirmed"] = bool(changes["library_confirmed"])
         for key in ("studio_name", "your_name", "library"):
@@ -4669,7 +4671,8 @@ def notifications(user=None):
         seen = now()
     for r in recent:
         r["new"] = r["at"] > seen
-    return {"needs": needs, "working": working, "recent": recent, "unread": len(needs) + sum(r["new"] for r in recent)}
+    return {"needs": needs, "working": working, "recent": recent, "unread": len(needs) + sum(r["new"] for r in recent),
+            "sounds": settings().get("sounds", True) is not False}
 
 
 def learn_auto_command():
@@ -7499,7 +7502,7 @@ class Handler(BaseHTTPRequestHandler):
              "can_edit": can_edit_project(p, self.user)}
             for p in list_projects()]
         me = accounts().public(self.user)
-        visible = ("studio_name", "your_name", "library", "ready_share", "link_copies", "gpu_encode") if me["role"] == "owner" else ("studio_name",)
+        visible = ("studio_name", "your_name", "library", "ready_share", "link_copies", "gpu_encode", "sounds") if me["role"] == "owner" else ("studio_name",)
         return {"can_effects": can_remove_effects(self.user), "me": me, "version": APP_VERSION, "approval": approval.status(DATA), "alone": not approval.open_to_others(DATA), "report": self.report_mode(), "updated": update_to_tell(me["email"]), "settings": {k: s[k] for k in visible},
                 "projects": projects, "styles": styles, "videos": videos, "statuses": STATUSES, "disk": library_space(),
                 "platform": "windows" if WINDOWS else "mac" if sys.platform == "darwin" else "linux"}

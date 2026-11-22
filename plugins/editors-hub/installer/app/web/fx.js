@@ -74,7 +74,10 @@
   }
   window.EHFX = {
     play, confetti,
-    celebrate(kind, text) { play(kind === "approved" ? "approved" : "draft"); confetti(text); },
+    celebrate(kind, text) {
+      const now = Date.now(); if (now - (window.EHFX._party || 0) < 6000) return;  // the bell and the review page can both see the same draft
+      window.EHFX._party = now; play(kind === "approved" ? "approved" : "draft"); confetti(text);
+    },
     on, set(v) { try { localStorage.setItem("eh-sounds", v ? "on" : "off"); } catch (e) {} if (v) ac(); },
   };
 })();
