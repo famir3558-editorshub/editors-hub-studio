@@ -2,6 +2,15 @@
 
 Shown in the studio after it updates. Each version: `## 1.2.3`, then `### New`, `### Better` or `### Fixed`, with one plain line per change.
 
+## 1.43.0
+### New
+- See when your client opened a draft and how much of it they watched: on the review page's Share button and in the Share window, and a phone notification the first time they open it. Opening the link yourself (Open in the Share window) never counts.
+- A gentle reminder on your phone when a client hasn't answered or commented on a draft 2 days after it went on their link.
+- Review drafts on the phone: watch an uploaded draft and leave notes at a moment, which go into the studio as your notes. A "draft ready" notification opens it straight away.
+- Upload a client's project to your Google Drive, only when you press Upload to your Drive on its page, then turn on Share so your team can bring it in from Import a project. Remove it from the Drive any time.
+### Better
+- The phone app keeps messages you write with no signal and sends them by itself when you're back online.
+
 ## 1.42.0
 ### New
 - Settings → Storage: what each video takes on the drive, and one click to clear what's safe to go: unfinished renders and uploads, check reports of drafts already made, and (only if you choose, after asking) old drafts of approved videos. Raw footage, exports, the latest and the approved draft are never touched.

@@ -361,3 +361,4 @@ pre { margin: 0; padding: 14px; background: rgba(0, 0, 0, 0.45); border: 1px sol
 .chat-compose { display: flex; gap: 8px; align-items: flex-end; padding: 12px 14px; border-top: 1px solid rgba(127, 127, 127, .2); }
 .chat-compose textarea { flex: 1; min-height: 40px; max-height: 140px; resize: vertical; }
 #chatCount:not(:empty) { margin-left: 6px; padding: 0 6px; border-radius: 999px; background: #e5192b; color: #fff; font-style: normal; font-size: 11px; }
+

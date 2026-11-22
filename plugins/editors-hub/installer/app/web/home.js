@@ -1018,8 +1018,49 @@ $("importProjectBtn").onclick = async () => {
       ? t.exports.map((x, i) => `<label><input type="radio" name="found" value="${esc(x.path)}"${i === 0 ? " checked" : ""}> <b>${esc(x.name)}</b> <span class="faint">${esc(x.where)} · ${gb(x.bytes)}${x.kind === "zip" ? " · .zip" : ""}</span></label>`).join("")
       : `<p class="faint" style="margin:0">No saved clients found on your drives, Desktop, Downloads or cloud folders. Type the folder's place below.</p>`;
     $("projectImportNote").textContent = `Space in your library: ${gb(t.library_free)}.`;
+    loadDriveProjects();
   } catch (e) {
     $("foundProjects").textContent = e.message;
+  }
+};
+
+// clients on your Drive: your own uploads, and what your team shared
+async function loadDriveProjects() {
+  const box = $("driveProjects");
+  try {
+    const r = await api("GET", "/api/drive-projects");
+    box.hidden = !r.approved;
+    box.innerHTML = r.projects.length
+      ? `<b>On your Drive</b>` + r.projects.map((p) => `<div class="drive-row"><span><b>${esc(p.name)}</b> <span class="faint">${gb(p.bytes)} · ${p.mine ? "yours" : `shared by ${esc(p.maker_name)}`}${p.shared && p.mine ? " · shared" : ""}${p.here ? " · already here" : ""}</span></span><button type="button" class="btn small" data-drivein="${esc(p.key)}">Bring in</button></div>`).join("")
+      : `<p class="faint" style="margin:0">Nothing on your Drive yet. Upload a client from its page (Upload to your Drive).</p>`;
+  } catch (e) {
+    box.hidden = true;
+  }
+}
+$("driveProjects").onclick = async (e) => {
+  const b = e.target.closest("[data-drivein]");
+  if (!b) return;
+  const f = $("projectImportForm"), err = f.querySelector(".error"), bar = f.querySelector(".progress");
+  b.disabled = true;
+  err.textContent = "";
+  bar.hidden = false;
+  try {
+    let job = await api("POST", "/api/drive-projects/download", { key: b.dataset.drivein });
+    window.dispatchEvent(new Event("editorshub:jobs"));
+    while (job.state === "running") {
+      bar.firstElementChild.style.width = `${job.total_bytes ? (job.done_bytes / job.total_bytes) * 100 : 5}%`;
+      $("projectImportNote").textContent = `${job.title}: ${job.stage || ""}`;
+      await new Promise((r) => setTimeout(r, 800));
+      job = await api("GET", `/api/jobs/${job.id}`);
+    }
+    if (job.state !== "done") throw new Error(job.message);
+    await load();
+    setTab("projects");
+    $("projectImportDlg").close();
+    toast(`${job.result.name} is in Projects (${job.result.videos} video${job.result.videos === 1 ? "" : "s"})`);
+  } catch (ex) {
+    err.textContent = ex.message;
+    b.disabled = false;
   }
 };
 

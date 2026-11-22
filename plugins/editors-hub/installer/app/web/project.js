@@ -34,6 +34,7 @@ function renderHero() {
   $("pAbout").textContent = p.about || "No details about this client yet.";
   $("editBtn").hidden = $("deleteBtn").hidden = !p.can_edit;
   $("downloadBtn").href = `/api/projects/${enc(projectId)}/download`;
+  drawDrive();
 }
 
 function renderTabs() {
@@ -179,6 +180,47 @@ const gb = (n) => (n >= 1e9 ? `${(n / 1e9).toFixed(1)} GB` : `${Math.max(1, Math
 function usedStyles() {
   return [...new Set(P.page.videos.map((v) => v.style_name))];
 }
+
+// ---- the owner's Drive: uploaded only when someone presses Upload; shared only when they turn Share on
+function drawDrive() {
+  const p = P.page, on = p.online;
+  $("driveBtn").hidden = !p.can_edit || P.driveBusy;
+  $("driveBtn").textContent = on ? "Upload again" : "Upload to your Drive";
+  $("driveLine").hidden = !on && !P.driveBusy;
+  if (P.driveBusy) return;
+  if (!on) return;
+  $("driveLine").innerHTML = `<span>☁️ On your Drive · uploaded ${esc(ago(on.at))}${on.bytes ? ` · ${gbOf(on.bytes)}` : ""}</span>` +
+    (p.can_edit ? `<label class="row toggle-row" title="Everyone approved in your studio can bring it in from Import a project"><span>Shared with your team</span><span class="switch"><input type="checkbox" id="driveShare"${on.shared ? " checked" : ""}><span></span></span></label>` +
+      `<button class="btn small ghost" type="button" id="driveRemove">Remove from Drive</button>` : "");
+  if ($("driveShare")) $("driveShare").onchange = async (e) => {
+    try { await api("POST", "/api/drive-projects/share", { key: on.key, shared: e.target.checked }); toast(e.target.checked ? "Shared: your team can bring it in from Import a project" : "Not shared any more"); load(); }
+    catch (x) { e.target.checked = !e.target.checked; toast(x.message, true); }
+  };
+  if ($("driveRemove")) $("driveRemove").onclick = async () => {
+    if (!confirm(`Remove ${p.name} from your Drive? The client stays here; only the Drive copy goes.`)) return;
+    try { await api("POST", "/api/drive-projects/remove", { key: on.key }); toast("Removed from your Drive"); load(); } catch (x) { toast(x.message, true); }
+  };
+}
+const gbOf = (n) => (n >= 1e9 ? `${(n / 1e9).toFixed(1)} GB` : `${Math.max(1, Math.round(n / 1e6))} MB`);
+
+$("driveBtn").onclick = async () => {
+  if (!confirm(`Upload ${P.page.name} (details, brand files and videos) to your Google Drive? It's only shared if you turn Share on afterwards.`)) return;
+  let job;
+  try { job = await api("POST", `/api/projects/${enc(projectId)}/drive`); } catch (e) { return toast(e.message, true); }
+  window.dispatchEvent(new Event("editorshub:jobs"));
+  P.driveBusy = true;
+  $("driveBtn").hidden = true;
+  $("driveLine").hidden = false;
+  while (job.state === "running") {
+    const pct = job.total_bytes ? Math.floor((job.done_bytes / job.total_bytes) * 100) : 0;
+    $("driveLine").innerHTML = `<span>☁️ ${esc(job.stage || "Uploading")} · ${pct}%</span>`;
+    await new Promise((r) => setTimeout(r, 1000));
+    try { job = await api("GET", `/api/jobs/${job.id}`); } catch (e) { break; }
+  }
+  P.driveBusy = false;
+  if (job.state === "done") toast(`${P.page.name} is on your Drive`); else toast(job.message || "The upload didn't finish", true);
+  load();
+};
 
 $("saveBtn").onclick = async () => {
   const f = $("saveForm"), styles = usedStyles(), n = P.page.videos.length;

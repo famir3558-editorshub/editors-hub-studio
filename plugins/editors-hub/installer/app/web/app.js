@@ -52,6 +52,14 @@ function fmtSize(n) {
   return `${n.toFixed(i ? 1 : 0)} ${u[i]}`;
 }
 
+// what the service saw of the client's looks at the draft on their link
+function viewsText(link) {
+  const w = link && link.views;
+  if (!w) return "👀 Your client hasn't opened this draft yet.";
+  return `👀 Your client opened it ${ago(new Date(w.first * 1000).toISOString())}${w.opens > 1 ? `, ${w.opens} times` : ""}, and watched ${w.pct}% of it` +
+    (w.last - w.first > 60 ? ` (last look ${ago(new Date(w.last * 1000).toISOString())})` : "") + ".";
+}
+
 function ago(iso) {
   if (!iso) return "";
   const s = (Date.now() - new Date(iso).getTime()) / 1000;
@@ -380,7 +388,7 @@ if (!location.pathname.startsWith("/signin")) refreshActivity();
 
 
 // a job's words and numbers, for bars shown on a style card or page
-const JOB_VERB = { "online-upload": "Uploading online", "online-download": "Downloading", export: "Saving to a drive",
+const JOB_VERB = { "online-upload": "Uploading online", "online-download": "Downloading", export: "Saving to a drive", "project-upload": "Uploading to your Drive", "project-download": "Bringing in",
                    duplicate: "Duplicating", import: "Bringing in", "project-import": "Bringing in" };
 function jobLine(j) {
   const pct = j.total_bytes ? Math.min(100, (j.done_bytes / j.total_bytes) * 100) : 0;
@@ -590,10 +598,11 @@ function openShareDialog(v, onChange = () => {}) {
     } else {
       dlg.innerHTML = `<form method="dialog"><h2>Share “${esc(v.name)}”</h2>
         <div class="share-link"><input id="shUrl" readonly value="${esc(link.url)}"><button type="button" class="btn primary" id="shCopy">Copy</button></div>
+        <p class="share-seen">${esc(viewsText(link))}</p>
         <p class="ask-text muted small-print">The link shows v${link.version}${link.client_draft ? `, which your client sees as Draft ${link.client_draft}` : ""}.${link.version < latest ? ` v${latest} is newer: pick it below and press Update the link: the same link then plays it.` : !link.qualities ? " It was shared before quality choices: press Update the link to add them." : " A new draft goes on it only when you pick it here."} Anyone who has the link can watch it, so send it only to your client.</p>
         ${pick(link.version < latest ? latest : link.version)}<div class="share-row share-row-end"><button type="button" class="btn" id="shSwap">Update the link</button></div>
         ${opts(link)}<div class="share-progress" id="shProg" hidden><div class="act-bar"><div></div></div><small></small></div><p class="share-err">${esc(message)}</p>
-        <div class="actions"><button type="button" class="btn danger" id="shOff">Turn off the link</button><span style="flex:1"></span><a class="btn ghost" href="${esc(link.url)}" target="_blank" rel="noopener">Open</a><button type="button" class="btn" data-close>Done</button></div></form>`;
+        <div class="actions"><button type="button" class="btn danger" id="shOff">Turn off the link</button><span style="flex:1"></span><a class="btn ghost" href="${esc(link.url)}?o=1" target="_blank" rel="noopener" title="Opening it yourself doesn't count as your client watching">Open</a><button type="button" class="btn" data-close>Done</button></div></form>`;
       dlg.querySelector("#shCopy").onclick = async () => {
         try { await navigator.clipboard.writeText(link.url); toast("Link copied"); } catch (e) { dlg.querySelector("#shUrl").select(); }
       };

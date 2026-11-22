@@ -300,3 +300,9 @@ dialog.whats-new li { display: flex; gap: 10px; line-height: 1.45; }
 dialog.whats-new .wn-ico { flex: none; width: 16px; text-align: center; opacity: .8; }
 dialog.whats-new .wn-fixed .wn-ico { color: #3fb27f; }
 dialog.whats-new .wn-new .wn-ico { color: #e5484d; }
+
+.drive-projects { display: grid; gap: 6px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 12px; background: rgba(0, 0, 0, 0.2); }
+.drive-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.drive-line { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 16px; margin: 10px 0 0; font-size: 13.5px; }
+.drive-line .toggle-row { gap: 10px; padding: 0; }
+.share-seen { margin: 6px 0 0; font-size: 13.5px; }

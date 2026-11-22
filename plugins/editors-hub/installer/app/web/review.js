@@ -92,7 +92,8 @@ function render() {
   if (isLocked()) $("changesBtn").disabled = true;
   $("approvedBar").hidden = !v.approved;
   if (v.approved) $("approvedBar").textContent = `✓ v${v.approved.version} approved ${ago(v.approved.at)}`;
-  $("shareBtn").textContent = v.link ? `Shared · v${v.link.version}` : "Share";
+  $("shareBtn").textContent = v.link ? `Shared · v${v.link.version}${v.link.views ? ` · 👀 ${v.link.views.pct}%` : ""}` : "Share";
+  $("shareBtn").title = v.link ? viewsText(v.link) : "";
   $("shareBtn").classList.toggle("on", !!v.link);
   const inc = v.incoming;
   $("incomingNote").hidden = !inc || !maker();

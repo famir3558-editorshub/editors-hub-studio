@@ -1527,6 +1527,16 @@ def pull_link_notes_soon(vid):
         threading.Thread(target=lambda: pull_link_notes(vid), daemon=True).start()
 
 
+LINK_VIEWS = "link-views.json"  # what the service says about each client link's drafts being opened and watched
+
+
+def link_views_for(link):
+    """When the client opened the draft on this link, how often, and how far they watched: {first, last, opens, pct}, or None."""
+    if not link or not link.get("key"):
+        return None
+    return ((read_json(DATA / LINK_VIEWS, {}) or {}).get(link["key"]) or {}).get(f"v{link.get('version')}")
+
+
 def link_watch():
     """Once a minute, one small answer from the service says how many comments each of this person's links has; only a
     link with more than last time is asked for its comments. (Asking every link every time used up the service's day.)"""
@@ -1542,7 +1552,11 @@ def link_watch():
         except Exception:  # never stops the comments
             pass
         try:
-            counts = approval.shared_call(DATA, "/links/activity")["links"]
+            answer = approval.shared_call(DATA, "/links/activity")
+            counts = answer["links"]
+            views = answer.get("views") or {}
+            if views != (read_json(DATA / LINK_VIEWS, {}) or {}):
+                write_json(DATA / LINK_VIEWS, views)
         except (approval.ApprovalError, OSError, KeyError, TypeError, ValueError):
             continue
         for vid, d in list(video_dirs().items()):
@@ -4825,6 +4839,11 @@ def phone_commands():
             elif op == "render":
                 set_render_choice(vid, args.get("choice") or {}, by=f"{owner.get('username') or 'Owner'} (phone)")
                 done(c, True, f"Render settings chosen for {name}: the draft is being made")
+            elif op == "note":
+                version = int(args.get("version") or latest_version(v))
+                add_note(vid, version, float(args.get("t") or 0), str(args.get("text") or ""), author=owner.get("username") or "Owner", author_email=owner["email"])
+                t = float(args.get("t") or 0)
+                done(c, True, f"Note added to draft {version} of {name} at {int(t // 60)}:{int(t % 60):02d}")
             elif op == "retry":
                 if not v.get("ready_failed"):
                     raise StudioError(f"{name} has no failed upload to try again.")
@@ -4916,7 +4935,8 @@ def phone_snapshot():
                 **({"link_key": v["link"].get("key"), "watch": v["link"].get("url"), "link_version": v["link"].get("version"),
                     "link_download": bool(v["link"].get("download")), "link_comments": bool(v["link"].get("comments")),
                     "link_client_draft": v["link"].get("client_draft"), "link_client_count": v["link"].get("client_count")} if v.get("link") else {}),
-                "versions": [d["version"] for d in v["drafts"]][-PHONE_SNAP_VERSIONS:]}
+                "versions": [d["version"] for d in v["drafts"]][-PHONE_SNAP_VERSIONS:],
+                "up": {k: u["file_id"] for k, u in sorted((v.get("uploads") or {}).items(), key=lambda x: int(x[0]))[-3:] if u.get("file_id")}}
         req = v.get("render_request") or {}
         if req.get("status") == "waiting":
             item["render"] = {"draft": req.get("draft"), "note": str(req.get("note") or "")[:300], "source": req.get("source") or {},
@@ -6215,6 +6235,163 @@ def export_project_to(project_id, dest_parent, user=None):
     return start_job("export", f"Saving {manifest['name']}", user, work)
 
 
+PROJECT_UPLOADS = ".project-uploads"
+PROJECT_ONLINE_ZIP = ".editors-hub-project.zip"
+
+
+def project_online_list(user=None):
+    """The projects on the owner's Drive this person can see: their own, and what others shared."""
+    if not approval.config():
+        return []
+    try:
+        items = approval.shared_call(DATA, "/projects/list").get("projects") or []
+    except approval.ApprovalError as e:
+        raise StudioError(str(e))
+    here = {pid: (project_meta(d).get("online") or {}).get("key") for pid, d in project_dirs().items()}
+    return [{**p, "here": p["key"] in here.values() or p["id"] in here} for p in items]
+
+
+def upload_project_online(project_id, user=None):
+    """Packs the client (details, brand, videos) and uploads it to the owner's Drive. Only when someone presses Upload:
+    nothing is uploaded on its own. A stopped upload carries on from where it got to (the packed copy is kept)."""
+    if not approval.config():
+        raise StudioError("Uploading to the Drive needs this computer approved by the studio's owner.")
+    d = project_dir(project_id)
+    meta = project_meta(d)
+    if not can_edit_project(meta, user):
+        raise auth.Forbidden("Only the person who made this client, or the owner, can upload it.")
+    files = transfer_files(d)
+    sig = hashlib.sha1(json.dumps([(rel, f.stat().st_size, int(f.stat().st_mtime)) for rel, f in files]).encode()).hexdigest()
+    keep = library() / PROJECT_UPLOADS / project_id
+    pack = keep / f"{project_id}{PROJECT_ONLINE_ZIP}"
+    info = read_json(keep / "upload.json", {}) or {}
+    fresh = info.get("sig") == sig and pack.is_file()
+    total = sum(f.stat().st_size for _, f in files)
+    if not fresh and shutil.disk_usage(library()).free < total * 1.05 + 100_000_000:
+        raise StudioError(f"Not enough space to pack it: uploading needs about {total / 1e9:.1f} GB free for a moment.")
+    named = {}
+    if user is not None and user["email"] != (approval.status(DATA).get("email") or "").strip().lower():
+        named = {"from_name": user["username"]}
+
+    def work(job):
+        nonlocal info
+        if not fresh:
+            shutil.rmtree(keep, ignore_errors=True)
+            keep.mkdir(parents=True)
+            manifest = project_manifest(d, files)
+            job["done_bytes"], job["total_bytes"], job["stage"] = 0, manifest["bytes"], "Packing the client"
+            part = keep / (pack.name + ".part")
+            try:
+                with open(part, "wb") as fh, zipfile.ZipFile(fh, "w", zipfile.ZIP_STORED, allowZip64=True) as zf:
+                    zf.writestr(f"{d.name}/{PROJECT_MANIFEST}", json.dumps(manifest, indent=1))
+                    for rel, f in files:
+                        check_stop(job)
+                        zf.write(f, f"{d.name}/{rel}")
+                        job["done_bytes"] += f.stat().st_size
+                os.replace(part, pack)
+            except BaseException:
+                shutil.rmtree(keep, ignore_errors=True)
+                raise
+            info = {"sig": sig, "size": pack.stat().st_size}
+            write_json(keep / "upload.json", info)
+        size = info["size"]
+        job["done_bytes"], job["total_bytes"] = 0, size
+        url, sent, got = info.get("url"), 0, None
+        if url and time.time() - info.get("url_ts", 0) < RESUME_KEEP:
+            held = drive_held(url, size)
+            if held:
+                sent, got = held
+                job["stage"] = f"Carrying on from {sent / 1e6:,.0f} MB"
+            else:
+                url = None
+        if not url:
+            check_stop(job)
+            try:
+                url = approval.shared_call(DATA, "/projects/start", id=project_id, name=meta["name"], bytes=size)["upload_url"]
+            except approval.ApprovalError as e:
+                raise StudioError(str(e))
+            info.update(url=url, url_ts=time.time())
+            write_json(keep / "upload.json", info)
+        if not got:
+            job["stage"] = "Uploading to your Drive"
+            got = drive_upload_file(url, pack, job, sent)
+        job["stage"] = "Finishing"
+        try:
+            r = approval.shared_call(DATA, "/projects/finish", id=project_id, name=meta["name"], file_id=got.get("id"),
+                                     notes=str(meta.get("about") or "")[:400], **named)["project"]
+        except approval.ApprovalError as e:
+            raise StudioError(str(e))
+        with LOCK:
+            data = read_json(d / "project.json", {}) or {}
+            data["online"] = {"key": r["key"], "at": now(), "shared": r["shared"], "bytes": size}
+            write_json(d / "project.json", data)
+        shutil.rmtree(keep, ignore_errors=True)
+        return {"name": meta["name"], "bytes": size, "key": r["key"], "shared": r["shared"]}
+    return start_job("project-upload", f"Uploading {meta['name']} to your Drive", user, work)
+
+
+def share_project_online(key, shared, user=None):
+    try:
+        r = approval.shared_call(DATA, "/projects/share", key=key, shared=bool(shared))["project"]
+    except approval.ApprovalError as e:
+        raise StudioError(str(e))
+    for pid, d in project_dirs().items():
+        with LOCK:
+            data = read_json(d / "project.json", {}) or {}
+            if (data.get("online") or {}).get("key") == key:
+                data["online"]["shared"] = r["shared"]
+                write_json(d / "project.json", data)
+    return r
+
+
+def remove_project_online(key, user=None):
+    try:
+        approval.shared_call(DATA, "/projects/remove", key=key)
+    except approval.ApprovalError as e:
+        raise StudioError(str(e))
+    for pid, d in project_dirs().items():
+        with LOCK:
+            data = read_json(d / "project.json", {}) or {}
+            if (data.get("online") or {}).get("key") == key:
+                data.pop("online")
+                write_json(d / "project.json", data)
+    return {"ok": True}
+
+
+def download_project_online(key, user=None):
+    """Brings a project from the Drive into this studio, like Import a project (a client already here keeps theirs)."""
+    if user is not None and user["role"] == "reviewer":
+        raise auth.Forbidden("Your account can't do that. Ask the owner.")
+    item = next((p for p in project_online_list(user) if p["key"] == key), None)
+    if not item:
+        raise NotFound("That project isn't on the Drive any more.")
+    if shutil.disk_usage(library()).free < item["bytes"] * 2.1 + 100_000_000:
+        raise StudioError(f"Not enough space: bringing it in needs about {item['bytes'] * 2 / 1e9:.1f} GB free for a moment.")
+
+    def work(job):
+        job["total_bytes"], job["stage"] = item["bytes"], "Downloading"
+        tmp = library() / f".online-{secrets.token_hex(4)}"
+        tmp.mkdir()
+        try:
+            whole = tmp / f"{item['id']}{PROJECT_ONLINE_ZIP}"
+            drive_download_file(key, whole, item["bytes"], job, opener=approval.open_shared_project)
+            job["stage"], job["done_bytes"] = "Unpacking and checking every file", 0
+            inner = import_project_from(whole, user, remove_after=True)
+            while inner["state"] == "running":
+                if job.get("stop"):
+                    inner["stop"] = True
+                job["done_bytes"], job["total_bytes"] = inner["done_bytes"], inner["total_bytes"] or item["bytes"]
+                time.sleep(0.3)
+            if inner["state"] == "stopped":
+                raise JobStopped()
+            if inner["state"] != "done":
+                raise StudioError(inner["message"])
+            return {**inner["result"], "from": f"your Drive, uploaded by {item.get('maker_name')}"}
+        finally:
+            shutil.rmtree(tmp, ignore_errors=True)
+    return start_job("project-download", f"Bringing in {item['name']} from your Drive", user, work)
+
+
 def read_project_export(path):
     """A saved client: a folder with editors-hub-project.json, or a .zip holding one. Returns (manifest, kind)."""
     path = Path(path)
@@ -6861,7 +7038,8 @@ def drive_share_style(style_id, user=None):
                      again=lambda: drive_share_style(style_id, user))
 
 
-def drive_download_file(key, dest, size, job):
+def drive_download_file(key, dest, size, job, opener=None):
+    opener = opener or approval.open_shared_style
     tries = 0
     while True:
         check_stop(job)
@@ -6869,7 +7047,7 @@ def drive_download_file(key, dest, size, job):
         if have >= size:
             return
         try:
-            with approval.open_shared_style(DATA, key, have) as resp, open(dest, "ab" if have else "wb") as out:
+            with opener(DATA, key, have) as resp, open(dest, "ab" if have else "wb") as out:
                 while True:
                     check_stop(job)
                     chunk = resp.read(1 << 20)
@@ -7671,6 +7849,9 @@ class Handler(BaseHTTPRequestHandler):
                     return self.send_json({"items": project_files(project_dir(parts[2]), parts[4])})
                 if parts[3:] == ["download"]:
                     return self.send_project_zip(parts[2])
+            if parts == ["api", "drive-projects"]:
+                self.need("owner", "editor")
+                return self.send_json({"projects": project_online_list(self.user), "approved": bool(approval.config())})
             if parts[:2] == ["api", "styles"] and len(parts) == 4 and parts[3] == "cover":
                 self.need("owner", "editor")
                 cover = style_cover(style_dir(parts[2], self.user))
@@ -7731,6 +7912,8 @@ class Handler(BaseHTTPRequestHandler):
                 return self.send_json(hubsetup.snapshot())
             if parts[:2] == ["api", "videos"] and len(parts) == 3:
                 view = video_view(load_video(parts[2]))
+                if view.get("link"):
+                    view["link"] = {**view["link"], "views": link_views_for(view["link"])}
                 if view.get("link"):
                     pull_link_notes_soon(parts[2])
                 if role == "reviewer":
@@ -7914,6 +8097,14 @@ class Handler(BaseHTTPRequestHandler):
                                                  body.get("about", ""), body.get("brand", ""), self.user))
         if method == "POST" and parts == ["api", "import-project"]:
             return self.send_json(import_project_from(body.get("path"), self.user))
+        if method == "POST" and parts[:2] == ["api", "projects"] and parts[3:] == ["drive"]:
+            return self.send_json(upload_project_online(parts[2], self.user))
+        if method == "POST" and parts == ["api", "drive-projects", "share"]:
+            return self.send_json(share_project_online(str(body.get("key", "")), body.get("shared"), self.user))
+        if method == "POST" and parts == ["api", "drive-projects", "remove"]:
+            return self.send_json(remove_project_online(str(body.get("key", "")), self.user))
+        if method == "POST" and parts == ["api", "drive-projects", "download"]:
+            return self.send_json(download_project_online(str(body.get("key", "")), self.user))
         if method == "POST" and parts[:2] == ["api", "projects"] and parts[3:] == ["export"]:
             return self.send_json(export_project_to(parts[2], body.get("dest"), self.user))
         if method == "POST" and parts[:2] == ["api", "projects"] and len(parts) == 3:
