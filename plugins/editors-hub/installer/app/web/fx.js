@@ -8,8 +8,13 @@
     if (ctx.state === "suspended") ctx.resume().catch(() => {});
     return ctx;
   }
-  // unlock audio on the first touch, so later events can play
-  ["pointerdown", "keydown", "touchend"].forEach((ev) => window.addEventListener(ev, () => { if (on()) ac(); }, { once: true, passive: true }));
+  // a sound the browser blocked (the page hasn't been clicked yet) plays on the first click, if that comes soon
+  let pending = null;
+  ["pointerdown", "keydown", "touchend"].forEach((ev) => window.addEventListener(ev, () => {
+    if (!on()) return;
+    const c = ac();
+    if (pending && c) { const p = pending; pending = null; if (Date.now() - p.at < 10000) (c.state === "running" ? Promise.resolve() : c.resume()).then(() => { try { SOUNDS[p.name](); } catch (e) {} }).catch(() => {}); }
+  }, { passive: true }));
   function tone(f, t0, dur, vol, type) {
     const c = ac(); if (!c) return;
     const o = c.createOscillator(), g = c.createGain(), t = c.currentTime + t0;
@@ -35,6 +40,9 @@
     if (!on() || !SOUNDS[name]) return;
     const now = Date.now(); if (now - (last[name] || 0) < 700) return;  // a burst of the same event plays once
     last[name] = now;
+    const c = ac();
+    if (!c) return;
+    if (c.state !== "running") { pending = { name, at: now }; c.resume().then(() => { if (c.state === "running" && pending && pending.name === name) { pending = null; try { SOUNDS[name](); } catch (e) {} } }).catch(() => {}); return; }
     try { SOUNDS[name](); } catch (e) {}
   }
   // the party popper: confetti from both bottom corners, with a card in the middle

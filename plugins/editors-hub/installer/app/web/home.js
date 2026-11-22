@@ -1275,6 +1275,7 @@ async function tellIfUpdated() {
   if (!version || document.querySelector("dialog[open]")) return;
   await api("POST", "/api/update-seen", {}).catch(() => {});  // first, so a reload while it's showing doesn't tell them twice
   const r = await api("GET", "/api/whats-new?since-update=1").catch(() => null);
+  if (window.EHFX) EHFX.play("ask");
   if (!r || !r.notes.length) return ehConfirm(`Your studio updated itself to version ${version}. Your videos, clients and styles are all still here.`, { title: "You're on the newest version", ok: "Got it", cancel: "" });
   showWhatsNew(r.notes, `Your studio updated itself to version ${version}. Your videos, clients and styles are all still here.`, "You're on the newest version");
 }

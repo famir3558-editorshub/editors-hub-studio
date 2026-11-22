@@ -461,6 +461,16 @@ function bellDraw() {
   if (panel.dataset.html !== html) { panel.innerHTML = html; panel.dataset.html = html; }
 }
 
+// the popups that ask you something chime as they open: what's new, render settings, the b-roll picker
+new MutationObserver((list) => {
+  for (const m of list) {
+    const d = m.target;
+    if (d.tagName === "DIALOG" && d.open && !d.dataset.chimed && (d.classList.contains("whats-new") || d.id === "renderDlg" || d.id === "brollDlg" || d.dataset.chime)) {
+      d.dataset.chimed = "1"; if (window.EHFX) EHFX.play("ask");
+    } else if (d.tagName === "DIALOG" && !d.open) delete d.dataset.chimed;
+  }
+}).observe(document.documentElement, { subtree: true, attributes: true, attributeFilter: ["open"] });
+
 function bellFx() {
   const d = Bell.data; if (!d) return;
   const ids = [...d.needs, ...d.recent].map((x) => String(x.id));

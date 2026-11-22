@@ -2,6 +2,10 @@
 
 Shown in the studio after it updates. Each version: `## 1.2.3`, then `### New`, `### Better` or `### Fixed`, with one plain line per change.
 
+## 1.40.3
+### Better
+- The popups that ask you something chime as they open: what's new after an update, render settings and the b-roll picker. A sound that comes before you've clicked anywhere on the page (browsers block those) now plays on your first click instead of being lost.
+
 ## 1.40.2
 ### Better
 - Sounds on every studio page, not just the review page: each new notification in the bell plays a sound, and a new draft or an approval gets the party popper, wherever you are in the studio. Switch them off or on in Settings → Sounds.
