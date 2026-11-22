@@ -16,6 +16,7 @@
   <a class="logo" href="/"></a>
   <nav class="crumbs"><a href="/">‹ Your videos</a><span>/</span><span id="vClient"></span><b id="vName">…</b></nav>
   <div class="spacer"></div>
+  <button class="btn small ghost" id="soundBtn" type="button" title="Sounds on or off" aria-label="Sounds on or off">🔊</button>
   <span class="claude-state" id="claudeState"></span>
   <select id="statusSel" title="Status" data-maker></select>
   <button class="btn small" id="shareBtn" data-maker title="A private link for your client: no sign-in">Share</button>
@@ -165,6 +166,7 @@
 <div class="dropveil" id="dropVeil"><div>Drop to add a new draft</div></div>
 <div class="uploading" id="uploading" hidden><span id="upText">Uploading…</span><div class="progress"><div id="upBar"></div></div></div>
 <div id="toast"></div>
+<script src="/static/fx.js"></script>
 <script src="/static/app.js"></script>
 <script src="/static/review.js"></script>
 </body>

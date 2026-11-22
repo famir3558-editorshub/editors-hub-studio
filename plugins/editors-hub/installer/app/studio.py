@@ -4486,6 +4486,24 @@ def phone_pic(folder, rel):
     return base64.b64encode(r.stdout).decode() if r.returncode == 0 and 0 < len(r.stdout) <= 110000 else None
 
 
+PHONE_BOARD_CLIPS = 400
+
+
+def phone_board(v):
+    """What the phone's Live preview needs besides the updates: the edit's length, tracks and step, and which preview frames go with it."""
+    p = v.get("progress") or {}
+    clips = [[c["track"], round(float(c["start"]), 2), round(float(c["end"]), 2)] for c in p.get("clips", []) if c.get("track")][-PHONE_BOARD_CLIPS:]
+    frames = preview_frames(v) or {}
+    return {"total": p.get("total") or 0, "pos": p.get("pos"), "step": p.get("step") or "", "steps": p.get("steps") or [], "draft": p.get("draft"),
+            "clips": clips, "frames": {"label": frames.get("label", ""), "duration": frames.get("duration") or 0, "n": len(frames.get("items") or [])}}
+
+
+def phone_frames(v):
+    """The preview frames (from the latest draft or the raw clip), small, with their place, for the phone."""
+    frames = preview_frames(v) or {}
+    return [{"id": -(i + 1), "at": f.get("at") or 0, "pic": phone_pic(v["folder"], f.get("file"))} for i, f in enumerate(frames.get("items") or [])]
+
+
 def phone_live_send():
     """Sends each edit's new Live updates to the phone. Only video.json files that changed are read."""
     s = settings()
@@ -4512,8 +4530,17 @@ def phone_live_send():
         fresh = [u for u in ups if int(u["id"]) > last]
         p = v.get("progress") or {}
         recent = time.time() - (p.get("last") or 0) < PHONE_LIVE_HOURS * 3600
+        board = phone_board(v) if p and recent else None
+        bsig = hashlib.sha256(json.dumps(board, sort_keys=True).encode()).hexdigest()[:16] if board else None
+        fkey = f"{board['frames']['label']}:{board['frames']['n']}" if board and board["frames"]["n"] else None
+        if board and (bsig != mark.get("b") or fkey != mark.get("f")) and not fresh:  # only the timeline or the frames changed
+            try:
+                approval.shared_call(DATA, "/app/live-push", video=vid, items=[], board=board, **({"frames": phone_frames(v)} if fkey != mark.get("f") else {}))
+                mark = {**mark, "b": bsig, "f": fkey}
+            except approval.ApprovalError:
+                continue
         if not fresh or not p or not recent:
-            sent[vid] = {"id": max([last] + [int(u["id"]) for u in ups]), "m": mtime}
+            sent[vid] = {**mark, "id": max([last] + [int(u["id"]) for u in ups]), "m": mtime}
             dirty = True
             continue
         if not mark:
@@ -4522,15 +4549,22 @@ def phone_live_send():
         for i in range(0, len(fresh), PHONE_LIVE_BATCH):
             part = fresh[i:i + PHONE_LIVE_BATCH]
             items = [{"id": u["id"], "at": u.get("at", ""), "text": u.get("text", ""), "step": u.get("step", ""), "draft": u.get("draft") or 0,
-                      "pic": phone_pic(v["folder"], u.get("image"))} for u in part]
+                      "pos": u.get("pos"), "pic": phone_pic(v["folder"], u.get("image"))} for u in part]
+            extra = {}
+            if i == 0 and board:
+                extra["board"] = board
+                if fkey != mark.get("f"):
+                    extra["frames"] = phone_frames(v)
             try:
-                approval.shared_call(DATA, "/app/live-push", video=vid, items=items)
+                approval.shared_call(DATA, "/app/live-push", video=vid, items=items, **extra)
             except approval.ApprovalError:
                 ok = False
                 break
+            if extra:
+                mark = {**mark, "b": bsig, "f": fkey}
             last = int(part[-1]["id"])
             n += len(part)
-        sent[vid] = {"id": last, "m": mtime if ok else None}
+        sent[vid] = {**mark, "id": last, "m": mtime if ok else None}
         dirty = True
     if dirty:
         write_json(path, sent)

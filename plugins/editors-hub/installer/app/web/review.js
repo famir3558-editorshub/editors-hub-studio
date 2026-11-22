@@ -23,6 +23,7 @@ async function load(first) {
   }
   const raw = JSON.stringify(v);
   if (raw === R.raw) return;
+  const prev = R.v;
   const prevLatest = R.v?.latest;
   if (R.v && !R.v.drafts.length && v.drafts.length) R.side = "notes";  // the first draft is here: on to watching it
   R.raw = raw;
@@ -35,6 +36,29 @@ async function load(first) {
     if (prevLatest) toast(`v${v.latest} is here`);
   }
   render();
+  if (!first && prev) fxChanges(prev, v);
+}
+
+// sounds and the party popper for what just changed (web/fx.js)
+function fxChanges(prev, v) {
+  if (!window.EHFX) return;
+  const asking = (x) => x?.broll && ["mode", "picking", "review"].includes(x.broll.stage) ? `${x.broll.stage}-${x.broll.ask}` : "";
+  if (v.status === "approved" && prev.status !== "approved") return EHFX.celebrate("approved", `${v.name} is approved 🎉`);
+  if ((v.latest || 0) > (prev.latest || 0)) return EHFX.celebrate("draft", `Draft ${v.latest} is ready 🎉`);
+  const req = v.render_request, was = prev.render_request;
+  if (maker() && req?.status === "waiting" && !(was?.status === "waiting" && was.id === req.id)) return EHFX.play("ask");
+  if (maker() && asking(v) && asking(v) !== asking(prev)) return EHFX.play("ask");
+  const lastId = (x) => (x.updates || []).reduce((m, u) => Math.max(m, u.id || 0), 0);
+  if (lastId(v) > lastId(prev)) EHFX.play("update");
+}
+
+{  // the sound switch in the top bar
+  const b = $("soundBtn");
+  if (b && window.EHFX) {
+    const show = () => { b.textContent = EHFX.on() ? "🔊" : "🔇"; b.title = EHFX.on() ? "Sounds are on" : "Sounds are off"; };
+    b.onclick = () => { EHFX.set(!EHFX.on()); show(); if (EHFX.on()) EHFX.play("update"); };
+    show();
+  }
 }
 
 const draft = () => R.v.drafts.find((d) => d.version === R.version);
